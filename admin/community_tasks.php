@@ -13,15 +13,57 @@ $error = '';
 // Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
+    if ($_POST['action'] === 'approve_task') {
+        $tid = intval($_POST['task_id'] ?? 0);
+        $task = $conn->query("SELECT * FROM community_task WHERE task_id = $tid AND status = 'under-review'")->fetch_assoc();
+        
+        if ($task) {
+            $uid = $task['user_id'];
+            $reward = $task['credit_reward'];
+            
+            $conn->begin_transaction();
+            try {
+                // 1. Mark task completed
+                $conn->query("UPDATE community_task SET status = 'completed', completed_at = NOW() WHERE task_id = $tid");
+                
+                // 2. Add credits to user wallet
+                $existing = $conn->query("SELECT * FROM wallet WHERE user_id = $uid")->fetch_assoc();
+                if ($existing) {
+                    $conn->query("UPDATE wallet SET balance = balance + $reward WHERE user_id = $uid");
+                } else {
+                    $conn->query("INSERT INTO wallet (user_id, balance) VALUES ($uid, $reward)");
+                }
+                
+                // 3. Log transaction (from_user_id is NULL for system rewards)
+                $stmt = $conn->prepare("INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note) VALUES (NULL, NULL, ?, 'community_reward', ?, ?, 'Task #$tid completed')");
+                $stmt->bind_param("idd", $uid, $reward, $reward);
+                $stmt->execute();
+                $stmt->close();
+                
+                $conn->commit();
+                $success = "Task #$tid approved! $reward TC awarded to the user.";
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = "Approval failed: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($_POST['action'] === 'reject_task') {
+        $tid = intval($_POST['task_id'] ?? 0);
+        $conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, submission_note = NULL, assigned_at = CURRENT_TIMESTAMP WHERE task_id = $tid");
+        $success = "Task #$tid rejected and returned to the pending pool.";
+    }
+
     if ($_POST['action'] === 'add_task') {
         $task_type = trim($_POST['task_type'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $location = trim($_POST['location'] ?? '');
-        $rep_boost = floatval($_POST['rep_boost'] ?? 0.25);
+        $credit_reward = floatval($_POST['credit_reward'] ?? 5.00);
 
         if ($task_type && $description) {
-            $stmt = $conn->prepare("INSERT INTO community_task (task_type, description, location, rep_boost, status) VALUES (?, ?, ?, ?, 'pending')");
-            $stmt->bind_param("sssd", $task_type, $description, $location, $rep_boost);
+            $stmt = $conn->prepare("INSERT INTO community_task (task_type, description, location, credit_reward, status) VALUES (?, ?, ?, ?, 'pending')");
+            $stmt->bind_param("sssd", $task_type, $description, $location, $credit_reward);
             if ($stmt->execute()) {
                 $success = "Task created successfully! It's now available for users to accept.";
             } else {
@@ -38,12 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $task_type = trim($_POST['task_type'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $location = trim($_POST['location'] ?? '');
-        $rep_boost = floatval($_POST['rep_boost'] ?? 0.25);
+        $credit_reward = floatval($_POST['credit_reward'] ?? 5.00);
         $status = $_POST['status'] ?? 'pending';
 
         if ($tid > 0 && $task_type && $description) {
-            $stmt = $conn->prepare("UPDATE community_task SET task_type = ?, description = ?, location = ?, rep_boost = ?, status = ? WHERE task_id = ?");
-            $stmt->bind_param("sssdsi", $task_type, $description, $location, $rep_boost, $status, $tid);
+            $stmt = $conn->prepare("UPDATE community_task SET task_type = ?, description = ?, location = ?, credit_reward = ?, status = ? WHERE task_id = ?");
+            $stmt->bind_param("sssdsi", $task_type, $description, $location, $credit_reward, $status, $tid);
             if ($stmt->execute()) {
                 $success = "Task #$tid updated.";
             }
@@ -65,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'reset_task') {
         $tid = intval($_POST['task_id'] ?? 0);
-        $conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, completed_at = NULL WHERE task_id = $tid");
+        $conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, completed_at = NULL, submission_note = NULL WHERE task_id = $tid");
         $success = "Task #$tid reset to pending and unassigned.";
     }
 }
@@ -73,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Status filter
 $status_filter = trim($_GET['status'] ?? '');
 $where_clause = '';
-if ($status_filter !== '' && in_array($status_filter, ['pending', 'in-progress', 'completed', 'cancelled'])) {
+if ($status_filter !== '' && in_array($status_filter, ['pending', 'in-progress', 'under-review', 'completed', 'cancelled'])) {
     $where_clause = "WHERE ct.status = '$status_filter'";
 }
 
@@ -81,6 +123,7 @@ if ($status_filter !== '' && in_array($status_filter, ['pending', 'in-progress',
 $count_all = $conn->query("SELECT COUNT(*) AS cnt FROM community_task")->fetch_assoc()['cnt'];
 $count_pending = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'pending'")->fetch_assoc()['cnt'];
 $count_progress = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'in-progress'")->fetch_assoc()['cnt'];
+$count_review = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'under-review'")->fetch_assoc()['cnt'];
 $count_completed = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'completed'")->fetch_assoc()['cnt'];
 $count_cancelled = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'cancelled'")->fetch_assoc()['cnt'];
 
@@ -129,6 +172,10 @@ include __DIR__ . '/../includes/admin_header.php';
         <span class="stat-value"><?php echo $count_progress; ?></span>
         <span class="stat-label">In Progress</span>
     </div>
+    <div class="stat-card stat-card-accent" style="--accent: #9c27b0; cursor:pointer;" onclick="location.href='?status=under-review'">
+        <span class="stat-value"><?php echo $count_review; ?></span>
+        <span class="stat-label">Under Review</span>
+    </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='?status=completed'">
         <span class="stat-value"><?php echo $count_completed; ?></span>
         <span class="stat-label">Completed</span>
@@ -149,6 +196,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <a href="?" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
             <a href="?status=pending" class="filter-tab <?php echo $status_filter === 'pending' ? 'active' : ''; ?>">Pending</a>
             <a href="?status=in-progress" class="filter-tab <?php echo $status_filter === 'in-progress' ? 'active' : ''; ?>">In Progress</a>
+            <a href="?status=under-review" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
             <a href="?status=completed" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">Completed</a>
             <a href="?status=cancelled" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
         </div>
@@ -163,7 +211,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     <th>Type</th>
                     <th>Description</th>
                     <th>Location</th>
-                    <th>Rep Boost</th>
+                    <th>Reward</th>
                     <th>Assigned To</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -175,18 +223,24 @@ include __DIR__ . '/../includes/admin_header.php';
                     $sc = 'badge-warning';
                     if ($t['status'] === 'completed') $sc = 'badge-success';
                     elseif ($t['status'] === 'in-progress') $sc = 'badge-info';
+                    elseif ($t['status'] === 'under-review') $sc = 'badge-primary';
                     elseif ($t['status'] === 'cancelled') $sc = 'badge-danger';
 
                     $desc_short = $t['description'] ? (strlen($t['description']) > 60 ? substr($t['description'], 0, 60) . '…' : $t['description']) : '—';
                 ?>
-                    <tr>
+                    <tr style="<?php echo $t['status'] === 'under-review' ? 'background-color:rgba(156,39,176,0.05);' : ''; ?>">
                         <td style="color:var(--text-muted);">#<?php echo $t['task_id']; ?></td>
                         <td><span class="badge badge-orange"><?php echo htmlspecialchars($t['task_type']); ?></span></td>
-                        <td style="max-width:220px; font-size:0.85rem;" title="<?php echo htmlspecialchars($t['description'] ?? ''); ?>">
-                            <?php echo htmlspecialchars($desc_short); ?>
+                        <td style="max-width:240px; font-size:0.85rem;">
+                            <div title="<?php echo htmlspecialchars($t['description'] ?? ''); ?>"><?php echo htmlspecialchars($desc_short); ?></div>
+                            <?php if ($t['status'] === 'under-review' && !empty($t['submission_note'])): ?>
+                                <div style="margin-top:8px; padding:6px; background:#fff; border-left:2px solid var(--primary); border-radius:4px; font-size:0.8rem; color:var(--text-secondary);">
+                                    <strong>Proof:</strong> <?php echo htmlspecialchars($t['submission_note']); ?>
+                                </div>
+                            <?php endif; ?>
                         </td>
                         <td style="font-size:0.85rem;"><?php echo htmlspecialchars($t['location'] ?? '—'); ?></td>
-                        <td><strong style="color:var(--success);">+<?php echo number_format($t['rep_boost'], 2); ?></strong></td>
+                        <td><strong style="color:var(--success);">+<?php echo number_format($t['credit_reward'], 2); ?> TC</strong></td>
                         <td>
                             <?php if ($t['assigned_user']): ?>
                                 <span><?php echo htmlspecialchars($t['assigned_user']); ?></span>
@@ -194,25 +248,51 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <span style="color:var(--text-muted); font-style:italic;">Unassigned</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="badge <?php echo $sc; ?>"><?php echo ucfirst($t['status']); ?></span></td>
+                        <td>
+                            <span class="badge <?php echo $sc; ?>">
+                                <?php 
+                                if ($t['status'] === 'under-review') echo 'Review';
+                                else echo ucfirst($t['status']); 
+                                ?>
+                            </span>
+                        </td>
                         <td style="font-size:0.82rem; color:var(--text-muted);"><?php echo date('M d, Y', strtotime($t['assigned_at'])); ?></td>
                         <td>
                             <div class="flex gap-1" style="flex-wrap:nowrap;">
-                                <!-- Edit -->
-                                <button type="button" class="btn btn-sm btn-secondary" title="Edit Task"
-                                    onclick="openEditTask(<?php echo $t['task_id']; ?>, '<?php echo addslashes(htmlspecialchars($t['task_type'])); ?>', '<?php echo addslashes(htmlspecialchars($t['description'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($t['location'] ?? '')); ?>', <?php echo $t['rep_boost']; ?>, '<?php echo $t['status']; ?>')">
-                                    &#x270E;
-                                </button>
-
-                                <?php if ($t['status'] === 'in-progress' || $t['status'] === 'completed'): ?>
-                                    <!-- Reset to pending -->
+                                
+                                <?php if ($t['status'] === 'under-review'): ?>
+                                    <!-- Approve -->
                                     <form method="POST" style="display:inline;">
-                                        <input type="hidden" name="action" value="reset_task">
+                                        <input type="hidden" name="action" value="approve_task">
                                         <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                                        <button type="submit" class="btn btn-sm btn-secondary" title="Reset to Pending"
-                                            onclick="return confirm('Reset this task to pending and unassign it?')">&#x21BA;</button>
+                                        <button type="submit" class="btn btn-sm btn-success" title="Approve Task and Award Credits"
+                                            onclick="return confirm('Approve this task? This will award <?php echo $t['credit_reward']; ?> TC to <?php echo htmlspecialchars($t['assigned_user']); ?>.')">&#x2705;</button>
                                     </form>
-                                <?php endif; ?>
+                                    <!-- Reject -->
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="action" value="reject_task">
+                                        <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Reject Task"
+                                            onclick="return confirm('Reject this submission? The task will be returned to the pending pool.')">&#x274C;</button>
+                                    </form>
+                                <?php else: ?>
+                                
+                                    <!-- Edit -->
+                                    <button type="button" class="btn btn-sm btn-secondary" title="Edit Task"
+                                        onclick="openEditTask(<?php echo $t['task_id']; ?>, '<?php echo addslashes(htmlspecialchars($t['task_type'])); ?>', '<?php echo addslashes(htmlspecialchars($t['description'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($t['location'] ?? '')); ?>', <?php echo $t['credit_reward']; ?>, '<?php echo $t['status']; ?>')">
+                                        &#x270E;
+                                    </button>
+
+                                    <?php if ($t['status'] === 'in-progress' || $t['status'] === 'completed'): ?>
+                                        <!-- Reset to pending -->
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="action" value="reset_task">
+                                            <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
+                                            <button type="submit" class="btn btn-sm btn-secondary" title="Reset to Pending"
+                                                onclick="return confirm('Reset this task to pending and unassign it?')">&#x21BA;</button>
+                                        </form>
+                                    <?php endif; ?>
+
 
                                 <?php if ($t['status'] !== 'cancelled'): ?>
                                     <!-- Cancel -->
@@ -231,6 +311,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                     <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently"
                                         onclick="return confirm('Permanently delete this task?')">&#x1F5D1;</button>
                                 </form>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>
@@ -273,9 +354,9 @@ include __DIR__ . '/../includes/admin_header.php';
                     <input type="text" id="add-task-type-new" class="form-control mt-1" placeholder="Type new task type..." style="display:none;">
                 </div>
                 <div class="form-group">
-                    <label>Rep Boost</label>
-                    <input type="number" name="rep_boost" class="form-control" value="0.25" min="0.05" max="1.00" step="0.05">
-                    <small style="color:var(--text-muted); font-size:0.72rem;">How much reputation this task rewards (0.05 – 1.00)</small>
+                    <label>Credit Reward (TC)</label>
+                    <input type="number" name="credit_reward" class="form-control" value="5.00" min="1" max="50" step="0.50">
+                    <small style="color:var(--text-muted); font-size:0.72rem;">Time credits rewarded on completion (1 – 50 TC)</small>
                 </div>
             </div>
             <div class="form-group">
@@ -314,6 +395,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     <select name="status" id="edit-task-status" class="form-control">
                         <option value="pending">Pending</option>
                         <option value="in-progress">In Progress</option>
+                        <option value="under-review">Under Review</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
@@ -329,8 +411,8 @@ include __DIR__ . '/../includes/admin_header.php';
                     <input type="text" name="location" id="edit-task-location" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Rep Boost</label>
-                    <input type="number" name="rep_boost" id="edit-task-boost" class="form-control" min="0.05" max="1.00" step="0.05">
+                    <label>Credit Reward (TC)</label>
+                    <input type="number" name="credit_reward" id="edit-task-reward" class="form-control" min="1" max="50" step="0.50">
                 </div>
             </div>
             <div class="flex gap-1" style="justify-content:flex-end;">
@@ -361,12 +443,12 @@ function toggleNewTaskType(prefix) {
 }
 
 // Edit modal opener
-function openEditTask(id, type, desc, location, boost, status) {
+function openEditTask(id, type, desc, location, reward, status) {
     document.getElementById('edit-task-id').value = id;
     document.getElementById('edit-task-type').value = type;
     document.getElementById('edit-task-desc').value = desc;
     document.getElementById('edit-task-location').value = location;
-    document.getElementById('edit-task-boost').value = boost;
+    document.getElementById('edit-task-reward').value = reward;
     document.getElementById('edit-task-status').value = status;
     document.getElementById('edit-task-modal').classList.add('active');
 }

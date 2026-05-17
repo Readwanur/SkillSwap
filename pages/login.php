@@ -21,20 +21,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Regular user login from the database
-        $stmt = $conn->prepare("SELECT user_id, name, email, password_hash FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT user_id, name, email, password_hash, status FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
-            if ($password === $user['password_hash']) {
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_email'] = $user['email'];
-                $_SESSION['is_admin'] = false;
-                header('Location: ../pages/dashboard.php');
-                exit;
+            if (password_verify($password, $user['password_hash'])) {
+                if ($user['status'] === 'suspended') {
+                    $error = 'Your account has been suspended by an administrator.';
+                } else {
+                    $_SESSION['user_id'] = $user['user_id'];
+                    $_SESSION['user_name'] = $user['name'];
+                    $_SESSION['user_email'] = $user['email'];
+                    $_SESSION['is_admin'] = false;
+                    header('Location: ../pages/dashboard.php');
+                    exit;
+                }
             } else {
                 $error = 'Invalid password.';
             }
