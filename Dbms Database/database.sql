@@ -54,7 +54,6 @@ CREATE TABLE IF NOT EXISTS users (
     bio TEXT,
     profile_photo VARCHAR(255),
     reliability_score DECIMAL(5, 2) DEFAULT 5.00,
-    role ENUM('user', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     availability_schedule TEXT
@@ -152,6 +151,9 @@ CREATE TABLE IF NOT EXISTS community_task (
     task_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     task_type VARCHAR(50),
+    description TEXT,
+    location VARCHAR(100),
+    rep_boost DECIMAL(5, 2) DEFAULT 0.25,
     status ENUM('pending', 'in-progress', 'completed', 'cancelled') DEFAULT 'pending',
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP NULL,
@@ -226,52 +228,94 @@ CREATE INDEX idx_txn_type ON transactions(type);
 CREATE INDEX idx_txn_timestamp ON transactions(timestamp);
 
 
--- ============================================================
--- SAMPLE DATA
--- ============================================================
+
 
 INSERT INTO skills (skill_name, catagory, description, difficulty_level) VALUES
+-- Technology
 ('Python Programming', 'Technology', 'Learn core Python concepts and automation.', 'Intermediate'),
+('Coding', 'Technology', 'Software development and logic.', 'Intermediate'),
+('Web Development', 'Technology', 'Building modern websites with HTML, CSS and JavaScript.', 'Intermediate'),
+('Mobile App Development', 'Technology', 'Creating apps for Android and iOS platforms.', 'Advanced'),
+('Database Management', 'Technology', 'Designing and managing SQL and NoSQL databases.', 'Advanced'),
+('Cybersecurity Basics', 'Technology', 'Understanding threats, encryption and safe browsing.', 'Beginner'),
+-- Design
 ('Graphic Design', 'Design', 'Creating visual content using Adobe Illustrator.', 'Advanced'),
+('UI/UX Design', 'Design', 'Designing user-friendly interfaces and experiences.', 'Intermediate'),
+('Video Editing', 'Design', 'Editing and producing videos with professional tools.', 'Intermediate'),
+-- Language
 ('Spanish Conversation', 'Language', 'Practice speaking Spanish with a native.', 'Beginner'),
+('Japanese Basics', 'Language', 'Learn Hiragana, Katakana and basic conversation.', 'Beginner'),
+('English Writing', 'Language', 'Improve academic and creative writing in English.', 'Intermediate'),
+('French Conversation', 'Language', 'Conversational French for travel and daily life.', 'Beginner'),
+-- Health
 ('Yoga Basics', 'Health', 'Introduction to Hatha Yoga poses and breathing.', 'Beginner'),
+('Mental Health Awareness', 'Health', 'Understanding stress management and mindfulness.', 'Beginner'),
+('Nutrition Planning', 'Health', 'Creating balanced meal plans for healthy living.', 'Intermediate'),
+-- Marketing
 ('SEO Strategy', 'Marketing', 'Optimizing websites for search engine rankings.', 'Advanced'),
+('Social Media Marketing', 'Marketing', 'Growing brand presence on Instagram, TikTok and X.', 'Intermediate'),
+('Content Writing', 'Marketing', 'Writing engaging blogs, articles and ad copy.', 'Beginner'),
+-- Academic
 ('Math', 'Academic', 'General mathematics and problem solving.', 'Intermediate'),
+('Physics Tutoring', 'Academic', 'Mechanics, thermodynamics and electromagnetism.', 'Advanced'),
+('Research Methods', 'Academic', 'Academic research design, citation and paper writing.', 'Intermediate'),
+-- Arts
 ('Music', 'Arts', 'Musical theory or instrument practice.', 'Beginner'),
 ('Art', 'Arts', 'Visual arts, painting, or sketching.', 'Beginner'),
-('Coding', 'Technology', 'Software development and logic.', 'Intermediate');
+('Creative Writing', 'Arts', 'Fiction, poetry and storytelling techniques.', 'Intermediate'),
+-- Fitness
+('Home Workouts', 'Fitness', 'Bodyweight exercises you can do without a gym.', 'Beginner'),
+('Weight Training', 'Fitness', 'Strength training with proper form and programs.', 'Intermediate'),
+-- Finance
+('Personal Budgeting', 'Finance', 'Managing income, expenses and savings effectively.', 'Beginner'),
+('Stock Market Basics', 'Finance', 'Understanding stocks, ETFs and portfolio strategy.', 'Intermediate'),
+-- Cooking
+('Baking Fundamentals', 'Cooking', 'Breads, pastries and desserts from scratch.', 'Beginner'),
+('International Cuisine', 'Cooking', 'Cooking dishes from around the world.', 'Intermediate'),
+-- Photography
+('Portrait Photography', 'Photography', 'Lighting, posing and editing for portrait shots.', 'Intermediate'),
+('Mobile Photography', 'Photography', 'Taking stunning photos with just your phone.', 'Beginner'),
+-- Lifestyle
+('Public Speaking', 'Lifestyle', 'Confidence building and presentation skills.', 'Beginner'),
+('Time Management', 'Lifestyle', 'Productivity techniques like Pomodoro and GTD.', 'Beginner');
 
-INSERT INTO users (name, email, password_hash, location, bio, reliability_score, role, availability_schedule) VALUES
-('Alice Johnson', 'Admin@SkillSwap.com', 'Admin123', 'New York', 'Software engineer passionate about teaching.', 4.80, 'admin', 'Mon 09:00-12:00, Wed 14:00-17:00'),
-('Bob Smith', 'bob@example.com', '1234', 'San Francisco', 'Professional designer with 10 years experience.', 4.50, 'user', 'Tue 10:00-15:00'),
-('Charlie Brown', 'charlie@example.com', '1234', 'Madrid', 'Native Spanish speaker and travel blogger.', 4.90, 'user', 'Fri 18:00-21:00'),
-('David Miller', 'david@example.com', '1234', 'Los Angeles', 'Certified Yoga instructor with a focus on mindfulness.', 5.00, 'user', 'Sat 08:00-10:00'),
-('Eva Green', 'eva@example.com', '1234', 'London', 'Digital marketing specialist and SEO consultant.', 4.20, 'user', NULL);
+-- NOTE: Admin (Admin@SkillSwap.com / Admin123) is NOT stored in the users table.
+-- Admin credentials are handled separately in the application login logic.
+-- The users table only contains regular platform users.
+
+INSERT INTO users (name, email, password_hash, location, bio, reliability_score, availability_schedule) VALUES
+('Bob Smith', 'bob@example.com', '1234', 'San Francisco', 'Professional designer with 10 years experience.', 4.50, 'Tue 10:00-15:00'),
+('Charlie Brown', 'charlie@example.com', '1234', 'Madrid', 'Native Spanish speaker and travel blogger.', 4.90, 'Fri 18:00-21:00'),
+('David Miller', 'david@example.com', '1234', 'Los Angeles', 'Certified Yoga instructor with a focus on mindfulness.', 5.00, 'Sat 08:00-10:00'),
+('Eva Green', 'eva@example.com', '1234', 'London', 'Digital marketing specialist and SEO consultant.', 4.20, NULL);
 
 INSERT INTO user_skills_offered (user_id, skill_id) VALUES
-(1, 9), (2, 8), (3, 7), (4, 6), (5, 5);
+(1, 8), (2, 7), (3, 6), (4, 5);
 
 INSERT INTO user_skills_requested (user_id, skill_id) VALUES
-(1, 6), (2, 9), (3, 1), (4, 7), (5, 2);
+(1, 9), (2, 1), (3, 7), (4, 2);
 
 INSERT INTO reputation (user_id, current_score, completed_sessions) VALUES
-(1, 4.8, 12), (2, 4.5, 8), (3, 4.9, 15), (4, 5.0, 5), (5, 4.2, 7);
+(1, 4.5, 8), (2, 4.9, 15), (3, 5.0, 5), (4, 4.2, 7);
 
 INSERT INTO wallet (user_id, balance) VALUES
-(1, 24.50), (2, 50.00), (3, 75.00), (4, 120.00), (5, 30.00);
+(1, 50.00), (2, 75.00), (3, 120.00), (4, 30.00);
 
-INSERT INTO community_task (user_id, task_type, status) VALUES
-(1, 'Physical', 'completed'),
-(2, 'Library', 'pending'),
-(4, 'Admin', 'completed');
+INSERT INTO community_task (user_id, task_type, description, location, rep_boost, status) VALUES
+(NULL, 'Library', 'Organize and label study materials in the community library.', 'Main Campus Library', 0.30, 'pending'),
+(NULL, 'Physical', 'Help set up tables and chairs for the weekend workshop event.', 'Community Center Hall B', 0.25, 'pending'),
+(NULL, 'Admin', 'Update the community notice board with latest announcements.', 'Student Union Office', 0.20, 'pending'),
+(1, 'Library', 'Sort donated books by category and shelve them.', 'City Public Library', 0.35, 'in-progress'),
+(3, 'Physical', 'Clean and organize shared workspace area.', 'Co-Working Hub Floor 2', 0.30, 'completed');
 
 INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer, rating, comment) VALUES
-(2, 1, 9, 'completed', '2026-05-10 14:00:00', 60, 20.00, 5, 'Great coding session! Alice is very helpful.'),
-(1, 4, 6, 'completed', '2026-05-11 10:00:00', 45, 15.00, 4, 'Very good Math practice, highly recommended.'),
-(4, 5, 5, 'scheduled', '2026-05-12 09:00:00', 60, 25.00, NULL, NULL),
-(3, 2, 8, 'completed', '2026-05-09 18:00:00', 30, 10.00, 5, 'Bob is a fantastic art teacher, very creative.');
+(1, 3, 6, 'completed', '2026-05-10 14:00:00', 60, 20.00, 5, 'David is a great Math tutor!'),
+(3, 4, 5, 'scheduled', '2026-05-12 09:00:00', 60, 25.00, NULL, NULL),
+(2, 1, 8, 'completed', '2026-05-09 18:00:00', 30, 10.00, 5, 'Bob is a fantastic art teacher, very creative.'),
+(4, 2, 7, 'completed', '2026-05-11 10:00:00', 45, 15.00, 4, 'Charlie made music lessons so fun!');
 
 INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES
-(1, 1, 2, 'credit_transfer', 20.00, 20.00),
-(2, 2, 3, 'credit_transfer', 15.00, 15.00),
-(4, 1, 4, 'credit_transfer', 10.00, 10.00);
+(1, 1, 3, 'credit_transfer', 20.00, 20.00),
+(3, 2, 1, 'credit_transfer', 10.00, 10.00),
+(4, 4, 2, 'credit_transfer', 15.00, 15.00);
+

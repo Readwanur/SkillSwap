@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        // Check for admin login
-        if ($email === 'admin@skillswap.com' && $password === 'admin123') {
+        // Admin login — admin is NOT a user, just a site manager
+        if (strcasecmp($email, 'Admin@SkillSwap.com') === 0 && $password === 'Admin123') {
             $_SESSION['user_id'] = 0;
             $_SESSION['user_name'] = 'Administrator';
             $_SESSION['user_email'] = $email;
@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // Regular user login from the database
         $stmt = $conn->prepare("SELECT user_id, name, email, password_hash FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -27,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
-            // Using plain text comparison since the demo data uses plain text passwords
             if ($password === $user['password_hash']) {
                 $_SESSION['user_id'] = $user['user_id'];
                 $_SESSION['user_name'] = $user['name'];

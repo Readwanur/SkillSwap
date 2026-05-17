@@ -47,10 +47,9 @@ $top_providers = $conn->query("
 
 // Top skills by session count
 $top_skills = $conn->query("
-    SELECT s.skill_name, c.category_name, COUNT(*) AS session_count
+    SELECT s.skill_name, s.catagory, COUNT(*) AS session_count
     FROM exchange_sessions es
     JOIN skills s ON es.skill_id = s.skill_id
-    LEFT JOIN categories c ON s.category_id = c.category_id
     GROUP BY es.skill_id
     ORDER BY session_count DESC
     LIMIT 10
@@ -150,7 +149,7 @@ include __DIR__ . '/../includes/admin_header.php';
                         <tr>
                             <td><strong><?php echo htmlspecialchars($s['skill_name']); ?></strong></td>
                             <td><span
-                                    class="badge badge-orange"><?php echo htmlspecialchars($s['category_name'] ?? 'N/A'); ?></span>
+                                    class="badge badge-orange"><?php echo htmlspecialchars($s['catagory'] ?? 'N/A'); ?></span>
                             </td>
                             <td><?php echo $s['session_count']; ?></td>
                         </tr>
