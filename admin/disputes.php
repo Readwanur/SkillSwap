@@ -17,9 +17,47 @@ define('REFUND_WINDOW_DAYS', 7);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $session_id = intval($_POST['session_id'] ?? 0);
 
+    if ($_POST['action'] === 'approve_completion') {
+        $session = $conn->query("SELECT * FROM exchange_sessions WHERE session_id = $session_id")->fetch_assoc();
+        if ($session && $session['status'] === 'under-review') {
+            $conn->begin_transaction();
+            try {
+                $requester_id = $session['requester_id'];
+                $amount = $session['time_credit_transfer'];
+                
+                $wallet_req = $conn->query("SELECT balance FROM wallet WHERE user_id = $requester_id FOR UPDATE")->fetch_assoc();
+                if (!$wallet_req || $wallet_req['balance'] < $amount) {
+                    throw new Exception("Requester has insufficient Time Credits (Balance: " . number_format($wallet_req['balance'] ?? 0, 2) . " TC).");
+                }
+
+                $conn->query("UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = $session_id");
+                $conn->query("UPDATE wallet SET balance = balance - $amount WHERE user_id = {$session['requester_id']}");
+                $conn->query("UPDATE wallet SET balance = balance + $amount WHERE user_id = {$session['provider_id']}");
+
+                $stmt = $conn->prepare("INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES (?, ?, ?, 'credit_transfer', ?, ?)");
+                $stmt->bind_param("iiidd", $session_id, $session['requester_id'], $session['provider_id'], $amount, $amount);
+                $stmt->execute();
+                $stmt->close();
+
+                $conn->query("UPDATE reputation SET completed_sessions = completed_sessions + 1 WHERE user_id = {$session['provider_id']}");
+
+                $conn->commit();
+                $success = "Session #$session_id approved. " . number_format($amount, 2) . " TC transferred.";
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = "Failed to approve session: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($_POST['action'] === 'reject_proof') {
+        $conn->query("UPDATE exchange_sessions SET status = 'scheduled', submission_note = NULL WHERE session_id = $session_id");
+        $success = "Session #$session_id proof rejected and moved back to scheduled.";
+    }
+
     if ($_POST['action'] === 'resolve_completed') {
         $conn->query("UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = $session_id");
-        $success = "Session #$session_id marked as completed.";
+        $success = "Session #$session_id marked as completed (No credits transferred).";
     }
 
     if ($_POST['action'] === 'resolve_cancelled') {
@@ -106,13 +144,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Status filter
 $status_filter = trim($_GET['status'] ?? '');
 $where_clause = '';
-if ($status_filter !== '' && in_array($status_filter, ['scheduled', 'completed', 'cancelled', 'refunded'])) {
+if ($status_filter !== '' && in_array($status_filter, ['scheduled', 'under-review', 'completed', 'cancelled', 'refunded'])) {
     $where_clause = "WHERE es.status = '$status_filter'";
 }
 
 // Counts
 $count_all = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions")->fetch_assoc()['cnt'];
 $count_scheduled = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'scheduled'")->fetch_assoc()['cnt'];
+$count_under_review = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'under-review'")->fetch_assoc()['cnt'];
 $count_completed = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'completed'")->fetch_assoc()['cnt'];
 $count_cancelled = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'cancelled'")->fetch_assoc()['cnt'];
 $count_refunded = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'refunded'")->fetch_assoc()['cnt'];
@@ -167,6 +206,10 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="stat-card stat-card-accent" style="--accent: var(--warning); cursor:pointer;" onclick="location.href='?status=scheduled'">
         <span class="stat-value"><?php echo $count_scheduled; ?></span>
         <span class="stat-label">Scheduled</span>
+    </div>
+    <div class="stat-card stat-card-accent" style="--accent: #2196F3; cursor:pointer;" onclick="location.href='?status=under-review'">
+        <span class="stat-value"><?php echo $count_under_review; ?></span>
+        <span class="stat-label">Under Review</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='?status=completed'">
         <span class="stat-value"><?php echo $count_completed; ?></span>
@@ -227,6 +270,7 @@ include __DIR__ . '/../includes/admin_header.php';
         <div class="admin-filter-tabs">
             <a href="?" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
             <a href="?status=scheduled" class="filter-tab <?php echo $status_filter === 'scheduled' ? 'active' : ''; ?>">&#x23F3; Scheduled</a>
+            <a href="?status=under-review" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">&#x1F50E; Under Review</a>
             <a href="?status=completed" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">&#x2705; Completed</a>
             <a href="?status=cancelled" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">&#x274C; Cancelled</a>
             <a href="?status=refunded" class="filter-tab <?php echo $status_filter === 'refunded' ? 'active' : ''; ?>">&#x1F4B8; Refunded</a>
@@ -255,10 +299,12 @@ include __DIR__ . '/../includes/admin_header.php';
                     $sc = 'badge-warning';
                     if ($d['status'] === 'completed')
                         $sc = 'badge-success';
+                    elseif ($d['status'] === 'under-review')
+                        $sc = 'badge-info';
                     elseif ($d['status'] === 'cancelled')
                         $sc = 'badge-danger';
                     elseif ($d['status'] === 'refunded')
-                        $sc = 'badge-info';
+                        $sc = 'badge-secondary';
 
                     // Calculate refund eligibility
                     $completion = $d['completion_time'] ?? $d['scheduled_time'];
@@ -284,6 +330,9 @@ include __DIR__ . '/../includes/admin_header.php';
                         <td><strong><?php echo number_format($d['time_credit_transfer'], 2); ?></strong> TC</td>
                         <td>
                             <span class="badge <?php echo $sc; ?>"><?php echo ucfirst($d['status']); ?></span>
+                            <?php if ($d['submission_note']): ?>
+                                <br><small style="color:var(--text-muted); font-size:0.75rem;">Proof: "<?php echo htmlspecialchars($d['submission_note']); ?>"</small>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?php if ($d['rating']): ?>
@@ -300,12 +349,25 @@ include __DIR__ . '/../includes/admin_header.php';
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
                                         <input type="hidden" name="action" value="resolve_completed">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Mark as completed">&#x2705;</button>
+                                        <button type="submit" class="btn btn-sm btn-success" title="Force complete without credit transfer">&#x2705;</button>
                                     </form>
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
                                         <input type="hidden" name="action" value="resolve_cancelled">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Cancel session">&#x274C;</button>
+                                    </form>
+                                </div>
+                            <?php elseif ($d['status'] === 'under-review'): ?>
+                                <div class="flex gap-1" style="flex-wrap:nowrap;">
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
+                                        <input type="hidden" name="action" value="approve_completion">
+                                        <button type="submit" class="btn btn-sm btn-success" title="Approve and Transfer Credits">&#x2705; Approve</button>
+                                    </form>
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
+                                        <input type="hidden" name="action" value="reject_proof">
+                                        <button type="submit" class="btn btn-sm btn-warning" title="Reject Proof">&#x21A9;&#xFE0F; Reject</button>
                                     </form>
                                 </div>
                             <?php elseif ($d['status'] === 'completed'): ?>

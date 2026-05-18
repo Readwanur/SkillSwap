@@ -98,7 +98,7 @@ include __DIR__ . '/../includes/header.php';
                                 $is_incoming = ($t['to_user_id'] == $user_id);
                                 ?>
                                 <tr>
-                                    <td>#<?php echo $t['transaction_id']; ?></td>
+                                    <td>#<?php echo $t['transcation_id']; ?></td>
                                     <td>
                                         <?php if ($is_incoming): ?>
                                             <span class="badge badge-success">Received</span>

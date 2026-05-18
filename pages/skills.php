@@ -10,12 +10,13 @@ $user_id = $_SESSION['user_id'];
 $page_title = 'Skills Marketplace';
 
 // Filter
-$category_filter = intval($_GET['category'] ?? 0);
+$category_filter = $_GET['category'] ?? '';
 $search = trim($_GET['search'] ?? '');
 
 $where = "1=1";
-if ($category_filter > 0) {
-    $where .= " AND s.category_id = $category_filter";
+if ($category_filter !== '') {
+    $escaped_cat = $conn->real_escape_string($category_filter);
+    $where .= " AND s.catagory = '$escaped_cat'";
 }
 if ($search !== '') {
     $escaped = $conn->real_escape_string($search);
@@ -23,14 +24,13 @@ if ($search !== '') {
 }
 
 // Fetch categories
-$categories = $conn->query("SELECT * FROM categories ORDER BY category_name");
+$categories = $conn->query("SELECT DISTINCT catagory FROM skills WHERE catagory IS NOT NULL ORDER BY catagory");
 
 // Fetch skills with provider count
 $skills = $conn->query("
-    SELECT s.*, c.category_name,
+    SELECT s.*,
            COUNT(DISTINCT uso.user_id) AS provider_count
     FROM skills s
-    LEFT JOIN categories c ON s.category_id = c.category_id
     LEFT JOIN user_skills_offered uso ON s.skill_id = uso.skill_id
     WHERE $where
     GROUP BY s.skill_id
@@ -52,12 +52,14 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="search" class="form-control" style="max-width:300px;"
                     placeholder="Search skills..." value="<?php echo htmlspecialchars($search); ?>">
                 <select name="category" class="form-control" style="max-width:200px;">
-                    <option value="0">All Categories</option>
-                    <?php while ($c = $categories->fetch_assoc()): ?>
-                        <option value="<?php echo $c['category_id']; ?>" <?php echo ($category_filter == $c['category_id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($c['category_name']); ?>
-                        </option>
-                    <?php endwhile; ?>
+                    <option value="">All Categories</option>
+                    <?php if ($categories): ?>
+                        <?php while ($c = $categories->fetch_assoc()): ?>
+                            <option value="<?php echo htmlspecialchars($c['catagory']); ?>" <?php echo ($category_filter === $c['catagory']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($c['catagory']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    <?php endif; ?>
                 </select>
                 <button type="submit" class="btn btn-primary btn-sm">Search</button>
                 <a href="../pages/skills.php" class="btn btn-secondary btn-sm">Clear</a>
@@ -65,13 +67,13 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Skills Grid -->
-        <?php if ($skills->num_rows > 0): ?>
+        <?php if ($skills && $skills->num_rows > 0): ?>
             <div class="grid-3">
-                <?php while ($skill = $skills->fetch_assoc()): ?>
+                <?php while ($skills && $skill = $skills->fetch_assoc()): ?>
                     <div class="card">
                         <div class="flex justify-between items-center mb-1">
                             <span
-                                class="badge badge-orange"><?php echo htmlspecialchars($skill['category_name'] ?? 'General'); ?></span>
+                                class="badge badge-orange"><?php echo htmlspecialchars($skill['catagory'] ?? 'General'); ?></span>
                             <span class="badge badge-info"><?php echo htmlspecialchars($skill['difficulty_level']); ?></span>
                         </div>
                         <h3 style="margin-top:8px;"><?php echo htmlspecialchars($skill['skill_name']); ?></h3>
