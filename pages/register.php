@@ -26,8 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($check->get_result()->num_rows > 0) {
             $error = 'An account with this email already exists.';
         } else {
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, location, bio) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sssss", $name, $email, $password, $location, $bio);
+            $stmt->bind_param("sssss", $name, $email, $hashed_password, $location, $bio);
 
             if ($stmt->execute()) {
                 $new_user_id = $stmt->insert_id;

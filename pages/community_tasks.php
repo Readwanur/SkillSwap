@@ -11,6 +11,9 @@ $page_title = 'Community Tasks';
 $success = '';
 $error = '';
 
+// Auto-expire tasks assigned more than 24 hours ago
+$conn->query("UPDATE community_task SET status = 'pending', user_id = NULL WHERE status = 'in-progress' AND assigned_at < NOW() - INTERVAL 1 DAY");
+
 // Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
@@ -20,30 +23,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt = $conn->prepare("UPDATE community_task SET user_id = ?, status = 'in-progress' WHERE task_id = ? AND status = 'pending'");
             $stmt->bind_param("ii", $user_id, $task_id);
             if ($stmt->execute() && $stmt->affected_rows > 0) {
-                $success = 'Task accepted! Complete it to earn reputation points.';
+                $success = 'Task accepted! Complete it to earn time credits.';
             }
             $stmt->close();
         }
     }
 
-    if ($_POST['action'] === 'complete_task') {
+    if ($_POST['action'] === 'submit_task') {
         $task_id = intval($_POST['task_id'] ?? 0);
-        if ($task_id > 0) {
+        $submission_note = trim($_POST['submission_note'] ?? '');
+        
+        if ($task_id > 0 && !empty($submission_note)) {
             $task = $conn->query("SELECT * FROM community_task WHERE task_id = $task_id AND user_id = $user_id AND status = 'in-progress'")->fetch_assoc();
             if ($task) {
-                $conn->query("UPDATE community_task SET status = 'completed', completed_at = NOW() WHERE task_id = $task_id");
-                // Boost reputation
-                $boost = $task['rep_boost'];
-                $conn->query("UPDATE reputation SET current_score = LEAST(current_score + ($boost / 100), 5.00) WHERE user_id = $user_id");
-                $success = 'Task completed! +' . number_format($boost, 2) . ' reputation boost applied.';
+                $stmt = $conn->prepare("UPDATE community_task SET status = 'under-review', submission_note = ? WHERE task_id = ?");
+                $stmt->bind_param("si", $submission_note, $task_id);
+                if ($stmt->execute()) {
+                    $success = 'Task submitted for review! You will receive your credits once an admin approves it.';
+                }
+                $stmt->close();
             }
+        } else {
+            $error = 'Submission note is required to complete the task.';
         }
     }
 }
 
-// Fetch user reputation
-$rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
-$below_threshold = ($rep && $rep['current_score'] < 2.50);
+// Fetch user wallet
+$wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
+$balance = $wallet ? $wallet['balance'] : 0.00;
 
 // My tasks
 $my_tasks = $conn->query("
@@ -56,7 +64,7 @@ $my_tasks = $conn->query("
 $available_tasks = $conn->query("
     SELECT * FROM community_task
     WHERE status = 'pending' AND (user_id IS NULL OR user_id != $user_id)
-    ORDER BY rep_boost DESC
+    ORDER BY credit_reward DESC
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -73,29 +81,16 @@ include __DIR__ . '/../includes/header.php';
             <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
-        <?php if ($below_threshold): ?>
-            <div class="alert alert-warning">
-                &#9888; Your reputation is below 2.50. Complete community tasks to restore your reputation and regain full
-                platform access.
-            </div>
-        <?php endif; ?>
-
-        <!-- Reputation Status -->
+        <!-- Wallet Status -->
         <div class="card mb-3">
             <div class="flex justify-between items-center">
                 <div>
-                    <h3 class="section-title" style="margin-bottom:4px;">Your Reputation</h3>
-                    <p style="color:var(--text-secondary); font-size:0.85rem;">Complete community tasks to boost your
-                        score</p>
+                    <h3 class="section-title" style="margin-bottom:4px;">Your Wallet</h3>
+                    <p style="color:var(--text-secondary); font-size:0.85rem;">Complete community tasks to earn time credits</p>
                 </div>
                 <div style="text-align:right;">
-                    <span
-                        style="font-size:1.8rem; font-weight:700; color:var(--orange-primary);"><?php echo $rep ? $rep['current_score'] : '5.00'; ?></span>
-                    <span style="color:var(--text-muted);">/5.00</span>
-                </div>
-            </div>
-            <div class="progress-bar mt-2">
-                <div class="fill" style="width: <?php echo ($rep ? ($rep['current_score'] / 5) * 100 : 100); ?>%;">
+                    <span style="font-size:1.8rem; font-weight:700; color:var(--orange-primary);"><?php echo number_format($balance, 2); ?></span>
+                    <span style="color:var(--text-muted);">TC</span>
                 </div>
             </div>
         </div>
@@ -109,29 +104,40 @@ include __DIR__ . '/../includes/header.php';
                     $status_class = 'badge-success';
                 elseif ($t['status'] === 'in-progress')
                     $status_class = 'badge-info';
+                elseif ($t['status'] === 'under-review')
+                    $status_class = 'badge-primary';
                 elseif ($t['status'] === 'cancelled')
                     $status_class = 'badge-danger';
                 ?>
                 <div class="task-card">
                     <div class="task-header">
                         <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
-                        <span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($t['status']); ?></span>
+                        <span class="badge <?php echo $status_class; ?>">
+                            <?php 
+                            if ($t['status'] === 'under-review') echo 'Under Review';
+                            else echo ucfirst($t['status']); 
+                            ?>
+                        </span>
                     </div>
                     <p><?php echo htmlspecialchars($t['description']); ?></p>
                     <div class="task-meta">
                         <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
-                        <span>&#11088; +<?php echo number_format($t['rep_boost'], 2); ?> Rep</span>
+                        <span>&#128176; +<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
                         <span>Assigned: <?php echo date('M d, Y', strtotime($t['assigned_at'])); ?></span>
                         <?php if ($t['completed_at']): ?>
                             <span>Completed: <?php echo date('M d, Y', strtotime($t['completed_at'])); ?></span>
                         <?php endif; ?>
                     </div>
                     <?php if ($t['status'] === 'in-progress'): ?>
-                        <form method="POST" class="mt-2">
-                            <input type="hidden" name="action" value="complete_task">
-                            <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                            <button type="submit" class="btn btn-sm btn-success">Mark Complete</button>
-                        </form>
+                        <div class="alert alert-info mt-2" style="font-size:0.8rem; padding:8px;">
+                            &#x23F0; You have 24 hours to complete this task from the time of assignment, or it will be automatically returned to the pool.
+                        </div>
+                        <button type="button" class="btn btn-sm btn-success mt-2" onclick="openSubmitModal(<?php echo $t['task_id']; ?>)">Submit for Review</button>
+                    <?php elseif ($t['status'] === 'under-review' && !empty($t['submission_note'])): ?>
+                        <div style="margin-top:10px; background:var(--bg-hover); padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; border-left:3px solid var(--primary);">
+                            <strong>Your Submission:</strong><br>
+                            <?php echo nl2br(htmlspecialchars($t['submission_note'])); ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             <?php endwhile; ?>
@@ -150,7 +156,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="task-card">
                     <div class="task-header">
                         <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
-                        <span class="badge badge-orange">+<?php echo number_format($t['rep_boost'], 2); ?> Rep</span>
+                        <span class="badge badge-orange">+<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
                     </div>
                     <p><?php echo htmlspecialchars($t['description']); ?></p>
                     <div class="task-meta">
@@ -173,5 +179,44 @@ include __DIR__ . '/../includes/header.php';
 
     </div>
 </div>
+
+<!-- ========== SUBMIT TASK MODAL ========== -->
+<div class="modal-overlay" id="submit-task-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Submit Task for Review</h3>
+            <button class="modal-close" onclick="document.getElementById('submit-task-modal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="submit_task">
+            <input type="hidden" name="task_id" id="submit-task-id">
+            
+            <div class="form-group">
+                <label>Proof of Completion *</label>
+                <textarea name="submission_note" class="form-control" rows="4" placeholder="Briefly describe what you did or provide a link to your work..." required></textarea>
+                <small style="color:var(--text-muted); font-size:0.75rem;">This note will be reviewed by an administrator before your time credits are awarded.</small>
+            </div>
+            
+            <div class="flex gap-1" style="justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('submit-task-modal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-success">Submit Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openSubmitModal(taskId) {
+    document.getElementById('submit-task-id').value = taskId;
+    document.getElementById('submit-task-modal').classList.add('active');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.remove('active');
+    });
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
