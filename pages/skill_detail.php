@@ -28,7 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
         $credit_cost = ($duration / 60) * 10; // 10 credits per hour
 
-        if ($wallet && $wallet['balance'] >= $credit_cost) {
+        $scheduled_timestamp = strtotime($scheduled_time);
+        if ($scheduled_timestamp < time()) {
+            $error = 'You cannot book a session in the past. Please select a valid date and time.';
+        } else if ($wallet && $wallet['balance'] >= $credit_cost) {
             $stmt = $conn->prepare("INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer) VALUES (?, ?, ?, 'scheduled', ?, ?, ?)");
             $stmt->bind_param("iiisid", $user_id, $provider_id, $skill_id, $scheduled_time, $duration, $credit_cost);
 
@@ -39,18 +42,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
             $stmt->close();
         } else {
-            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC.';
+            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC but your balance is ' . number_format($wallet['balance'] ?? 0, 2) . ' TC. Negative balances are not allowed.';
         }
     }
 }
 
 // Fetch skill info
-$skill = $conn->query("
-    SELECT s.*, c.category_name
+$skill_res = $conn->query("
+    SELECT s.*
     FROM skills s
-    LEFT JOIN categories c ON s.category_id = c.category_id
     WHERE s.skill_id = $skill_id
-")->fetch_assoc();
+");
+$skill = $skill_res ? $skill_res->fetch_assoc() : null;
 
 if (!$skill) {
     header('Location: ../pages/skills.php');
@@ -64,7 +67,7 @@ $providers = $conn->query("
     FROM user_skills_offered uso
     JOIN users u ON uso.user_id = u.user_id
     LEFT JOIN reputation r ON u.user_id = r.user_id
-    WHERE uso.skill_id = $skill_id AND u.user_id != $user_id
+    WHERE uso.skill_id = $skill_id
     ORDER BY r.current_score DESC
 ");
 
@@ -89,26 +92,28 @@ include __DIR__ . '/../includes/header.php';
                 <h1 style="margin:0; font-size:1.5rem;"><?php echo htmlspecialchars($skill['skill_name']); ?></h1>
                 <div class="flex gap-1">
                     <span
-                        class="badge badge-orange"><?php echo htmlspecialchars($skill['category_name'] ?? 'General'); ?></span>
+                        class="badge badge-orange"><?php echo htmlspecialchars($skill['catagory'] ?? 'General'); ?></span>
                     <span class="badge badge-info"><?php echo htmlspecialchars($skill['difficulty_level']); ?></span>
                 </div>
             </div>
             <p style="color:var(--text-secondary); margin-top: 8px;">
                 <?php echo htmlspecialchars($skill['description'] ?? 'No description available.'); ?></p>
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-top: 8px;">Base Duration:
-                <?php echo $skill['base_duration']; ?> min</p>
         </div>
 
         <!-- Providers -->
         <h2 class="section-title">Available Providers</h2>
 
-        <?php if ($providers->num_rows > 0): ?>
-            <?php while ($p = $providers->fetch_assoc()): ?>
+        <?php if ($providers && $providers->num_rows > 0): ?>
+            <?php while ($providers && $p = $providers->fetch_assoc()): ?>
                 <div class="card mb-2">
                     <div class="flex gap-2">
                         <div class="avatar avatar-lg"><?php echo strtoupper(substr($p['name'], 0, 1)); ?></div>
                         <div style="flex:1;">
-                            <h3 style="margin-bottom: 4px;"><?php echo htmlspecialchars($p['name']); ?></h3>
+                            <h3 style="margin-bottom: 4px;">
+                                <a href="javascript:void(0)" onclick="openMentorInfo('<?php echo htmlspecialchars(addslashes($p['name'])); ?>', '<?php echo htmlspecialchars(addslashes($p['location'] ?? '')); ?>', '<?php echo htmlspecialchars(addslashes($p['bio'] ?? '')); ?>', '<?php echo $p['current_score'] ?? '5.00'; ?>', <?php echo $p['completed_sessions'] ?? 0; ?>, '<?php echo htmlspecialchars(addslashes($p['mentor_level'] ?? 'Novice')); ?>')" style="color: var(--primary); text-decoration: none;">
+                                    <?php echo htmlspecialchars($p['name']); ?>
+                                </a>
+                            </h3>
                             <p style="color:var(--text-secondary); font-size:0.85rem;">
                                 <?php echo htmlspecialchars($p['location'] ?? 'Unknown'); ?></p>
                             <p style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">
@@ -122,10 +127,16 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                         <div>
-                            <button class="btn btn-primary btn-sm"
-                                onclick="openBooking(<?php echo $p['user_id']; ?>, '<?php echo htmlspecialchars($p['name']); ?>')">
-                                Book Session
-                            </button>
+                            <?php if ($p['user_id'] == $user_id): ?>
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    This is You
+                                </button>
+                            <?php else: ?>
+                                <button class="btn btn-primary btn-sm"
+                                    onclick="openBooking(<?php echo $p['user_id']; ?>, '<?php echo htmlspecialchars($p['name']); ?>')">
+                                    Book Session
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -156,7 +167,7 @@ include __DIR__ . '/../includes/header.php';
                     id="modal_provider_name"></strong></p>
             <div class="form-group">
                 <label for="scheduled_time">Preferred Date & Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" min="<?php echo date('Y-m-d\TH:i'); ?>" required>
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -186,6 +197,39 @@ include __DIR__ . '/../includes/header.php';
     document.getElementById('bookingModal').addEventListener('click', function (e) {
         if (e.target === this) closeBooking();
     });
+
+    function openMentorInfo(name, location, bio, score, sessions, level) {
+        document.getElementById('mentor_info_content').innerHTML = `
+            <h3 style="margin-bottom: 8px;">${name}</h3>
+            <p style="color:var(--text-secondary); font-size:0.9rem;"><strong>Location:</strong> ${location || 'Unknown'}</p>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:8px;"><strong>Bio:</strong> ${bio || 'No bio available'}</p>
+            <div class="flex gap-2 mt-3" style="font-size: 0.9rem; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+                <span>&#11088; ${score}/5 Rating</span>
+                <span style="color:var(--text-muted);">&bull; ${sessions} Sessions</span>
+                <span class="badge badge-orange">${level}</span>
+            </div>
+        `;
+        document.getElementById('mentorInfoModal').classList.add('active');
+    }
+
+    function closeMentorInfo() {
+        document.getElementById('mentorInfoModal').classList.remove('active');
+    }
+
+    document.getElementById('mentorInfoModal').addEventListener('click', function (e) {
+        if (e.target === this) closeMentorInfo();
+    });
 </script>
+
+<!-- Mentor Info Modal -->
+<div class="modal-overlay" id="mentorInfoModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Mentor Profile</h3>
+            <button class="modal-close" onclick="closeMentorInfo()">&times;</button>
+        </div>
+        <div id="mentor_info_content"></div>
+    </div>
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
