@@ -25,13 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $requester_id = $session['requester_id'];
                 $amount = $session['time_credit_transfer'];
                 
-                $wallet_req = $conn->query("SELECT balance FROM wallet WHERE user_id = $requester_id FOR UPDATE")->fetch_assoc();
-                if (!$wallet_req || $wallet_req['balance'] < $amount) {
-                    throw new Exception("Requester has insufficient Time Credits (Balance: " . number_format($wallet_req['balance'] ?? 0, 2) . " TC).");
-                }
-
                 $conn->query("UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = $session_id");
-                $conn->query("UPDATE wallet SET balance = balance - $amount WHERE user_id = {$session['requester_id']}");
+                
+                // Escrow is already deducted, so we just transfer to provider
                 $conn->query("UPDATE wallet SET balance = balance + $amount WHERE user_id = {$session['provider_id']}");
 
                 $stmt = $conn->prepare("INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES (?, ?, ?, 'credit_transfer', ?, ?)");
@@ -61,8 +57,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'resolve_cancelled') {
-        $conn->query("UPDATE exchange_sessions SET status = 'cancelled' WHERE session_id = $session_id");
-        $success = "Session #$session_id cancelled by admin.";
+        $session = $conn->query("SELECT * FROM exchange_sessions WHERE session_id = $session_id AND status != 'cancelled'")->fetch_assoc();
+        if ($session) {
+            $conn->begin_transaction();
+            try {
+                $conn->query("UPDATE exchange_sessions SET status = 'cancelled' WHERE session_id = $session_id");
+                // Refund escrow to requester
+                $amount = $session['time_credit_transfer'];
+                $conn->query("UPDATE wallet SET balance = balance + $amount WHERE user_id = {$session['requester_id']}");
+                $conn->commit();
+                $success = "Session #$session_id cancelled by admin and credits refunded to requester.";
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = "Failed to cancel session: " . $e->getMessage();
+            }
+        }
     }
 
     if ($_POST['action'] === 'refund') {

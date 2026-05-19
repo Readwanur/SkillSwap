@@ -141,7 +141,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="form-group">
                         <label for="location">Location</label>
-                        <input type="text" id="location" name="location" class="form-control"
+                        <input type="text" id="location" name="location" class="form-control city-autocomplete"
                             value="<?php echo htmlspecialchars($user['location'] ?? ''); ?>">
                     </div>
                     <div class="form-group">
