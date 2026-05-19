@@ -98,7 +98,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <?php if ($pending_tasks > 0): ?>
         <div class="alert alert-info" style="display:flex; justify-content:space-between; align-items:center;">
             <span>&#x1F4CB; <strong><?php echo $pending_tasks; ?> community task(s)</strong> are pending assignment.</span>
-            <a href="../admin/analytics.php" class="btn btn-sm btn-secondary">View</a>
+            <a href="../admin/community_tasks.php" class="btn btn-sm btn-secondary">View</a>
         </div>
     <?php endif; ?>
 </div>

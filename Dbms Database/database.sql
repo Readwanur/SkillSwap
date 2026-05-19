@@ -65,6 +65,21 @@ CREATE INDEX idx_users_location ON users(location);
 CREATE INDEX idx_users_last_active ON users(last_active_at);
 CREATE INDEX idx_users_reliability ON users(reliability_score);
 
+-- =========================
+-- ENTITY: user_availability
+-- =========================
+-- PK: availability_id
+-- =========================
+CREATE TABLE IF NOT EXISTS user_availability (
+    availability_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    day_of_week VARCHAR(20) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_availability_user ON user_availability(user_id);
 
 -- =========================
 -- RELATIONSHIP: user_skills_offered (many-to-many junction)
@@ -117,6 +132,7 @@ CREATE TABLE IF NOT EXISTS reputation (
     cancelled_sessions INT DEFAULT 0,
     no_show_decay DECIMAL(5, 2) DEFAULT 0.00,
     last_decay_date DATE,
+    mentor_level VARCHAR(50) DEFAULT 'Novice',
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -180,15 +196,17 @@ CREATE TABLE IF NOT EXISTS exchange_sessions (
     requester_id INT NOT NULL,
     provider_id INT NOT NULL,
     skill_id INT NOT NULL,
-    status ENUM('scheduled', 'completed', 'cancelled', 'refunded') DEFAULT 'scheduled',
+    status ENUM('scheduled', 'under-review', 'completed', 'cancelled', 'refunded') DEFAULT 'scheduled',
     scheduled_time DATETIME NOT NULL,
     completion_time DATETIME NULL,
     session_duration INT,
     feedback_given BOOLEAN DEFAULT FALSE,
     time_credit_transfer DECIMAL(10, 2),
+    submission_note TEXT,
     rating INT CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
     bonus_multiplier DECIMAL(3, 2) DEFAULT 1.00,
+    completion_otp VARCHAR(10) NULL,
     FOREIGN KEY (requester_id) REFERENCES users(user_id),
     FOREIGN KEY (provider_id) REFERENCES users(user_id),
     FOREIGN KEY (skill_id) REFERENCES skills(skill_id)

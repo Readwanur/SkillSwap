@@ -5,5 +5,6 @@
     </div>
 </footer>
 
+<script src="<?php echo dirname($_SERVER['SCRIPT_NAME']); ?>/../assets/js/city-autocomplete.js"></script>
 </body>
 </html>

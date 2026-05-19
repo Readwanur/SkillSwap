@@ -141,7 +141,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="form-group">
                         <label for="location">Location</label>
-                        <input type="text" id="location" name="location" class="form-control"
+                        <input type="text" id="location" name="location" class="form-control city-autocomplete"
                             value="<?php echo htmlspecialchars($user['location'] ?? ''); ?>">
                     </div>
                     <div class="form-group">
@@ -201,7 +201,7 @@ include __DIR__ . '/../includes/header.php';
                 <h3>Skills I Teach</h3>
             </div>
             <div class="mb-2">
-                <?php while ($s = $offered->fetch_assoc()): ?>
+                <?php while ($offered && $s = $offered->fetch_assoc()): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="remove_offered">
                         <input type="hidden" name="skill_id" value="<?php echo $s['skill_id']; ?>">
@@ -217,11 +217,13 @@ include __DIR__ . '/../includes/header.php';
                 <select name="skill_id" class="form-control" style="max-width: 250px;" required>
                     <option value="">Select a skill...</option>
                     <?php
-                    $all_skills->data_seek(0);
-                    while ($s = $all_skills->fetch_assoc()): ?>
-                        <option value="<?php echo $s['skill_id']; ?>"><?php echo htmlspecialchars($s['skill_name']); ?>
-                        </option>
-                    <?php endwhile; ?>
+                    if ($all_skills) {
+                        $all_skills->data_seek(0);
+                        while ($s = $all_skills->fetch_assoc()): ?>
+                            <option value="<?php echo $s['skill_id']; ?>"><?php echo htmlspecialchars($s['skill_name']); ?>
+                            </option>
+                        <?php endwhile;
+                    } ?>
                 </select>
                 <button type="submit" class="btn btn-sm btn-primary">Add</button>
             </form>
@@ -233,7 +235,7 @@ include __DIR__ . '/../includes/header.php';
                 <h3>Skills I Want to Learn</h3>
             </div>
             <div class="mb-2">
-                <?php while ($s = $requested->fetch_assoc()): ?>
+                <?php while ($requested && $s = $requested->fetch_assoc()): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="remove_requested">
                         <input type="hidden" name="skill_id" value="<?php echo $s['skill_id']; ?>">
@@ -249,11 +251,13 @@ include __DIR__ . '/../includes/header.php';
                 <select name="skill_id" class="form-control" style="max-width: 250px;" required>
                     <option value="">Select a skill...</option>
                     <?php
-                    $all_skills->data_seek(0);
-                    while ($s = $all_skills->fetch_assoc()): ?>
-                        <option value="<?php echo $s['skill_id']; ?>"><?php echo htmlspecialchars($s['skill_name']); ?>
-                        </option>
-                    <?php endwhile; ?>
+                    if ($all_skills) {
+                        $all_skills->data_seek(0);
+                        while ($s = $all_skills->fetch_assoc()): ?>
+                            <option value="<?php echo $s['skill_id']; ?>"><?php echo htmlspecialchars($s['skill_name']); ?>
+                            </option>
+                        <?php endwhile;
+                    } ?>
                 </select>
                 <button type="submit" class="btn btn-sm btn-primary">Add</button>
             </form>
@@ -265,7 +269,7 @@ include __DIR__ . '/../includes/header.php';
                 <h3>My Availability</h3>
             </div>
 
-            <?php if ($availability->num_rows > 0): ?>
+            <?php if ($availability && $availability->num_rows > 0): ?>
                 <div class="table-wrapper mb-2">
                     <table>
                         <thead>
@@ -277,7 +281,7 @@ include __DIR__ . '/../includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php while ($a = $availability->fetch_assoc()): ?>
+                            <?php while ($availability && $a = $availability->fetch_assoc()): ?>
                                 <tr>
                                     <td><?php echo $a['day_of_week']; ?></td>
                                     <td><?php echo date('h:i A', strtotime($a['start_time'])); ?></td>
