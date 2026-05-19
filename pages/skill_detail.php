@@ -32,17 +32,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($scheduled_timestamp < time()) {
             $error = 'You cannot book a session in the past. Please select a valid date and time.';
         } else if ($wallet && $wallet['balance'] >= $credit_cost) {
-            $stmt = $conn->prepare("INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer) VALUES (?, ?, ?, 'scheduled', ?, ?, ?)");
-            $stmt->bind_param("iiisid", $user_id, $provider_id, $skill_id, $scheduled_time, $duration, $credit_cost);
+            $conn->begin_transaction();
+            try {
+                // Generate a 4-digit OTP
+                $completion_otp = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
 
-            if ($stmt->execute()) {
-                $success = 'Session booked successfully! ' . number_format($credit_cost, 2) . ' TC will be transferred upon completion.';
-            } else {
-                $error = 'Failed to book session.';
+                // 1. Deduct from requester's wallet (Escrow)
+                $conn->query("UPDATE wallet SET balance = balance - $credit_cost WHERE user_id = $user_id");
+
+                // 2. Insert session with OTP
+                $stmt = $conn->prepare("INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer, completion_otp) VALUES (?, ?, ?, 'scheduled', ?, ?, ?, ?)");
+                $stmt->bind_param("iiisids", $user_id, $provider_id, $skill_id, $scheduled_time, $duration, $credit_cost, $completion_otp);
+                
+                if ($stmt->execute()) {
+                    $conn->commit();
+                    $success = 'Session booked successfully! ' . number_format($credit_cost, 2) . ' TC has been held in escrow.';
+                } else {
+                    throw new Exception('Failed to book session.');
+                }
+                $stmt->close();
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = $e->getMessage();
             }
-            $stmt->close();
         } else {
-            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC but your balance is ' . number_format($wallet['balance'] ?? 0, 2) . ' TC. Negative balances are not allowed.';
+            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC but your balance is ' . number_format($wallet['balance'] ?? 0, 2) . ' TC.';
         }
     }
 }
@@ -167,7 +181,7 @@ include __DIR__ . '/../includes/header.php';
                     id="modal_provider_name"></strong></p>
             <div class="form-group">
                 <label for="scheduled_time">Preferred Date & Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" min="<?php echo date('Y-m-d\TH:i'); ?>" required>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -184,9 +198,21 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+    // Set min datetime to the user's local "now"
+    function setMinDateTime() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var d = String(now.getDate()).padStart(2, '0');
+        var h = String(now.getHours()).padStart(2, '0');
+        var min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+    }
+
     function openBooking(providerId, providerName) {
         document.getElementById('modal_provider_id').value = providerId;
         document.getElementById('modal_provider_name').textContent = providerName;
+        setMinDateTime();
         document.getElementById('bookingModal').classList.add('active');
     }
 

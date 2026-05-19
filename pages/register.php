@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="form-group">
                     <label for="location">Location</label>
-                    <input type="text" id="location" name="location" class="form-control" placeholder="City, Country"
+                    <input type="text" id="location" name="location" class="form-control city-autocomplete" placeholder="City, Country"
                         value="<?php echo htmlspecialchars($_POST['location'] ?? ''); ?>">
                 </div>
 
@@ -130,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+    <script src="../assets/js/city-autocomplete.js"></script>
 </body>
 
 </html>

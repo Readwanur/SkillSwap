@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS exchange_sessions (
     rating INT CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
     bonus_multiplier DECIMAL(3, 2) DEFAULT 1.00,
+    completion_otp VARCHAR(10) NULL,
     FOREIGN KEY (requester_id) REFERENCES users(user_id),
     FOREIGN KEY (provider_id) REFERENCES users(user_id),
     FOREIGN KEY (skill_id) REFERENCES skills(skill_id)

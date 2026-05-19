@@ -34,7 +34,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
     <nav class="navbar">
         <div class="container">
             <a href="../pages/dashboard.php" class="navbar-brand">
-                <img src="../assets/finalLogo.png" alt="SkillSwap Logo">
+                <img src="../assets/netflixStyleLogo-removebg-preview.png" alt="SkillSwap Logo">
             </a>
 
             <button class="nav-toggle"
