@@ -306,10 +306,10 @@ INSERT INTO skills (skill_name, catagory, description, difficulty_level) VALUES
 
 -- NOTE: All sample users below have the password "password" (securely hashed)
 INSERT INTO users (name, email, password_hash, location, bio, reliability_score, availability_schedule) VALUES
-('Bob Smith', 'bob@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'San Francisco', 'Professional designer with 10 years experience.', 4.50, 'Tue 10:00-15:00'),
-('Charlie Brown', 'charlie@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Madrid', 'Native Spanish speaker and travel blogger.', 4.90, 'Fri 18:00-21:00'),
-('David Miller', 'david@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Los Angeles', 'Certified Yoga instructor with a focus on mindfulness.', 5.00, 'Sat 08:00-10:00'),
-('Eva Green', 'eva@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'London', 'Digital marketing specialist and SEO consultant.', 4.20, NULL);
+('Mr. Bobuddin', 'bob@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'San Francisco', 'Professional designer with 10 years experience.', 4.50, 'Tue 10:00-15:00'),
+('Fida Haque Charlie', 'charlie@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Madrid', 'Native Spanish speaker and travel blogger.', 4.90, 'Fri 18:00-21:00'),
+('Bhondu Mahi', 'mahi@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Los Angeles', 'Certified Yoga instructor with a focus on mindfulness.', 5.00, 'Sat 08:00-10:00'),
+('Hukna Rafi', 'rafi@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'London', 'Digital marketing specialist and SEO consultant.', 4.20, NULL);
 
 INSERT INTO user_skills_offered (user_id, skill_id) VALUES
 (1, 8), (2, 7), (3, 6), (4, 5);
