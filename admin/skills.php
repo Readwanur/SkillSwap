@@ -88,6 +88,67 @@ $search = trim($_GET['search'] ?? '');
 $cat_filter = trim($_GET['category'] ?? '');
 $diff_filter = trim($_GET['difficulty'] ?? '');
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'category');
+$order = trim($_GET['order'] ?? 'asc');
+
+$allowed_sorts = [
+    'id' => 's.skill_id',
+    'name' => 's.skill_name',
+    'category' => 's.catagory',
+    'difficulty' => 's.difficulty_level',
+    'teachers' => 'providers',
+    'learners' => 'learners'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 's.catagory';
+$order = (strtolower($order) === 'desc') ? 'DESC' : 'ASC';
+
+if ($sort === 'category') {
+    $sort_query = "s.catagory $order, s.skill_name ASC";
+} elseif ($sort === 'difficulty') {
+    $sort_query = "FIELD(s.difficulty_level, 'Beginner', 'Intermediate', 'Advanced') $order";
+} else {
+    $sort_query = "$sort_col $order";
+}
+
+// Sort URL generator
+function getSortUrl($col, $dir, $search, $category, $difficulty) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    if ($search !== '') $query['search'] = $search;
+    if ($category !== '') $query['category'] = $category;
+    if ($difficulty !== '') $query['difficulty'] = $difficulty;
+    return 'skills.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order, $search, $category, $difficulty) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            $url = getSortUrl($col, 'desc', $search, $category, $difficulty);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            $url = getSortUrl($col, 'asc', $search, $category, $difficulty);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        $url = getSortUrl($col, 'asc', $search, $category, $difficulty);
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 $where = "WHERE 1=1";
 if ($search !== '') {
     $search_esc = $conn->real_escape_string($search);
@@ -110,7 +171,7 @@ $skills = $conn->query("
     LEFT JOIN user_skills_requested usr ON s.skill_id = usr.skill_id
     $where
     GROUP BY s.skill_id
-    ORDER BY s.catagory, s.skill_name
+    ORDER BY $sort_query
 ");
 
 // Summary stats
@@ -169,7 +230,7 @@ include __DIR__ . '/../includes/admin_header.php';
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
         <?php foreach ($cat_count_arr as $cat_name => $cat_cnt): ?>
-            <a href="?category=<?php echo urlencode($cat_name); ?>"
+            <a href="?category=<?php echo urlencode($cat_name); ?><?php echo $sort !== 'category' ? '&sort=' . urlencode($sort) : ''; ?><?php echo $order !== 'ASC' ? '&order=' . urlencode(strtolower($order)) : ''; ?>"
                class="skill-tag <?php echo $cat_filter === $cat_name ? 'skill-tag-active' : ''; ?>"
                style="cursor:pointer; text-decoration:none;">
                 <?php echo htmlspecialchars($cat_name); ?>
@@ -187,6 +248,8 @@ include __DIR__ . '/../includes/admin_header.php';
 <!-- Search & Filter Bar -->
 <div class="card mb-3">
     <form method="GET" class="admin-filter-bar">
+        <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort); ?>">
+        <input type="hidden" name="order" value="<?php echo htmlspecialchars(strtolower($order)); ?>">
         <div class="admin-search-box">
             <input type="text" name="search" class="form-control" placeholder="&#x1F50D; Search skills by name or description..."
                 value="<?php echo htmlspecialchars($search); ?>">
@@ -200,17 +263,28 @@ include __DIR__ . '/../includes/admin_header.php';
             <?php endforeach; ?>
         </select>
         <div class="admin-filter-tabs">
-            <a href="?<?php echo $search ? 'search=' . urlencode($search) : ''; ?><?php echo $cat_filter ? '&category=' . urlencode($cat_filter) : ''; ?>"
+            <?php
+            function buildTabUrl($diff, $search, $cat, $sort, $order) {
+                $q = [];
+                if ($diff !== '') $q['difficulty'] = $diff;
+                if ($search !== '') $q['search'] = $search;
+                if ($cat !== '') $q['category'] = $cat;
+                if ($sort !== '') $q['sort'] = $sort;
+                if ($order !== '') $q['order'] = strtolower($order);
+                return '?' . http_build_query($q);
+            }
+            ?>
+            <a href="<?php echo buildTabUrl('', $search, $cat_filter, $sort, $order); ?>"
                class="filter-tab <?php echo $diff_filter === '' ? 'active' : ''; ?>">All</a>
-            <a href="?difficulty=Beginner<?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $cat_filter ? '&category=' . urlencode($cat_filter) : ''; ?>"
+            <a href="<?php echo buildTabUrl('Beginner', $search, $cat_filter, $sort, $order); ?>"
                class="filter-tab <?php echo $diff_filter === 'Beginner' ? 'active' : ''; ?>" style="<?php echo $diff_filter === 'Beginner' ? '' : 'color:var(--success);'; ?>">Beginner</a>
-            <a href="?difficulty=Intermediate<?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $cat_filter ? '&category=' . urlencode($cat_filter) : ''; ?>"
+            <a href="<?php echo buildTabUrl('Intermediate', $search, $cat_filter, $sort, $order); ?>"
                class="filter-tab <?php echo $diff_filter === 'Intermediate' ? 'active' : ''; ?>" style="<?php echo $diff_filter === 'Intermediate' ? '' : 'color:var(--warning);'; ?>">Intermediate</a>
-            <a href="?difficulty=Advanced<?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $cat_filter ? '&category=' . urlencode($cat_filter) : ''; ?>"
+            <a href="<?php echo buildTabUrl('Advanced', $search, $cat_filter, $sort, $order); ?>"
                class="filter-tab <?php echo $diff_filter === 'Advanced' ? 'active' : ''; ?>" style="<?php echo $diff_filter === 'Advanced' ? '' : 'color:var(--danger);'; ?>">Advanced</a>
         </div>
         <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-        <?php if ($search || $cat_filter || $diff_filter): ?>
+        <?php if ($search || $cat_filter || $diff_filter || $sort !== 'category' || $order !== 'ASC'): ?>
             <a href="skills.php" class="btn btn-sm btn-secondary">Clear All</a>
         <?php endif; ?>
     </form>
@@ -226,13 +300,43 @@ include __DIR__ . '/../includes/admin_header.php';
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Skill Name</th>
-                    <th>Category</th>
-                    <th>Difficulty</th>
+                    <th>
+                        <span class="th-content">
+                            <span>ID</span>
+                            <?php echo renderSortButtons('id', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Skill Name</span>
+                            <?php echo renderSortButtons('name', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Category</span>
+                            <?php echo renderSortButtons('category', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Difficulty</span>
+                            <?php echo renderSortButtons('difficulty', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
                     <th>Description</th>
-                    <th title="Users who teach this skill">Teachers</th>
-                    <th title="Users who want to learn this skill">Learners</th>
+                    <th>
+                        <span class="th-content">
+                            <span title="Users who teach this skill">Teachers</span>
+                            <?php echo renderSortButtons('teachers', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span title="Users who want to learn this skill">Learners</span>
+                            <?php echo renderSortButtons('learners', $sort, $order, $search, $cat_filter, $diff_filter); ?>
+                        </span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -249,7 +353,7 @@ include __DIR__ . '/../includes/admin_header.php';
                         <td style="color:var(--text-muted);">#<?php echo $s['skill_id']; ?></td>
                         <td><strong><?php echo htmlspecialchars($s['skill_name']); ?></strong></td>
                         <td>
-                            <a href="?category=<?php echo urlencode($s['catagory'] ?? ''); ?>" class="badge badge-orange" style="text-decoration:none;">
+                            <a href="?category=<?php echo urlencode($s['catagory'] ?? ''); ?><?php echo $sort !== 'category' ? '&sort=' . urlencode($sort) : ''; ?><?php echo $order !== 'ASC' ? '&order=' . urlencode(strtolower($order)) : ''; ?>" class="badge badge-orange" style="text-decoration:none;">
                                 <?php echo htmlspecialchars($s['catagory'] ?? 'N/A'); ?>
                             </a>
                         </td>

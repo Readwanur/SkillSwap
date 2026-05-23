@@ -448,6 +448,43 @@ table th {
     font-family: var(--font-main);
 }
 
+.th-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.sort-arrows {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 2px;
+}
+
+.sort-arrows a.sort-arrow {
+    color: var(--text-muted);
+    opacity: 0.3;
+    font-size: 0.75rem;
+    line-height: 1;
+    text-decoration: none;
+    transition: var(--transition);
+    display: inline-block;
+    padding: 1px;
+}
+
+.sort-arrows a.sort-arrow:hover {
+    color: var(--primary);
+    opacity: 0.8;
+    text-decoration: none;
+}
+
+.sort-arrows a.sort-arrow.active {
+    color: var(--primary);
+    opacity: 1;
+}
+
 table tr:hover {
     background: var(--bg-hover);
 }
