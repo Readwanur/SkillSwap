@@ -119,6 +119,60 @@ if ($status_filter !== '' && in_array($status_filter, ['pending', 'in-progress',
     $where_clause = "WHERE ct.status = '$status_filter'";
 }
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'created');
+$order = trim($_GET['order'] ?? 'desc');
+
+$allowed_sorts = [
+    'id' => 'ct.task_id',
+    'type' => 'ct.task_type',
+    'location' => 'ct.location',
+    'reward' => 'ct.credit_reward',
+    'assigned' => 'u.name',
+    'status' => 'ct.status',
+    'created' => 'ct.assigned_at'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 'ct.assigned_at';
+$order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
+
+// Sort URL generator
+function getSortUrl($col, $dir, $status) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    if ($status !== '') {
+        $query['status'] = $status;
+    }
+    return 'community_tasks.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order, $status) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            $url = getSortUrl($col, 'desc', $status);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            $url = getSortUrl($col, 'asc', $status);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        $url = getSortUrl($col, 'asc', $status);
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 // Counts
 $count_all = $conn->query("SELECT COUNT(*) AS cnt FROM community_task")->fetch_assoc()['cnt'];
 $count_pending = $conn->query("SELECT COUNT(*) AS cnt FROM community_task WHERE status = 'pending'")->fetch_assoc()['cnt'];
@@ -133,7 +187,7 @@ $tasks = $conn->query("
     FROM community_task ct
     LEFT JOIN users u ON ct.user_id = u.user_id
     $where_clause
-    ORDER BY ct.assigned_at DESC
+    ORDER BY $sort_col $order
 ");
 
 // Existing task types for dropdown
@@ -159,24 +213,33 @@ include __DIR__ . '/../includes/admin_header.php';
 <?php endif; ?>
 
 <!-- Summary Stats -->
+<?php
+function buildTabUrl($status, $sort, $order) {
+    $q = [];
+    if ($status !== '') $q['status'] = $status;
+    if ($sort !== '') $q['sort'] = $sort;
+    if ($order !== '') $q['order'] = strtolower($order);
+    return '?' . http_build_query($q);
+}
+?>
 <div class="stats-grid" style="margin-bottom:16px;">
-    <div class="stat-card stat-card-accent" style="--accent: var(--primary); cursor:pointer;" onclick="location.href='?'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--primary); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_all; ?></span>
         <span class="stat-label">Total Tasks</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--warning); cursor:pointer;" onclick="location.href='?status=pending'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--warning); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('pending', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_pending; ?></span>
         <span class="stat-label">Pending</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--info); cursor:pointer;" onclick="location.href='?status=in-progress'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--info); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('in-progress', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_progress; ?></span>
         <span class="stat-label">In Progress</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: #9c27b0; cursor:pointer;" onclick="location.href='?status=under-review'">
+    <div class="stat-card stat-card-accent" style="--accent: #9c27b0; cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('under-review', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_review; ?></span>
         <span class="stat-label">Under Review</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='?status=completed'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('completed', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_completed; ?></span>
         <span class="stat-label">Completed</span>
     </div>
@@ -193,12 +256,12 @@ include __DIR__ . '/../includes/admin_header.php';
             <?php endif; ?>
         </h3>
         <div class="admin-filter-tabs">
-            <a href="?" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
-            <a href="?status=pending" class="filter-tab <?php echo $status_filter === 'pending' ? 'active' : ''; ?>">Pending</a>
-            <a href="?status=in-progress" class="filter-tab <?php echo $status_filter === 'in-progress' ? 'active' : ''; ?>">In Progress</a>
-            <a href="?status=under-review" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
-            <a href="?status=completed" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">Completed</a>
-            <a href="?status=cancelled" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
+            <a href="<?php echo buildTabUrl('', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
+            <a href="<?php echo buildTabUrl('pending', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'pending' ? 'active' : ''; ?>">Pending</a>
+            <a href="<?php echo buildTabUrl('in-progress', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'in-progress' ? 'active' : ''; ?>">In Progress</a>
+            <a href="<?php echo buildTabUrl('under-review', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
+            <a href="<?php echo buildTabUrl('completed', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">Completed</a>
+            <a href="<?php echo buildTabUrl('cancelled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
         </div>
     </div>
 
@@ -207,14 +270,49 @@ include __DIR__ . '/../includes/admin_header.php';
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Type</th>
+                    <th>
+                        <span class="th-content">
+                            <span>ID</span>
+                            <?php echo renderSortButtons('id', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Type</span>
+                            <?php echo renderSortButtons('type', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
                     <th>Description</th>
-                    <th>Location</th>
-                    <th>Reward</th>
-                    <th>Assigned To</th>
-                    <th>Status</th>
-                    <th>Created</th>
+                    <th>
+                        <span class="th-content">
+                            <span>Location</span>
+                            <?php echo renderSortButtons('location', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Reward</span>
+                            <?php echo renderSortButtons('reward', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Assigned To</span>
+                            <?php echo renderSortButtons('assigned', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Status</span>
+                            <?php echo renderSortButtons('status', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Created</span>
+                            <?php echo renderSortButtons('created', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>

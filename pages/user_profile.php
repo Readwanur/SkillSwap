@@ -6,6 +6,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+$user_id = $_SESSION['user_id'];
 $profile_id = intval($_GET['id'] ?? 0);
 if ($profile_id <= 0) {
     header('Location: search_users.php');
@@ -15,6 +16,54 @@ if ($profile_id <= 0) {
 if ($profile_id === $_SESSION['user_id']) {
     header('Location: profile.php');
     exit;
+}
+
+$success = '';
+$error = '';
+
+// Handle session booking
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'book_session') {
+    $provider_id = intval($_POST['provider_id'] ?? 0);
+    $skill_id = intval($_POST['skill_id'] ?? 0);
+    $scheduled_time = $_POST['scheduled_time'] ?? '';
+    $duration = intval($_POST['duration'] ?? 60);
+
+    if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
+        // Check wallet balance
+        $wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
+        $credit_cost = ($duration / 60) * 10; // 10 credits per hour
+
+        $scheduled_timestamp = strtotime($scheduled_time);
+        if ($scheduled_timestamp < time()) {
+            $error = 'You cannot book a session in the past. Please select a valid date and time.';
+        } else if ($wallet && $wallet['balance'] >= $credit_cost) {
+            $conn->begin_transaction();
+            try {
+                // Generate a 4-digit OTP
+                $completion_otp = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+
+                // 1. Deduct from requester's wallet (Escrow)
+                $conn->query("UPDATE wallet SET balance = balance - $credit_cost WHERE user_id = $user_id");
+
+                // 2. Insert session with OTP
+                $stmt = $conn->prepare("INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer, completion_otp) VALUES (?, ?, ?, 'scheduled', ?, ?, ?, ?)");
+                $stmt->bind_param("iiisids", $user_id, $provider_id, $skill_id, $scheduled_time, $duration, $credit_cost, $completion_otp);
+                
+                if ($stmt->execute()) {
+                    $conn->commit();
+                    $success = 'Session booked successfully! ' . number_format($credit_cost, 2) . ' TC has been held in escrow.';
+                } else {
+                    throw new Exception('Failed to book session.');
+                }
+                $stmt->close();
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = $e->getMessage();
+            }
+        } else {
+            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC but your balance is ' . number_format($wallet['balance'] ?? 0, 2) . ' TC.';
+        }
+    }
 }
 
 $user = $conn->query("
@@ -40,6 +89,13 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-wrapper">
     <div class="container">
         <a href="javascript:history.back()" style="color: var(--text-muted); font-size: 0.85rem;">&larr; Back</a>
+
+        <?php if ($success): ?>
+            <div class="alert alert-success mt-2"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-danger mt-2"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
 
         <div class="card mt-2 mb-3">
             <div class="flex gap-2 items-center">
@@ -73,10 +129,15 @@ include __DIR__ . '/../includes/header.php';
                 <?php if ($offered && $offered->num_rows > 0): ?>
                     <ul style="list-style:none; padding:0;">
                         <?php while ($s = $offered->fetch_assoc()): ?>
-                            <li style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-color);">
-                                <div class="flex justify-between">
-                                    <strong><a href="skill_detail.php?id=<?php echo $s['skill_id']; ?>" style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($s['skill_name']); ?></a></strong>
-                                    <span class="badge badge-info" style="font-size:0.7rem;"><?php echo htmlspecialchars($s['difficulty_level']); ?></span>
+                            <li style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-color);">
+                                <div class="flex justify-between items-center" style="gap:10px;">
+                                    <div>
+                                        <strong><a href="skill_detail.php?id=<?php echo $s['skill_id']; ?>" style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($s['skill_name']); ?></a></strong>
+                                        <span class="badge badge-info" style="font-size:0.7rem; margin-left:8px; display:inline-block;"><?php echo htmlspecialchars($s['difficulty_level']); ?></span>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm" onclick="openBooking(<?php echo $s['skill_id']; ?>, '<?php echo htmlspecialchars(addslashes($s['skill_name'])); ?>')">
+                                        Book Session
+                                    </button>
                                 </div>
                             </li>
                         <?php endwhile; ?>
@@ -102,5 +163,66 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- Booking Modal -->
+<div class="modal-overlay" id="bookingModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Book a Session</h3>
+            <button class="modal-close" onclick="closeBooking()">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="book_session">
+            <input type="hidden" name="provider_id" value="<?php echo $profile_id; ?>">
+            <input type="hidden" name="skill_id" id="modal_skill_id">
+            
+            <p style="color:var(--text-secondary); margin-bottom:8px;">Provider: <strong><?php echo htmlspecialchars($user['name']); ?></strong></p>
+            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong></p>
+            
+            <div class="form-group">
+                <label for="scheduled_time">Preferred Date & Time</label>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="duration">Duration (minutes)</label>
+                <select name="duration" id="duration" class="form-control">
+                    <option value="30">30 minutes (5 TC)</option>
+                    <option value="60" selected>60 minutes (10 TC)</option>
+                    <option value="90">90 minutes (15 TC)</option>
+                    <option value="120">120 minutes (20 TC)</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Set min datetime to the user's local "now"
+    function setMinDateTime() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var d = String(now.getDate()).padStart(2, '0');
+        var h = String(now.getHours()).padStart(2, '0');
+        var min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+    }
+
+    function openBooking(skillId, skillName) {
+        document.getElementById('modal_skill_id').value = skillId;
+        document.getElementById('modal_skill_name').textContent = skillName;
+        setMinDateTime();
+        document.getElementById('bookingModal').classList.add('active');
+    }
+
+    function closeBooking() {
+        document.getElementById('bookingModal').classList.remove('active');
+    }
+
+    document.getElementById('bookingModal').addEventListener('click', function (e) {
+        if (e.target === this) closeBooking();
+    });
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

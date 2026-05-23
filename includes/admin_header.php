@@ -35,11 +35,10 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
 
 <body>
 
-    <!-- Admin Navbar -->
     <nav class="navbar">
-        <div class="container">
+        <div class="container" style="max-width: 100%; padding: 0 30px;">
             <a href="../admin/dashboard.php" class="navbar-brand">
-                <img src="../assets/finalLogo.png" alt="SkillSwap Logo"><span
+                <img src="../assets/skillswap.png" alt="SkillSwap Logo"><span
                     style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">ADMIN</span>
             </a>
 

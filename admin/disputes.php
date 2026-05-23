@@ -157,6 +157,62 @@ if ($status_filter !== '' && in_array($status_filter, ['scheduled', 'under-revie
     $where_clause = "WHERE es.status = '$status_filter'";
 }
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'scheduled');
+$order = trim($_GET['order'] ?? 'desc');
+
+$allowed_sorts = [
+    'id' => 'es.session_id',
+    'skill' => 's.skill_name',
+    'requester' => 'u_req.name',
+    'provider' => 'u_prov.name',
+    'scheduled' => 'es.scheduled_time',
+    'duration' => 'es.session_duration',
+    'credits' => 'es.time_credit_transfer',
+    'status' => 'es.status',
+    'rating' => 'es.rating'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 'es.scheduled_time';
+$order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
+
+// Sort URL generator
+function getSortUrl($col, $dir, $status) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    if ($status !== '') {
+        $query['status'] = $status;
+    }
+    return 'disputes.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order, $status) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            $url = getSortUrl($col, 'desc', $status);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            $url = getSortUrl($col, 'asc', $status);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        $url = getSortUrl($col, 'asc', $status);
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 // Counts
 $count_all = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions")->fetch_assoc()['cnt'];
 $count_scheduled = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE status = 'scheduled'")->fetch_assoc()['cnt'];
@@ -175,7 +231,7 @@ $disputes = $conn->query("
     JOIN users u_req ON es.requester_id = u_req.user_id
     JOIN users u_prov ON es.provider_id = u_prov.user_id
     $where_clause
-    ORDER BY es.scheduled_time DESC
+    ORDER BY $sort_col $order
 ");
 
 // Fetch recent refund transactions for the notification panel
@@ -207,28 +263,37 @@ include __DIR__ . '/../includes/admin_header.php';
 <?php endif; ?>
 
 <!-- Summary Stats -->
+<?php
+function buildTabUrl($status, $sort, $order) {
+    $q = [];
+    if ($status !== '') $q['status'] = $status;
+    if ($sort !== '') $q['sort'] = $sort;
+    if ($order !== '') $q['order'] = strtolower($order);
+    return '?' . http_build_query($q);
+}
+?>
 <div class="stats-grid" style="margin-bottom:16px;">
-    <div class="stat-card stat-card-accent" style="--accent: var(--primary); cursor:pointer;" onclick="location.href='?'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--primary); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_all; ?></span>
         <span class="stat-label">Total Sessions</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--warning); cursor:pointer;" onclick="location.href='?status=scheduled'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--warning); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('scheduled', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_scheduled; ?></span>
         <span class="stat-label">Scheduled</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: #2196F3; cursor:pointer;" onclick="location.href='?status=under-review'">
+    <div class="stat-card stat-card-accent" style="--accent: #2196F3; cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('under-review', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_under_review; ?></span>
         <span class="stat-label">Under Review</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='?status=completed'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--success); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('completed', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_completed; ?></span>
         <span class="stat-label">Completed</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: var(--danger); cursor:pointer;" onclick="location.href='?status=cancelled'">
+    <div class="stat-card stat-card-accent" style="--accent: var(--danger); cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('cancelled', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_cancelled; ?></span>
         <span class="stat-label">Cancelled</span>
     </div>
-    <div class="stat-card stat-card-accent" style="--accent: #9c27b0; cursor:pointer;" onclick="location.href='?status=refunded'">
+    <div class="stat-card stat-card-accent" style="--accent: #9c27b0; cursor:pointer;" onclick="location.href='<?php echo buildTabUrl('refunded', $sort, $order); ?>'">
         <span class="stat-value"><?php echo $count_refunded; ?></span>
         <span class="stat-label">Refunded</span>
     </div>
@@ -277,12 +342,12 @@ include __DIR__ . '/../includes/admin_header.php';
             <?php endif; ?>
         </h3>
         <div class="admin-filter-tabs">
-            <a href="?" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
-            <a href="?status=scheduled" class="filter-tab <?php echo $status_filter === 'scheduled' ? 'active' : ''; ?>">&#x23F3; Scheduled</a>
-            <a href="?status=under-review" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">&#x1F50E; Under Review</a>
-            <a href="?status=completed" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">&#x2705; Completed</a>
-            <a href="?status=cancelled" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">&#x274C; Cancelled</a>
-            <a href="?status=refunded" class="filter-tab <?php echo $status_filter === 'refunded' ? 'active' : ''; ?>">&#x1F4B8; Refunded</a>
+            <a href="<?php echo buildTabUrl('', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
+            <a href="<?php echo buildTabUrl('scheduled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'scheduled' ? 'active' : ''; ?>">&#x23F3; Scheduled</a>
+            <a href="<?php echo buildTabUrl('under-review', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">&#x1F50E; Under Review</a>
+            <a href="<?php echo buildTabUrl('completed', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">&#x2705; Completed</a>
+            <a href="<?php echo buildTabUrl('cancelled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">&#x274C; Cancelled</a>
+            <a href="<?php echo buildTabUrl('refunded', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'refunded' ? 'active' : ''; ?>">&#x1F4B8; Refunded</a>
         </div>
     </div>
 
@@ -291,15 +356,60 @@ include __DIR__ . '/../includes/admin_header.php';
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Skill</th>
-                    <th>Requester</th>
-                    <th>Provider</th>
-                    <th>Scheduled</th>
-                    <th>Duration</th>
-                    <th>Credits</th>
-                    <th>Status</th>
-                    <th>Review</th>
+                    <th>
+                        <span class="th-content">
+                            <span>ID</span>
+                            <?php echo renderSortButtons('id', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Skill</span>
+                            <?php echo renderSortButtons('skill', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Requester</span>
+                            <?php echo renderSortButtons('requester', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Provider</span>
+                            <?php echo renderSortButtons('provider', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Scheduled</span>
+                            <?php echo renderSortButtons('scheduled', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Duration</span>
+                            <?php echo renderSortButtons('duration', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Credits</span>
+                            <?php echo renderSortButtons('credits', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Status</span>
+                            <?php echo renderSortButtons('status', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Review</span>
+                            <?php echo renderSortButtons('rating', $sort, $order, $status_filter); ?>
+                        </span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>

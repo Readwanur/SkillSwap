@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-card" style="max-width: 480px;">
             <div class="auth-logo">
 
-                <img src="../assets/finalLogo.png" alt="SkillSwap Logo" class="auth-logo-img">
+                <img src="../assets/skillswap.png" alt="SkillSwap Logo" class="auth-logo-img">
 
                 <p>Create Your Account</p>
             </div>

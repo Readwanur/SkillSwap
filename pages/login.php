@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-card">
             <div class="auth-logo">
 
-                <img src="../assets/finalLogo.png" alt="Logo" class="auth-logo-img">
+                <img src="../assets/skillswap.png" alt="Logo" class="auth-logo-img">
                 <p>Exchange Skills, Earn Time Credits</p>
             </div>
 

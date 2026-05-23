@@ -27,6 +27,53 @@ $above_avg = $conn->query("
            (SELECT AVG(balance) FROM wallet) AS is_above
 ")->fetch_assoc()['is_above'];
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'date');
+$order = trim($_GET['order'] ?? 'desc');
+
+$allowed_sorts = [
+    'id' => 't.transcation_id',
+    'amount' => 't.final_amount',
+    'date' => 't.timestamp'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 't.timestamp';
+$order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
+
+// Sort URL generator
+function getSortUrl($col, $dir) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    return 'wallet.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            $url = getSortUrl($col, 'desc');
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            $url = getSortUrl($col, 'asc');
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        $url = getSortUrl($col, 'asc');
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 // All transactions
 $transactions = $conn->query("
     SELECT t.*, u_from.name AS from_name, u_to.name AS to_name, s.skill_name
@@ -36,7 +83,7 @@ $transactions = $conn->query("
     LEFT JOIN exchange_sessions es ON t.session_id = es.session_id
     LEFT JOIN skills s ON es.skill_id = s.skill_id
     WHERE t.from_user_id = $user_id OR t.to_user_id = $user_id
-    ORDER BY t.timestamp DESC
+    ORDER BY $sort_col $order
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -84,13 +131,28 @@ include __DIR__ . '/../includes/header.php';
                     <table>
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>ID</span>
+                                        <?php echo renderSortButtons('id', $sort, $order); ?>
+                                    </span>
+                                </th>
                                 <th>Type</th>
                                 <th>Skill</th>
                                 <th>From</th>
                                 <th>To</th>
-                                <th>Amount</th>
-                                <th>Date</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Amount</span>
+                                        <?php echo renderSortButtons('amount', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Date</span>
+                                        <?php echo renderSortButtons('date', $sort, $order); ?>
+                                    </span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
