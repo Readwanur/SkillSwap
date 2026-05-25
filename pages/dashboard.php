@@ -53,6 +53,52 @@ $skills_requested = $conn->query("
     WHERE usr.user_id = $user_id
 ");
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'date');
+$order = trim($_GET['order'] ?? 'desc');
+
+$allowed_sorts = [
+    'amount' => 't.final_amount',
+    'date' => 't.timestamp'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 't.timestamp';
+$order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
+
+// Sort URL generator
+function getSortUrl($col, $dir) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    return 'dashboard.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            $url = getSortUrl($col, 'desc');
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            $url = getSortUrl($col, 'asc');
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        $url = getSortUrl($col, 'asc');
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 // Recent transactions
 $recent_txn = $conn->query("
     SELECT t.*, u_from.name AS from_name, u_to.name AS to_name
@@ -60,7 +106,7 @@ $recent_txn = $conn->query("
     JOIN users u_from ON t.from_user_id = u_from.user_id
     JOIN users u_to ON t.to_user_id = u_to.user_id
     WHERE t.from_user_id = $user_id OR t.to_user_id = $user_id
-    ORDER BY t.timestamp DESC
+    ORDER BY $sort_col $order
     LIMIT 5
 ");
 
@@ -177,8 +223,18 @@ include __DIR__ . '/../includes/header.php';
                                 <th>Type</th>
                                 <th>From</th>
                                 <th>To</th>
-                                <th>Amount</th>
-                                <th>Date</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Amount</span>
+                                        <?php echo renderSortButtons('amount', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Date</span>
+                                        <?php echo renderSortButtons('date', $sort, $order); ?>
+                                    </span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>

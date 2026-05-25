@@ -67,6 +67,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Search
 $search = trim($_GET['search'] ?? '');
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'joined');
+$order = trim($_GET['order'] ?? 'desc');
+
+$allowed_sorts = [
+    'id' => 'u.user_id',
+    'name' => 'u.name',
+    'rep' => 'r.current_score',
+    'sessions' => 'r.completed_sessions',
+    'balance' => 'w.balance',
+    'joined' => 'u.created_at'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 'u.created_at';
+$order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
+
+// Sort URL generator
+function getSortUrl($col, $dir, $search) {
+    $query = [
+        'sort' => $col,
+        'order' => $dir
+    ];
+    if ($search !== '') {
+        $query['search'] = $search;
+    }
+    return 'users.php?' . http_build_query($query);
+}
+
+// Sort Buttons generator (single toggle button beside column header)
+function renderSortButtons($col, $current_sort, $current_order, $search) {
+    if ($current_sort === $col) {
+        if (strtolower($current_order) === 'asc') {
+            // Currently sorted ascending. Click to sort descending.
+            $url = getSortUrl($col, 'desc', $search);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
+            </span>';
+        } else {
+            // Currently sorted descending. Click to sort ascending.
+            $url = getSortUrl($col, 'asc', $search);
+            return '
+            <span class="sort-arrows">
+                <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
+            </span>';
+        }
+    } else {
+        // Not currently sorted. Click to sort ascending.
+        $url = getSortUrl($col, 'asc', $search);
+        return '
+        <span class="sort-arrows">
+            <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
+        </span>';
+    }
+}
+
 $where = "WHERE 1=1";
 $params = [];
 $types = '';
@@ -87,7 +143,7 @@ $sql = "
     LEFT JOIN reputation r ON u.user_id = r.user_id
     LEFT JOIN wallet w ON u.user_id = w.user_id
     $where
-    ORDER BY u.created_at DESC
+    ORDER BY $sort_col $order
 ";
 
 if (!empty($params)) {
@@ -119,12 +175,15 @@ include __DIR__ . '/../includes/admin_header.php';
 <!-- Search Bar -->
 <div class="card mb-3">
     <form method="GET" class="admin-filter-bar">
+        <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort); ?>">
+        <input type="hidden" name="order" value="<?php echo htmlspecialchars(strtolower($order)); ?>">
         <div class="admin-search-box">
             <input type="text" name="search" class="form-control" placeholder="&#x1F50D; Search by name, email, or location..."
                 value="<?php echo htmlspecialchars($search); ?>" style="min-width:280px;">
         </div>
+
         <button type="submit" class="btn btn-sm btn-primary">Search</button>
-        <?php if ($search): ?>
+        <?php if ($search || $sort !== 'joined' || $order !== 'DESC'): ?>
             <a href="users.php" class="btn btn-sm btn-secondary">Clear</a>
         <?php endif; ?>
     </form>
@@ -140,15 +199,45 @@ include __DIR__ . '/../includes/admin_header.php';
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>User</th>
+                    <th>
+                        <span class="th-content">
+                            <span>ID</span>
+                            <?php echo renderSortButtons('id', $sort, $order, $search); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>User</span>
+                            <?php echo renderSortButtons('name', $sort, $order, $search); ?>
+                        </span>
+                    </th>
                     <th>Email</th>
                     <th>Location</th>
-                    <th>Rep Score</th>
-                    <th>Sessions</th>
-                    <th>Balance</th>
+                    <th>
+                        <span class="th-content">
+                            <span>Rep Score</span>
+                            <?php echo renderSortButtons('rep', $sort, $order, $search); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Sessions</span>
+                            <?php echo renderSortButtons('sessions', $sort, $order, $search); ?>
+                        </span>
+                    </th>
+                    <th>
+                        <span class="th-content">
+                            <span>Balance</span>
+                            <?php echo renderSortButtons('balance', $sort, $order, $search); ?>
+                        </span>
+                    </th>
                     <th>Status</th>
-                    <th>Joined</th>
+                    <th>
+                        <span class="th-content">
+                            <span>Joined</span>
+                            <?php echo renderSortButtons('joined', $sort, $order, $search); ?>
+                        </span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
