@@ -18,38 +18,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'complete_session_otp' && $session_id > 0) {
         $otp = trim($_POST['otp'] ?? '');
-        $sess = $conn->query("SELECT requester_id, provider_id, time_credit_transfer, completion_otp, status FROM exchange_sessions WHERE session_id = $session_id AND provider_id = $user_id")->fetch_assoc();
-        
-        if ($sess && $sess['status'] === 'scheduled') {
-            if ($sess['completion_otp'] === $otp) {
-                $conn->begin_transaction();
-                try {
-                    $amount = $sess['time_credit_transfer'];
-                    $prov_id = $sess['provider_id'];
-                    $req_id = $sess['requester_id'];
-
-                    $conn->query("UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = $session_id");
-                    
-                    $conn->query("UPDATE wallet SET balance = balance + $amount WHERE user_id = $prov_id");
-
-                    $stmt = $conn->prepare("INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES (?, ?, ?, 'credit_transfer', ?, ?)");
-                    $stmt->bind_param("iiidd", $session_id, $req_id, $prov_id, $amount, $amount);
-                    $stmt->execute();
-                    $stmt->close();
-
-                    $conn->query("UPDATE reputation SET completed_sessions = completed_sessions + 1 WHERE user_id = $prov_id");
-
-                    $conn->commit();
-                    $success = "Session completed successfully! $amount TC transferred to your wallet.";
-                } catch (Exception $e) {
-                    $conn->rollback();
-                    $error = 'Failed to complete session.';
-                }
-            } else {
-                $error = 'Invalid OTP.';
-            }
+        // --- STORED PROCEDURE: sp_complete_session ---
+        // Replaces multi-query PHP transaction with a single atomic DB call.
+        // The procedure validates OTP, transfers credits, logs transaction,
+        // and updates reputation (trigger TR-3 auto-updates mentor_level).
+        $stmt = $conn->prepare("CALL sp_complete_session(?, ?, ?, @sp_status, @sp_message)");
+        $stmt->bind_param("iis", $session_id, $user_id, $otp);
+        $stmt->execute();
+        $stmt->close();
+        $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
+        if ($result['status'] === 'success') {
+            $success = $result['message'];
+        } else {
+            $error = $result['message'];
         }
     }
+
 
     if ($_POST['action'] === 'submit_proof' && $session_id > 0) {
         $submission_note = trim($_POST['submission_note'] ?? '');
@@ -96,22 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->bind_param("isii", $rating, $comment, $session_id, $user_id);
         $stmt->execute();
         if ($stmt->affected_rows > 0) {
-            $session = $conn->query("SELECT provider_id FROM exchange_sessions WHERE session_id = $session_id")->fetch_assoc();
-            if ($session) {
-                $provider_id = $session['provider_id'];
-                $avg = $conn->query("SELECT AVG(rating) as avg_rating FROM exchange_sessions WHERE provider_id = $provider_id AND rating IS NOT NULL")->fetch_assoc();
-                if ($avg && $avg['avg_rating']) {
-                    $new_score = round($avg['avg_rating'], 2);
-                    $conn->query("UPDATE reputation SET current_score = $new_score WHERE user_id = $provider_id");
-                }
-            }
-
+            // NOTE: Trigger TR-2 (trg_after_session_rated) automatically
+            // recalculates the provider's avg reputation score using
+            // a correlated subquery: AVG(rating) FROM exchange_sessions.
+            // No manual PHP recalculation needed.
             $success = 'Review submitted. Thank you!';
         } else {
             $error = 'Failed to submit review. Unauthorized or invalid session.';
         }
         $stmt->close();
     }
+
 }
 
 // Fetch sessions

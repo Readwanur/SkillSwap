@@ -64,8 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-wrapper">
         <div class="auth-card">
             <div class="auth-logo">
-
-                <img src="../assets/skillswap.png" alt="Logo" class="auth-logo-img">
+                <a href="../index.php?v=<?=time()?>"><img src="../assets/skillswap.png" alt="Logo" class="auth-logo-img"></a>
                 <p>Exchange Skills, Earn Time Credits</p>
             </div>
 
@@ -91,6 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="auth-footer">
                 Don't have an account? <a href="../pages/register.php">Sign Up</a>
+                <br><br>
+                <a href="../index.php?v=<?=time()?>" style="font-size:0.8rem; color:var(--text-muted);">&larr; Back to Home</a>
             </div>
         </div>
     </div>
