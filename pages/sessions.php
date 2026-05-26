@@ -36,17 +36,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 
     if ($_POST['action'] === 'submit_proof' && $session_id > 0) {
+        $type = $_POST['dispute_action'] ?? 'proof';
         $submission_note = trim($_POST['submission_note'] ?? '');
-        if ($submission_note) {
-            $stmt = $conn->prepare("UPDATE exchange_sessions SET status = 'under-review', submission_note = ? WHERE session_id = ? AND status = 'scheduled' AND (provider_id = ? OR requester_id = ?)");
-            $stmt->bind_param("siii", $submission_note, $session_id, $user_id, $user_id);
-            $stmt->execute();
-            if ($stmt->affected_rows > 0) {
-                $success = 'Proof submitted! Admin will verify the session shortly.';
+        if (empty($submission_note)) {
+            $error = 'Please provide details or notes.';
+        } else {
+            if ($type === 'proof') {
+                $stmt = $conn->prepare("UPDATE exchange_sessions SET status = 'under-review', submission_note = ? WHERE session_id = ? AND status = 'scheduled' AND (provider_id = ? OR requester_id = ?)");
+                $stmt->bind_param("siii", $submission_note, $session_id, $user_id, $user_id);
+                $stmt->execute();
+                if ($stmt->affected_rows > 0) {
+                    $success = 'Proof submitted! Admin will verify the session shortly.';
+                } else {
+                    $error = 'Failed to submit proof. Unauthorized or invalid session.';
+                }
+                $stmt->close();
             } else {
-                $error = 'Failed to submit proof. Unauthorized or invalid session.';
+                $conn->begin_transaction();
+                try {
+                    $stmt1 = $conn->prepare("UPDATE exchange_sessions SET status = 'disputed' WHERE session_id = ? AND status IN ('scheduled', 'under-review') AND (provider_id = ? OR requester_id = ?)");
+                    $stmt1->bind_param("iii", $session_id, $user_id, $user_id);
+                    $stmt1->execute();
+                    
+                    if ($stmt1->affected_rows > 0) {
+                        $stmt2 = $conn->prepare("INSERT INTO disputes (session_id, filed_by_user_id, reason) VALUES (?, ?, ?)");
+                        $stmt2->bind_param("iis", $session_id, $user_id, $submission_note);
+                        $stmt2->execute();
+                        $stmt2->close();
+                        
+                        $conn->commit();
+                        $success = 'Formal dispute filed successfully! Admin has been notified and the session is locked.';
+                    } else {
+                        $conn->rollback();
+                        $error = 'Failed to file dispute. Session may not be in scheduled or under-review state.';
+                    }
+                    $stmt1->close();
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    $error = 'Database error: ' . $e->getMessage();
+                }
             }
-            $stmt->close();
         }
     }
 
@@ -104,6 +133,8 @@ elseif ($filter === 'completed')
     $filter_sql = "AND es.status = 'completed'";
 elseif ($filter === 'cancelled')
     $filter_sql = "AND es.status = 'cancelled'";
+elseif ($filter === 'disputed')
+    $filter_sql = "AND es.status = 'disputed'";
 
 $sessions = $conn->query("
     SELECT es.*, s.skill_name,
@@ -139,6 +170,7 @@ include __DIR__ . '/../includes/header.php';
             <a href="?filter=under-review" class="tab-btn <?php echo $filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
             <a href="?filter=completed" class="tab-btn <?php echo $filter === 'completed' ? 'active' : ''; ?>">Completed</a>
             <a href="?filter=cancelled" class="tab-btn <?php echo $filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
+            <a href="?filter=disputed" class="tab-btn <?php echo $filter === 'disputed' ? 'active' : ''; ?>">Disputed</a>
         </div>
 
         <!-- Sessions List -->
@@ -152,6 +184,8 @@ include __DIR__ . '/../includes/header.php';
                 if ($s['status'] === 'completed')
                     $status_class = 'badge-success';
                 elseif ($s['status'] === 'cancelled')
+                    $status_class = 'badge-danger';
+                elseif ($s['status'] === 'disputed')
                     $status_class = 'badge-danger';
                 ?>
                 <div class="session-card">
@@ -172,16 +206,18 @@ include __DIR__ . '/../includes/header.php';
                     <div class="session-actions">
                         <span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($s['status']); ?></span>
 
-                        <?php if ($s['status'] === 'scheduled'): ?>
-                            <?php if (!$is_requester): ?>
+                        <?php if ($s['status'] === 'scheduled' || $s['status'] === 'under-review'): ?>
+                            <?php if ($s['status'] === 'scheduled' && !$is_requester): ?>
                                 <button class="btn btn-sm btn-success" onclick="openComplete(<?php echo $s['session_id']; ?>)">Complete Session</button>
                             <?php endif; ?>
                             <button class="btn btn-sm btn-secondary" onclick="openDispute(<?php echo $s['session_id']; ?>)">Submit Proof / Dispute</button>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="action" value="cancel">
-                                <input type="hidden" name="session_id" value="<?php echo $s['session_id']; ?>">
-                                <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
-                            </form>
+                            <?php if ($s['status'] === 'scheduled'): ?>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="cancel">
+                                    <input type="hidden" name="session_id" value="<?php echo $s['session_id']; ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                </form>
+                            <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if ($s['status'] === 'completed' && !$s['feedback_given'] && $is_requester): ?>
@@ -305,12 +341,20 @@ include __DIR__ . '/../includes/header.php';
         <form method="POST">
             <input type="hidden" name="action" value="submit_proof">
             <input type="hidden" name="session_id" id="dispute_session_id">
-            <p style="color:var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Use this if the OTP is unavailable or there is a dispute. The Admin will review this manually.</p>
+            
             <div class="form-group">
-                <label for="submission_note">Proof / Note</label>
-                <textarea name="submission_note" id="submission_note" class="form-control" placeholder="Describe what was covered in the session..." required></textarea>
+                <label for="dispute_action">Action Type</label>
+                <select name="dispute_action" id="dispute_action" class="form-control">
+                    <option value="proof" selected>Submit Completion Proof (I taught/attended this session)</option>
+                    <option value="dispute">File Formal Dispute (No-show, conflict, or credit issue)</option>
+                </select>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Submit for Admin Review</button>
+            
+            <div class="form-group">
+                <label for="submission_note">Details / Note / Reason</label>
+                <textarea name="submission_note" id="submission_note" class="form-control" placeholder="Provide details, proof notes, or dispute reason..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Submit to Admin</button>
         </form>
     </div>
 </div>

@@ -69,11 +69,18 @@ BEGIN
         IF NEW.status = 'completed' THEN
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, 'Your exchange session has been marked as completed!', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'You have completed a teaching session! Credits have been transferred to your wallet.', 'session_update');
         ELSEIF NEW.status = 'cancelled' THEN
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.provider_id, 'A scheduled session has been cancelled.', 'session_update');
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, 'Your scheduled session has been cancelled.', 'session_update');
+        ELSEIF NEW.status = 'disputed' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
         END IF;
     END IF;
 END";
@@ -218,8 +225,10 @@ BEGIN
     SET v_credit_cost = (p_duration / 60.0) * 10;
     SET v_otp = LPAD(FLOOR(RAND() * 10000), 4, '0');
 
-    -- Check balance using subquery
-    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id;
+    START TRANSACTION;
+
+    -- Check balance using subquery with row lock
+    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id FOR UPDATE;
 
     -- Check for defaulted loans
     SELECT EXISTS (
@@ -242,20 +251,22 @@ BEGIN
     ) INTO v_has_conflict;
 
     IF v_has_defaulted_loan THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Your account has a defaulted loan. Please repay it before booking new sessions.';
     ELSEIF v_has_conflict THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Schedule conflict detected. Either you or the provider has an overlapping active session scheduled at this time.';
     ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC, have ', COALESCE(v_balance, 0), ' TC.');
     ELSEIF p_scheduled_time <= NOW() THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Cannot book a session in the past.';
     ELSE
-        START TRANSACTION;
-
         -- Deduct escrow
         UPDATE wallet SET balance = balance - v_credit_cost WHERE user_id = p_requester_id;
 
@@ -273,8 +284,295 @@ END";
 if ($conn->query($q_proc)) {
     if ($verbose) echo "✓ Stored procedure sp_book_session recreated/updated.<br>";
 } else {
-    $success = false;
     if ($verbose) echo "✗ Error creating stored procedure sp_book_session: " . $conn->error . "<br>";
+}
+
+// 5b. Update sp_complete_session stored procedure (fix: v_provider_id -> v_actual_provider_id)
+$conn->query("DROP PROCEDURE IF EXISTS sp_complete_session");
+$q_complete = "CREATE PROCEDURE sp_complete_session(
+    IN p_session_id INT,
+    IN p_provider_id INT,
+    IN p_otp VARCHAR(10),
+    OUT p_status VARCHAR(50),
+    OUT p_message VARCHAR(255)
+)
+BEGIN
+    DECLARE v_actual_provider_id INT;
+    DECLARE v_requester_id INT;
+    DECLARE v_amount DECIMAL(10,2);
+    DECLARE v_stored_otp VARCHAR(10);
+    DECLARE v_session_status VARCHAR(20);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Transaction failed due to a database error.';
+    END;
+
+    SELECT provider_id, requester_id, time_credit_transfer, completion_otp, status
+    INTO v_actual_provider_id, v_requester_id, v_amount, v_stored_otp, v_session_status
+    FROM exchange_sessions
+    WHERE session_id = p_session_id;
+
+    IF v_actual_provider_id IS NULL THEN
+        SET p_status = 'error';
+        SET p_message = 'Session not found.';
+    ELSEIF v_actual_provider_id != p_provider_id THEN
+        SET p_status = 'error';
+        SET p_message = 'You are not the provider for this session.';
+    ELSEIF v_session_status != 'scheduled' THEN
+        SET p_status = 'error';
+        SET p_message = 'Session is not in scheduled status.';
+    ELSEIF v_stored_otp != p_otp THEN
+        SET p_status = 'error';
+        SET p_message = 'Invalid OTP.';
+    ELSE
+        START TRANSACTION;
+
+        UPDATE exchange_sessions
+        SET status = 'completed', completion_time = NOW()
+        WHERE session_id = p_session_id;
+
+        UPDATE wallet SET balance = balance + v_amount
+        WHERE user_id = v_actual_provider_id;
+
+        INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note)
+        VALUES (p_session_id, v_requester_id, v_actual_provider_id, 'credit_transfer', v_amount, v_amount, 'Time credit transfer for completed session');
+
+        UPDATE reputation
+        SET completed_sessions = completed_sessions + 1
+        WHERE user_id = v_actual_provider_id;
+
+        COMMIT;
+        SET p_status = 'success';
+        SET p_message = CONCAT('Session completed! ', v_amount, ' TC transferred.');
+    END IF;
+END";
+if ($conn->query($q_complete)) {
+    if ($verbose) echo "✓ Stored procedure sp_complete_session recreated/updated.<br>";
+} else {
+    if ($verbose) echo "✗ Error creating stored procedure sp_complete_session: " . $conn->error . "<br>";
+}
+
+// 6. Create conversations table
+$q_conv = "CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)";
+if ($conn->query($q_conv)) {
+    if ($verbose) echo "✓ Table conversations created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating conversations: " . $conn->error . "<br>";
+}
+
+// 7. Create conversation_members table
+$q_members = "CREATE TABLE IF NOT EXISTS conversation_members (
+    conversation_id INT,
+    user_id INT,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (conversation_id, user_id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+)";
+if ($conn->query($q_members)) {
+    if ($verbose) echo "✓ Table conversation_members created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating conversation_members: " . $conn->error . "<br>";
+}
+
+// 8. Create messages table
+$q_msg = "CREATE TABLE IF NOT EXISTS messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
+)";
+if ($conn->query($q_msg)) {
+    if ($verbose) echo "✓ Table messages created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating messages: " . $conn->error . "<br>";
+}
+
+// 9. Create messages index (safely)
+$check_index = $conn->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = '$dbname' AND table_name = 'messages' AND index_name = 'idx_messages_thread' LIMIT 1");
+if ($check_index && $check_index->num_rows == 0) {
+    if ($conn->query("CREATE INDEX idx_messages_thread ON messages(conversation_id, sent_at DESC)")) {
+        if ($verbose) echo "✓ Index idx_messages_thread created.<br>";
+    } else {
+        $success = false;
+        if ($verbose) echo "✗ Error creating index: " . $conn->error . "<br>";
+    }
+}
+
+// Alter exchange_sessions status ENUM if not already done
+$conn->query("ALTER TABLE exchange_sessions MODIFY COLUMN status ENUM('scheduled', 'under-review', 'completed', 'cancelled', 'refunded', 'disputed') DEFAULT 'scheduled'");
+
+// 10. Create disputes table
+$q_disp = "CREATE TABLE IF NOT EXISTS disputes (
+    dispute_id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id INT NOT NULL,
+    filed_by_user_id INT NOT NULL,
+    reason TEXT NOT NULL,
+    status ENUM('open', 'resolved_refunded', 'resolved_payout') DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES exchange_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (filed_by_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+)";
+if ($conn->query($q_disp)) {
+    if ($verbose) echo "✓ Table disputes created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating disputes: " . $conn->error . "<br>";
+}
+
+// 11. Create vw_public_users view
+$q_pub_u = "CREATE OR REPLACE VIEW vw_public_users AS
+SELECT user_id, name, location, bio, reliability_score, status, created_at, last_active_at
+FROM users";
+if ($conn->query($q_pub_u)) {
+    if ($verbose) echo "✓ View vw_public_users created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating view vw_public_users: " . $conn->error . "<br>";
+}
+
+// 12. Create vw_smart_matches view
+$q_smart = "CREATE OR REPLACE VIEW vw_smart_matches AS
+SELECT DISTINCT
+    my_req.user_id AS user_a_id,
+    their_off.user_id AS user_b_id,
+    s1.skill_id AS user_a_requests_skill_id,
+    s1.skill_name AS user_a_requests_skill_name,
+    s2.skill_id AS user_b_requests_skill_id,
+    s2.skill_name AS user_b_requests_skill_name,
+    u.name AS user_b_name,
+    u.location AS user_b_location,
+    u.reliability_score AS user_b_reliability,
+    DENSE_RANK() OVER (
+        PARTITION BY my_req.user_id 
+        ORDER BY u.reliability_score DESC, u.user_id ASC
+    ) as match_rank
+FROM user_skills_requested my_req
+JOIN user_skills_offered their_off ON my_req.skill_id = their_off.skill_id
+JOIN user_skills_requested their_req ON their_off.user_id = their_req.user_id
+JOIN user_skills_offered my_off ON their_req.skill_id = my_off.skill_id AND my_off.user_id = my_req.user_id
+JOIN users u ON their_off.user_id = u.user_id
+JOIN skills s1 ON my_req.skill_id = s1.skill_id
+JOIN skills s2 ON their_req.skill_id = s2.skill_id
+WHERE u.status = 'active'";
+if ($conn->query($q_smart)) {
+    if ($verbose) echo "✓ View vw_smart_matches created/verified.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating view vw_smart_matches: " . $conn->error . "<br>";
+}
+
+// 13. Create sp_resolve_dispute stored procedure
+$conn->query("DROP PROCEDURE IF EXISTS sp_resolve_dispute");
+$q_proc_disp = "CREATE PROCEDURE sp_resolve_dispute(
+    IN p_dispute_id INT,
+    IN p_verdict VARCHAR(20),
+    OUT p_status VARCHAR(50),
+    OUT p_message VARCHAR(255)
+)
+BEGIN
+    DECLARE v_session_id INT;
+    DECLARE v_requester_id INT;
+    DECLARE v_provider_id INT;
+    DECLARE v_amount DECIMAL(10,2);
+    DECLARE v_dispute_status VARCHAR(20);
+    DECLARE v_session_status VARCHAR(20);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Dispute resolution failed due to a database error.';
+    END;
+
+    -- Fetch dispute and session details
+    SELECT d.status, d.session_id, es.requester_id, es.provider_id, es.time_credit_transfer, es.status
+    INTO v_dispute_status, v_session_id, v_requester_id, v_provider_id, v_amount, v_session_status
+    FROM disputes d
+    JOIN exchange_sessions es ON d.session_id = es.session_id
+    WHERE d.dispute_id = p_dispute_id
+    FOR UPDATE;
+
+    IF v_dispute_status IS NULL THEN
+        SET p_status = 'error';
+        SET p_message = 'Dispute not found.';
+    ELSEIF v_dispute_status != 'open' THEN
+        SET p_status = 'error';
+        SET p_message = 'Dispute is already resolved.';
+    ELSE
+        START TRANSACTION;
+
+        IF p_verdict = 'refund' THEN
+            -- Update session status
+            UPDATE exchange_sessions SET status = 'cancelled' WHERE session_id = v_session_id;
+            
+            -- Refund held escrow credits back to requester
+            UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_requester_id;
+            
+            -- Log system refund transaction
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            VALUES (v_session_id, NULL, v_requester_id, 'full_refund', v_amount, v_amount, 'Refund via dispute resolution.');
+            
+            -- Update dispute status
+            UPDATE disputes SET status = 'resolved_refunded' WHERE dispute_id = p_dispute_id;
+            
+            -- Penalize provider reliability in reputation
+            UPDATE reputation 
+            SET current_score = GREATEST(current_score - 0.50, 1.00),
+                cancelled_sessions = cancelled_sessions + 1
+            WHERE user_id = v_provider_id;
+
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Dispute refunded. ', v_amount, ' TC returned to requester.');
+
+        ELSEIF p_verdict = 'payout' THEN
+            -- Update session status
+            UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = v_session_id;
+            
+            -- Transfer escrow credits to provider
+            UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_provider_id;
+            
+            -- Log credit transfer transaction
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            VALUES (v_session_id, v_requester_id, v_provider_id, 'credit_transfer', v_amount, v_amount, 'Payout via dispute resolution.');
+            
+            -- Update dispute status
+            UPDATE disputes SET status = 'resolved_payout' WHERE dispute_id = p_dispute_id;
+            
+            -- Increment provider completed sessions
+            UPDATE reputation 
+            SET completed_sessions = completed_sessions + 1 
+            WHERE user_id = v_provider_id;
+
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Dispute paid out. ', v_amount, ' TC transferred to provider.');
+        ELSE
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = 'Invalid verdict. Use refund or payout.';
+        END IF;
+    END IF;
+END";
+if ($conn->query($q_proc_disp)) {
+    if ($verbose) echo "✓ Stored procedure sp_resolve_dispute created.<br>";
+} else {
+    $success = false;
+    if ($verbose) echo "✗ Error creating stored procedure sp_resolve_dispute: " . $conn->error . "<br>";
 }
 
 if ($verbose) {

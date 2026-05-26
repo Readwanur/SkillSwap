@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS exchange_sessions (
     requester_id INT NOT NULL,
     provider_id INT NOT NULL,
     skill_id INT NOT NULL,
-    status ENUM('scheduled', 'under-review', 'completed', 'cancelled', 'refunded') DEFAULT 'scheduled',
+    status ENUM('scheduled', 'under-review', 'completed', 'cancelled', 'refunded', 'disputed') DEFAULT 'scheduled',
     scheduled_time DATETIME NOT NULL,
     completion_time DATETIME NULL,
     session_duration INT,
@@ -534,11 +534,18 @@ BEGIN
         IF NEW.status = 'completed' THEN
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, 'Your exchange session has been marked as completed!', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'You have completed a teaching session! Credits have been transferred to your wallet.', 'session_update');
         ELSEIF NEW.status = 'cancelled' THEN
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.provider_id, 'A scheduled session has been cancelled.', 'session_update');
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, 'Your scheduled session has been cancelled.', 'session_update');
+        ELSEIF NEW.status = 'disputed' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
         END IF;
     END IF;
 END //
@@ -756,16 +763,16 @@ BEGIN
 
         -- 2. Transfer credits to provider
         UPDATE wallet SET balance = balance + v_amount
-        WHERE user_id = v_provider_id;
+        WHERE user_id = v_actual_provider_id;
 
         -- 3. Log transaction
         INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note)
-        VALUES (p_session_id, v_requester_id, v_provider_id, 'credit_transfer', v_amount, v_amount, 'Time credit transfer for completed session');
+        VALUES (p_session_id, v_requester_id, v_actual_provider_id, 'credit_transfer', v_amount, v_amount, 'Time credit transfer for completed session');
 
         -- 4. Update provider reputation
         UPDATE reputation
         SET completed_sessions = completed_sessions + 1
-        WHERE user_id = v_provider_id;
+        WHERE user_id = v_actual_provider_id;
 
         COMMIT;
         SET p_status = 'success';
@@ -808,8 +815,10 @@ BEGIN
     SET v_credit_cost = (p_duration / 60.0) * 10;
     SET v_otp = LPAD(FLOOR(RAND() * 10000), 4, '0');
 
-    -- Check balance using subquery
-    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id;
+    START TRANSACTION;
+
+    -- Check balance using subquery with row lock
+    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id FOR UPDATE;
 
     -- [Flaw 7] Check for defaulted loans
     SELECT EXISTS (
@@ -832,21 +841,23 @@ BEGIN
     ) INTO v_has_conflict;
 
     IF v_has_defaulted_loan THEN
+        ROLLBACK;
         -- [Flaw 7] Block session booking for defaulted users
         SET p_status = 'error';
         SET p_message = 'Your account has a defaulted loan. Please repay it before booking new sessions.';
     ELSEIF v_has_conflict THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Schedule conflict detected. Either you or the provider has an overlapping active session scheduled at this time.';
     ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC, have ', COALESCE(v_balance, 0), ' TC.');
     ELSEIF p_scheduled_time <= NOW() THEN
+        ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Cannot book a session in the past.';
     ELSE
-        START TRANSACTION;
-
         -- Deduct escrow
         UPDATE wallet SET balance = balance - v_credit_cost WHERE user_id = p_requester_id;
 
@@ -1446,4 +1457,177 @@ SELECT
     es.rating,
     es.bonus_multiplier
 FROM exchange_sessions es;
+
+-- ============================================================
+-- PEER-TO-PEER MESSAGING TABLES & INDEXES
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS conversation_members (
+    conversation_id INT,
+    user_id INT,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (conversation_id, user_id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_messages_thread ON messages(conversation_id, sent_at DESC);
+
+
+-- ============================================================
+-- PHASE 6: DISPUTES, VIEWS & RESOLUTION PROCEDURES
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS disputes (
+    dispute_id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id INT NOT NULL,
+    filed_by_user_id INT NOT NULL,
+    reason TEXT NOT NULL,
+    status ENUM('open', 'resolved_refunded', 'resolved_payout') DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES exchange_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (filed_by_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE OR REPLACE VIEW vw_public_users AS
+SELECT user_id, name, location, bio, reliability_score, status, created_at, last_active_at
+FROM users;
+
+CREATE OR REPLACE VIEW vw_smart_matches AS
+SELECT DISTINCT
+    my_req.user_id AS user_a_id,
+    their_off.user_id AS user_b_id,
+    s1.skill_id AS user_a_requests_skill_id,
+    s1.skill_name AS user_a_requests_skill_name,
+    s2.skill_id AS user_b_requests_skill_id,
+    s2.skill_name AS user_b_requests_skill_name,
+    u.name AS user_b_name,
+    u.location AS user_b_location,
+    u.reliability_score AS user_b_reliability,
+    DENSE_RANK() OVER (
+        PARTITION BY my_req.user_id 
+        ORDER BY u.reliability_score DESC, u.user_id ASC
+    ) as match_rank
+FROM user_skills_requested my_req
+JOIN user_skills_offered their_off ON my_req.skill_id = their_off.skill_id
+JOIN user_skills_requested their_req ON their_off.user_id = their_req.user_id
+JOIN user_skills_offered my_off ON their_req.skill_id = my_off.skill_id AND my_off.user_id = my_req.user_id
+JOIN users u ON their_off.user_id = u.user_id
+JOIN skills s1 ON my_req.skill_id = s1.skill_id
+JOIN skills s2 ON their_req.skill_id = s2.skill_id
+WHERE u.status = 'active';
+
+DROP PROCEDURE IF EXISTS sp_resolve_dispute;
+DELIMITER //
+CREATE PROCEDURE sp_resolve_dispute(
+    IN p_dispute_id INT,
+    IN p_verdict VARCHAR(20),
+    OUT p_status VARCHAR(50),
+    OUT p_message VARCHAR(255)
+)
+BEGIN
+    DECLARE v_session_id INT;
+    DECLARE v_requester_id INT;
+    DECLARE v_provider_id INT;
+    DECLARE v_amount DECIMAL(10,2);
+    DECLARE v_dispute_status VARCHAR(20);
+    DECLARE v_session_status VARCHAR(20);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Dispute resolution failed due to a database error.';
+    END;
+
+    -- Fetch dispute and session details
+    SELECT d.status, d.session_id, es.requester_id, es.provider_id, es.time_credit_transfer, es.status
+    INTO v_dispute_status, v_session_id, v_requester_id, v_provider_id, v_amount, v_session_status
+    FROM disputes d
+    JOIN exchange_sessions es ON d.session_id = es.session_id
+    WHERE d.dispute_id = p_dispute_id
+    FOR UPDATE;
+
+    IF v_dispute_status IS NULL THEN
+        SET p_status = 'error';
+        SET p_message = 'Dispute not found.';
+    ELSEIF v_dispute_status != 'open' THEN
+        SET p_status = 'error';
+        SET p_message = 'Dispute is already resolved.';
+    ELSE
+        START TRANSACTION;
+
+        IF p_verdict = 'refund' THEN
+            -- Update session status
+            UPDATE exchange_sessions SET status = 'cancelled' WHERE session_id = v_session_id;
+            
+            -- Refund held escrow credits back to requester
+            UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_requester_id;
+            
+            -- Log system refund transaction
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            VALUES (v_session_id, NULL, v_requester_id, 'full_refund', v_amount, v_amount, 'Refund via dispute resolution.');
+            
+            -- Update dispute status
+            UPDATE disputes SET status = 'resolved_refunded' WHERE dispute_id = p_dispute_id;
+            
+            -- Penalize provider reliability in reputation
+            UPDATE reputation 
+            SET current_score = GREATEST(current_score - 0.50, 1.00),
+                cancelled_sessions = cancelled_sessions + 1
+            WHERE user_id = v_provider_id;
+
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Dispute refunded. ', v_amount, ' TC returned to requester.');
+
+        ELSEIF p_verdict = 'payout' THEN
+            -- Update session status
+            UPDATE exchange_sessions SET status = 'completed', completion_time = NOW() WHERE session_id = v_session_id;
+            
+            -- Transfer escrow credits to provider
+            UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_provider_id;
+            
+            -- Log credit transfer transaction
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            VALUES (v_session_id, v_requester_id, v_provider_id, 'credit_transfer', v_amount, v_amount, 'Payout via dispute resolution.');
+            
+            -- Update dispute status
+            UPDATE disputes SET status = 'resolved_payout' WHERE dispute_id = p_dispute_id;
+            
+            -- Increment provider completed sessions
+            UPDATE reputation 
+            SET completed_sessions = completed_sessions + 1 
+            WHERE user_id = v_provider_id;
+
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Dispute paid out. ', v_amount, ' TC transferred to provider.');
+        ELSE
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = 'Invalid verdict. Use refund or payout.';
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+ALTER TABLE exchange_sessions MODIFY COLUMN status ENUM('scheduled', 'under-review', 'completed', 'cancelled', 'refunded', 'disputed') DEFAULT 'scheduled';
+
 

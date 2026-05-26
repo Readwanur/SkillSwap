@@ -271,6 +271,102 @@ while ($ts = $task_stats->fetch_assoc()) {
     $task_data[$ts['status']] = $ts['cnt'];
 }
 
+// --- OLAP BI: Demand-to-Supply Ratio ---
+$demand_supply = $conn->query("
+    SELECT
+        s.skill_name,
+        s.catagory,
+        COALESCE(d.demand_count, 0) AS demand_count,
+        COALESCE(o.supply_count, 0) AS supply_count,
+        CASE
+            WHEN COALESCE(o.supply_count, 0) = 0 THEN 999.99
+            ELSE ROUND(COALESCE(d.demand_count, 0) * 1.0 / o.supply_count, 2)
+        END AS demand_supply_ratio,
+        CASE
+            WHEN COALESCE(o.supply_count, 0) = 0 THEN 'Critical Gap ⛔'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 3 THEN 'High Demand 🔥'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 1.5 THEN 'Growing 📈'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count >= 0.8 THEN 'Balanced ⚖️'
+            ELSE 'Over-Supplied 📦'
+        END AS market_status
+    FROM skills s
+    LEFT JOIN (
+        SELECT skill_id, COUNT(*) AS demand_count
+        FROM user_skills_requested
+        GROUP BY skill_id
+    ) d ON s.skill_id = d.skill_id
+    LEFT JOIN (
+        SELECT skill_id, COUNT(*) AS supply_count
+        FROM user_skills_offered
+        GROUP BY skill_id
+    ) o ON s.skill_id = o.skill_id
+    WHERE COALESCE(d.demand_count, 0) > 0 OR COALESCE(o.supply_count, 0) > 0
+    ORDER BY demand_supply_ratio DESC
+    LIMIT 15
+");
+
+// --- OLAP BI: Skill Popularity Percentiles (NTILE) ---
+$skill_percentiles = $conn->query("
+    WITH skill_activity AS (
+        SELECT
+            s.skill_id,
+            s.skill_name,
+            s.catagory,
+            COUNT(es.session_id) AS total_sessions,
+            COALESCE(SUM(es.session_duration), 0) AS total_minutes,
+            COALESCE(ROUND(AVG(es.rating), 2), 0) AS avg_rating
+        FROM skills s
+        LEFT JOIN exchange_sessions es ON s.skill_id = es.skill_id AND es.status = 'completed'
+        GROUP BY s.skill_id
+        HAVING total_sessions > 0
+    )
+    SELECT
+        skill_name,
+        catagory,
+        total_sessions,
+        ROUND(total_minutes / 60.0, 1) AS total_hours,
+        avg_rating,
+        NTILE(4) OVER (ORDER BY total_sessions DESC) AS popularity_quartile,
+        PERCENT_RANK() OVER (ORDER BY total_sessions DESC) AS pct_rank
+    FROM skill_activity
+    ORDER BY popularity_quartile ASC, total_sessions DESC
+    LIMIT 20
+");
+
+// --- OLAP BI: Month-over-Month (MoM) Session Booking Growth ---
+$mom_growth = $conn->query("
+    WITH monthly_bookings AS (
+        SELECT
+            DATE_FORMAT(scheduled_time, '%Y-%m') AS month,
+            COUNT(*) AS total_bookings,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+            ROUND(AVG(session_duration), 0) AS avg_duration_mins
+        FROM exchange_sessions
+        GROUP BY month
+    )
+    SELECT
+        month,
+        total_bookings,
+        completed,
+        cancelled,
+        avg_duration_mins,
+        LAG(total_bookings) OVER (ORDER BY month) AS prev_month_bookings,
+        CASE
+            WHEN LAG(total_bookings) OVER (ORDER BY month) IS NULL THEN NULL
+            WHEN LAG(total_bookings) OVER (ORDER BY month) = 0 THEN 100.0
+            ELSE ROUND(
+                (total_bookings - LAG(total_bookings) OVER (ORDER BY month)) * 100.0 /
+                LAG(total_bookings) OVER (ORDER BY month),
+                1
+            )
+        END AS mom_growth_pct,
+        SUM(total_bookings) OVER (ORDER BY month) AS cumulative_bookings
+    FROM monthly_bookings
+    ORDER BY month DESC
+    LIMIT 12
+");
+
 include __DIR__ . '/../includes/admin_header.php';
 ?>
 
@@ -783,6 +879,187 @@ include __DIR__ . '/../includes/admin_header.php';
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- BUSINESS INTELLIGENCE OLAP PANELS -->
+<!-- ============================================================ -->
+<div class="card mb-3" style="border: 2px solid var(--info);">
+    <div class="card-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(14, 165, 233, 0.08)); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
+        <div>
+            <h2 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">🧠 Business Intelligence Analytics</h2>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
+        </div>
+        <span class="badge badge-info" style="font-size: 0.75rem;">Window Functions + CTEs</span>
+    </div>
+
+    <div style="padding: 20px;">
+
+        <!-- Demand-to-Supply Ratio -->
+        <div class="card mb-3" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+            <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">📊 Demand-to-Supply Ratio (Market Economics)</h4>
+                <span class="badge badge-warning" style="font-size: 0.7rem;">Correlated Subqueries</span>
+            </div>
+            <div class="table-wrapper">
+                <table style="font-size: 0.82rem; background: var(--bg-secondary);">
+                    <thead>
+                        <tr style="background: var(--bg-primary);">
+                            <th>Skill</th>
+                            <th>Category</th>
+                            <th style="text-align: center;">Demand (Learners)</th>
+                            <th style="text-align: center;">Supply (Providers)</th>
+                            <th style="text-align: right;">D:S Ratio</th>
+                            <th style="text-align: center;">Market Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($demand_supply && $demand_supply->num_rows > 0): ?>
+                            <?php while ($ds = $demand_supply->fetch_assoc()):
+                                $ratio = $ds['demand_supply_ratio'];
+                                $ratio_color = 'var(--text-secondary)';
+                                if ($ratio >= 999) $ratio_color = 'var(--danger)';
+                                elseif ($ratio > 3) $ratio_color = '#ef4444';
+                                elseif ($ratio > 1.5) $ratio_color = 'var(--warning)';
+                                elseif ($ratio >= 0.8) $ratio_color = 'var(--success)';
+                                else $ratio_color = 'var(--info)';
+
+                                $status_badge = 'badge-info';
+                                if (strpos($ds['market_status'], 'Critical') !== false) $status_badge = 'badge-danger';
+                                elseif (strpos($ds['market_status'], 'High') !== false) $status_badge = 'badge-warning';
+                                elseif (strpos($ds['market_status'], 'Growing') !== false) $status_badge = 'badge-orange';
+                                elseif (strpos($ds['market_status'], 'Balanced') !== false) $status_badge = 'badge-success';
+                            ?>
+                                <tr style="border-bottom: 1px solid var(--border-light);">
+                                    <td><strong><?php echo htmlspecialchars($ds['skill_name']); ?></strong></td>
+                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($ds['catagory'] ?? 'General'); ?></span></td>
+                                    <td style="text-align: center; color: var(--danger); font-weight: 600;"><?php echo $ds['demand_count']; ?></td>
+                                    <td style="text-align: center; color: var(--success); font-weight: 600;"><?php echo $ds['supply_count']; ?></td>
+                                    <td style="text-align: right; font-weight: bold; color: <?php echo $ratio_color; ?>;">
+                                        <?php echo $ratio >= 999 ? '∞' : $ratio . ':1'; ?>
+                                    </td>
+                                    <td style="text-align: center;"><span class="badge <?php echo $status_badge; ?>"><?php echo $ds['market_status']; ?></span></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No demand/supply data available.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid-2 mb-3">
+            <!-- Skill Popularity Percentiles (NTILE) -->
+            <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+                <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">🏅 Skill Popularity Percentiles</h4>
+                    <span class="badge badge-success" style="font-size: 0.7rem;">NTILE(4) OVER()</span>
+                </div>
+                <div class="table-wrapper">
+                    <table style="font-size: 0.82rem; background: var(--bg-secondary);">
+                        <thead>
+                            <tr style="background: var(--bg-primary);">
+                                <th>Skill</th>
+                                <th style="text-align: center;">Sessions</th>
+                                <th style="text-align: center;">Hours</th>
+                                <th style="text-align: center;">Rating</th>
+                                <th style="text-align: center;">Quartile</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($skill_percentiles && $skill_percentiles->num_rows > 0): ?>
+                                <?php while ($sp = $skill_percentiles->fetch_assoc()):
+                                    $q = (int)$sp['popularity_quartile'];
+                                    $quartile_labels = [1 => 'Top 25% 🥇', 2 => 'Top 50% 🥈', 3 => 'Top 75% 🥉', 4 => 'Bottom 25%'];
+                                    $quartile_badges = [1 => 'badge-success', 2 => 'badge-info', 3 => 'badge-warning', 4 => 'badge-danger'];
+                                    $pct = round((1 - (float)$sp['pct_rank']) * 100, 0);
+                                ?>
+                                    <tr style="border-bottom: 1px solid var(--border-light);">
+                                        <td>
+                                            <strong><?php echo htmlspecialchars($sp['skill_name']); ?></strong>
+                                            <br><small style="color:var(--text-muted);"><?php echo htmlspecialchars($sp['catagory'] ?? 'General'); ?></small>
+                                        </td>
+                                        <td style="text-align: center; font-weight: 600;"><?php echo $sp['total_sessions']; ?></td>
+                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $sp['total_hours']; ?>h</td>
+                                        <td style="text-align: center;">⭐ <?php echo $sp['avg_rating']; ?></td>
+                                        <td style="text-align: center;">
+                                            <span class="badge <?php echo $quartile_badges[$q] ?? 'badge-info'; ?>">
+                                                <?php echo $quartile_labels[$q] ?? 'Q'.$q; ?>
+                                            </span>
+                                            <br><small style="color:var(--text-muted);">Top <?php echo $pct; ?>%</small>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No completed sessions to rank.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Month-over-Month Growth -->
+            <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+                <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">📈 Month-over-Month Session Growth</h4>
+                    <span class="badge badge-info" style="font-size: 0.7rem;">LAG() OVER()</span>
+                </div>
+                <div class="table-wrapper">
+                    <table style="font-size: 0.82rem; background: var(--bg-secondary);">
+                        <thead>
+                            <tr style="background: var(--bg-primary);">
+                                <th>Month</th>
+                                <th style="text-align: center;">Bookings</th>
+                                <th style="text-align: center;">Completed</th>
+                                <th style="text-align: center;">Avg Duration</th>
+                                <th style="text-align: right;">MoM Growth</th>
+                                <th style="text-align: right;">Cumulative</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($mom_growth && $mom_growth->num_rows > 0): ?>
+                                <?php while ($mg = $mom_growth->fetch_assoc()):
+                                    $mom_pct = $mg['mom_growth_pct'];
+                                    $mom_color = 'var(--text-secondary)';
+                                    $mom_text = '—';
+                                    if ($mom_pct !== null) {
+                                        if ($mom_pct > 0) {
+                                            $mom_color = 'var(--success)';
+                                            $mom_text = '▲ +' . $mom_pct . '%';
+                                        } elseif ($mom_pct < 0) {
+                                            $mom_color = 'var(--danger)';
+                                            $mom_text = '▼ ' . $mom_pct . '%';
+                                        } else {
+                                            $mom_text = '→ 0%';
+                                        }
+                                    }
+                                ?>
+                                    <tr style="border-bottom: 1px solid var(--border-light);">
+                                        <td><strong><?php echo $mg['month']; ?></strong></td>
+                                        <td style="text-align: center; font-weight: 600;"><?php echo $mg['total_bookings']; ?></td>
+                                        <td style="text-align: center; color: var(--success);"><?php echo $mg['completed']; ?></td>
+                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $mg['avg_duration_mins']; ?> min</td>
+                                        <td style="text-align: right; font-weight: bold; color: <?php echo $mom_color; ?>;"><?php echo $mom_text; ?></td>
+                                        <td style="text-align: right; font-weight: 600;"><?php echo $mg['cumulative_bookings']; ?></td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No monthly booking data found.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 

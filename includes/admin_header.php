@@ -22,6 +22,7 @@ $page_titles = [
     'system_audit' => 'System Audit Logs',
     'transaction_simulator' => 'ACID Transaction Simulator',
     'stress_test' => 'Stress Test & Index Profiler',
+    'formal_disputes' => 'Formal Disputes',
 ];
 $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
 ?>
@@ -102,6 +103,10 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 <li><a href="../admin/stress_test.php"
                         class="<?php echo $current_page === 'stress_test' ? 'active' : ''; ?>">
                         <span class="sidebar-icon">🚀</span> Stress Test</a>
+                </li>
+                <li><a href="../admin/formal_disputes.php"
+                        class="<?php echo $current_page === 'formal_disputes' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon">⚖️</span> Formal Disputes</a>
                 </li>
             </ul>
 

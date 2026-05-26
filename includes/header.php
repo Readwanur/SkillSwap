@@ -8,11 +8,25 @@ $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0;
 $is_admin = isset($_SESSION['is_admin']) ? $_SESSION['is_admin'] : false;
 
 $time_credits = 0.00;
+$unread_msg_count = 0;
 if (isset($conn) && $user_id > 0 && !$is_admin) {
     $wallet_res = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id");
     if ($wallet_res && $wallet_res->num_rows > 0) {
         $wallet_row = $wallet_res->fetch_assoc();
         $time_credits = $wallet_row['balance'];
+    }
+
+    // Count unread chat messages
+    $unread_msg_res = $conn->query("
+        SELECT COUNT(*) AS count 
+        FROM messages m
+        INNER JOIN conversation_members cm ON m.conversation_id = cm.conversation_id
+        WHERE cm.user_id = $user_id 
+          AND m.sender_id != $user_id 
+          AND m.is_read = 0
+    ");
+    if ($unread_msg_res && $unread_msg_res->num_rows > 0) {
+        $unread_msg_count = intval($unread_msg_res->fetch_assoc()['count']);
     }
 }
 ?>
@@ -55,6 +69,12 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                 class="<?php echo $current_page == 'community_tasks' ? 'active' : ''; ?>">Community</a></li>
                         <li><a href="../pages/profile.php"
                                 class="<?php echo $current_page == 'profile' ? 'active' : ''; ?>">Profile</a></li>
+                        <li><a href="../pages/messages.php"
+                                class="<?php echo $current_page == 'messages' ? 'active' : ''; ?>">Messages
+                                <?php if ($unread_msg_count > 0): ?>
+                                    <span class="badge badge-orange" style="font-size:0.65rem; padding: 2px 5px; border-radius: 50%; display:inline-block; vertical-align:middle; line-height:1;"><?php echo $unread_msg_count; ?></span>
+                                <?php endif; ?>
+                            </a></li>
                     </ul>
                     <?php if ($user_id > 0): ?>
                         <form action="../pages/search_users.php" method="GET" style="display:inline-block; position:relative;" id="headerSearchForm">
