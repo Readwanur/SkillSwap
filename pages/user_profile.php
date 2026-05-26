@@ -29,42 +29,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $duration = intval($_POST['duration'] ?? 60);
 
     if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
-        // Check wallet balance
-        $wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
-        $credit_cost = ($duration / 60) * 10; // 10 credits per hour
-
-        $scheduled_timestamp = strtotime($scheduled_time);
-        if ($scheduled_timestamp < time()) {
-            $error = 'You cannot book a session in the past. Please select a valid date and time.';
-        } else if ($wallet && $wallet['balance'] >= $credit_cost) {
-            $conn->begin_transaction();
-            try {
-                // Generate a 4-digit OTP
-                $completion_otp = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-
-                // 1. Deduct from requester's wallet (Escrow)
-                $conn->query("UPDATE wallet SET balance = balance - $credit_cost WHERE user_id = $user_id");
-
-                // 2. Insert session with OTP
-                $stmt = $conn->prepare("INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer, completion_otp) VALUES (?, ?, ?, 'scheduled', ?, ?, ?, ?)");
-                $stmt->bind_param("iiisids", $user_id, $provider_id, $skill_id, $scheduled_time, $duration, $credit_cost, $completion_otp);
-                
-                if ($stmt->execute()) {
-                    $conn->commit();
-                    $success = 'Session booked successfully! ' . number_format($credit_cost, 2) . ' TC has been held in escrow.';
-                } else {
-                    throw new Exception('Failed to book session.');
-                }
-                $stmt->close();
-            } catch (Exception $e) {
-                $conn->rollback();
-                $error = $e->getMessage();
-            }
+        // --- STORED PROCEDURE: sp_book_session ---
+        // Atomically validates balance, deducts escrow, generates OTP,
+        // and creates the session record. Replaces multi-query PHP logic.
+        $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
+        $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);
+        $stmt->execute();
+        $stmt->close();
+        $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
+        if ($result['status'] === 'success') {
+            $success = $result['message'];
         } else {
-            $error = 'Insufficient Time Credits. You need ' . number_format($credit_cost, 2) . ' TC but your balance is ' . number_format($wallet['balance'] ?? 0, 2) . ' TC.';
+            $error = $result['message'];
         }
     }
 }
+
 
 $user = $conn->query("
     SELECT u.name, u.location, u.bio, u.created_at, u.last_active_at, r.current_score, r.completed_sessions, r.mentor_level

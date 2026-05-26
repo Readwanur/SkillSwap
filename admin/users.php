@@ -157,6 +157,21 @@ if (!empty($params)) {
 
 $count_all = $conn->query("SELECT COUNT(*) AS cnt FROM users")->fetch_assoc()['cnt'];
 
+// --- COMPLEX QUERY: CQ-11 ---
+// Inactive users with no sessions in the past 30 days (DATEDIFF + NOT EXISTS)
+$inactive_users = $conn->query("
+    SELECT u.user_id, u.name, u.email, u.last_active_at,
+           DATEDIFF(NOW(), u.last_active_at) AS days_inactive
+    FROM users u
+    WHERE u.status = 'active'
+      AND NOT EXISTS (
+          SELECT 1 FROM exchange_sessions es
+          WHERE (es.requester_id = u.user_id OR es.provider_id = u.user_id)
+            AND es.scheduled_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      )
+    ORDER BY days_inactive DESC
+");
+
 include __DIR__ . '/../includes/admin_header.php';
 ?>
 
@@ -186,8 +201,46 @@ include __DIR__ . '/../includes/admin_header.php';
         <?php if ($search || $sort !== 'joined' || $order !== 'DESC'): ?>
             <a href="users.php" class="btn btn-sm btn-secondary">Clear</a>
         <?php endif; ?>
-    </form>
 </div>
+
+<!-- Alert: Inactive Users (CQ-11) -->
+<?php if ($inactive_users && $inactive_users->num_rows > 0): ?>
+    <div class="card mb-3" style="border: 1px solid var(--warning); background: rgba(115,92,0,0.02);">
+        <div class="card-header" style="border-bottom: 1px solid rgba(115,92,0,0.15); margin-bottom: 15px;">
+            <h3 style="color: var(--warning); margin:0;">⚠️ Inactive Users Alert (30+ Days No Session)</h3>
+            <span class="badge badge-warning" style="background: rgba(115,92,0,0.15); color: var(--warning);"><?php echo $inactive_users->num_rows; ?> User(s)</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
+            Active accounts that have not participated in any session (as requester or provider) within the past 30 days.
+        </p>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Last Active At</th>
+                        <th>Inactivity Period</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($iu = $inactive_users->fetch_assoc()): ?>
+                        <tr>
+                            <td>#<?php echo $iu['user_id']; ?></td>
+                            <td>
+                                <strong><a href="../pages/user_profile.php?id=<?php echo $iu['user_id']; ?>" style="color: var(--primary); text-decoration:none;"><?php echo htmlspecialchars($iu['name']); ?></a></strong>
+                            </td>
+                            <td><?php echo htmlspecialchars($iu['email']); ?></td>
+                            <td style="color:var(--text-muted);"><?php echo date('M d, Y', strtotime($iu['last_active_at'])); ?></td>
+                            <td style="color:var(--danger); font-weight:600;"><?php echo $iu['days_inactive']; ?> days inactive</td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- Users Table -->
 <div class="card">
@@ -265,6 +318,11 @@ include __DIR__ . '/../includes/admin_header.php';
                         <td>
                             <span style="color:var(--success);" title="Completed"><?php echo $u['completed_sessions'] ?? 0; ?></span> /
                             <span style="color:var(--danger);" title="Cancelled"><?php echo $u['cancelled_sessions'] ?? 0; ?></span>
+                            <?php 
+                            $total = ($u['completed_sessions'] ?? 0) + ($u['cancelled_sessions'] ?? 0);
+                            $rate = $total > 0 ? round(($u['cancelled_sessions'] ?? 0) * 100 / $total, 1) : 0;
+                            ?>
+                            <br><small style="color: <?php echo $rate > 20 ? 'var(--danger)' : 'var(--text-muted)'; ?>; font-size:0.75rem;">Cancel Rate: <?php echo $rate; ?>%</small>
                         </td>
                         <td><?php echo number_format($u['balance'] ?? 0, 2); ?> TC</td>
                         <td>

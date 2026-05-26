@@ -26,14 +26,12 @@ if ($search !== '') {
 // Fetch categories
 $categories = $conn->query("SELECT DISTINCT catagory FROM skills WHERE catagory IS NOT NULL ORDER BY catagory");
 
-// Fetch skills with provider count
+// --- VIEW: vw_skill_marketplace ---
+// Fetch skills with provider count, rating, and session stats using view
 $skills = $conn->query("
-    SELECT s.*,
-           COUNT(DISTINCT uso.user_id) AS provider_count
-    FROM skills s
-    LEFT JOIN user_skills_offered uso ON s.skill_id = uso.skill_id
+    SELECT *
+    FROM vw_skill_marketplace s
     WHERE $where
-    GROUP BY s.skill_id
     ORDER BY s.skill_name
 ");
 
@@ -70,18 +68,29 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($skills && $skills->num_rows > 0): ?>
             <div class="grid-3">
                 <?php while ($skills && $skill = $skills->fetch_assoc()): ?>
-                    <div class="card">
-                        <div class="flex justify-between items-center mb-1">
-                            <span
-                                class="badge badge-orange"><?php echo htmlspecialchars($skill['catagory'] ?? 'General'); ?></span>
-                            <span class="badge badge-info"><?php echo htmlspecialchars($skill['difficulty_level']); ?></span>
+                    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span
+                                    class="badge badge-orange"><?php echo htmlspecialchars($skill['catagory'] ?? 'General'); ?></span>
+                                <span class="badge badge-info"><?php echo htmlspecialchars($skill['difficulty_level']); ?></span>
+                            </div>
+                            <h3 style="margin-top:8px; margin-bottom:2px;"><?php echo htmlspecialchars($skill['skill_name']); ?></h3>
+                            
+                            <div style="font-size:0.8rem; margin-bottom: 8px;">
+                                <?php if ($skill['avg_skill_rating'] !== null): ?>
+                                    <span style="color: var(--secondary); font-weight:600;">⭐ <?php echo number_format($skill['avg_skill_rating'], 1); ?></span>
+                                    <span style="color: var(--text-muted); opacity: 0.8;">(<?php echo $skill['total_sessions']; ?> session<?php echo $skill['total_sessions'] == 1 ? '' : 's'; ?>)</span>
+                                <?php else: ?>
+                                    <span style="color: var(--text-muted); font-style:italic; font-size:0.75rem;">No reviews yet</span>
+                                <?php endif; ?>
+                            </div>
+
+                            <p style="color:var(--text-secondary); font-size:0.85rem; margin: 8px 0;">
+                                <?php echo htmlspecialchars($skill['description'] ?? 'No description'); ?></p>
                         </div>
-                        <h3 style="margin-top:8px;"><?php echo htmlspecialchars($skill['skill_name']); ?></h3>
-                        <p style="color:var(--text-secondary); font-size:0.85rem; margin: 8px 0;">
-                            <?php echo htmlspecialchars($skill['description'] ?? 'No description'); ?></p>
-                        <div class="flex justify-between items-center mt-2">
-                            <span style="color:var(--text-muted); font-size:0.8rem;"><?php echo $skill['provider_count']; ?>
-                                provider(s)</span>
+                        <div class="flex justify-between items-center mt-2" style="border-top: 1px solid var(--border-light); padding-top: 10px;">
+                            <span style="color:var(--text-muted); font-size:0.8rem;"><?php echo $skill['provider_count']; ?> provider(s)</span>
                             <a href="../pages/skill_detail.php?id=<?php echo $skill['skill_id']; ?>"
                                 class="btn btn-sm btn-primary">View Providers</a>
                         </div>

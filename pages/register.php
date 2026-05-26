@@ -19,40 +19,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 4) {
         $error = 'Password must be at least 4 characters.';
     } else {
-        // Check if email already exists
-        $check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-        $check->bind_param("s", $email);
-        $check->execute();
-        if ($check->get_result()->num_rows > 0) {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+        // --- STORED PROCEDURE: sp_register_user ---
+        // Atomically creates user, wallet (with welcome bonus), and reputation.
+        // Uses EXISTS subquery to check for duplicate emails.
+        // Replaces separate INSERT statements with a single atomic DB call.
+        $stmt = $conn->prepare("CALL sp_register_user(?, ?, ?, ?, ?, @sp_status, @sp_user_id)");
+        $stmt->bind_param("sssss", $name, $email, $hashed_password, $location, $bio);
+        $stmt->execute();
+        $stmt->close();
+        $result = $conn->query("SELECT @sp_status AS status, @sp_user_id AS user_id")->fetch_assoc();
+
+        if ($result['status'] === 'success') {
+            $success = 'Account created! You received 10 Time Credits as a welcome bonus.';
+        } elseif ($result['status'] === 'duplicate') {
             $error = 'An account with this email already exists.';
         } else {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash, location, bio) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sssss", $name, $email, $hashed_password, $location, $bio);
-
-            if ($stmt->execute()) {
-                $new_user_id = $stmt->insert_id;
-
-                // Create wallet for new user
-                $wallet_stmt = $conn->prepare("INSERT INTO wallet (user_id, balance) VALUES (?, 10.00)");
-                $wallet_stmt->bind_param("i", $new_user_id);
-                $wallet_stmt->execute();
-                $wallet_stmt->close();
-
-                // Create reputation entry
-                $rep_stmt = $conn->prepare("INSERT INTO reputation (user_id, current_score, completed_sessions, mentor_level) VALUES (?, 5.00, 0, 'Novice')");
-                $rep_stmt->bind_param("i", $new_user_id);
-                $rep_stmt->execute();
-                $rep_stmt->close();
-
-                $success = 'Account created! You received 10 Time Credits as a welcome bonus.';
-            } else {
-                $error = 'Registration failed. Please try again.';
-            }
-            $stmt->close();
+            $error = 'Registration failed. Please try again.';
         }
-        $check->close();
     }
+
 }
 ?>
 <!DOCTYPE html>
@@ -70,9 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-wrapper">
         <div class="auth-card" style="max-width: 480px;">
             <div class="auth-logo">
-
-                <img src="../assets/skillswap.png" alt="SkillSwap Logo" class="auth-logo-img">
-
+                <a href="../index.php?v=<?=time()?>"><img src="../assets/skillswap.png" alt="SkillSwap Logo" class="auth-logo-img"></a>
                 <p>Create Your Account</p>
             </div>
 
@@ -127,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="auth-footer">
                 Already have an account? <a href="../pages/login.php">Login</a>
+                <br><br>
+                <a href="../index.php?v=<?=time()?>" style="font-size:0.8rem; color:var(--text-muted);">&larr; Back to Home</a>
             </div>
         </div>
     </div>

@@ -9,20 +9,14 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $page_title = 'Dashboard';
 
-// Fetch user info
-$user = $conn->query("SELECT * FROM users WHERE user_id = $user_id")->fetch_assoc();
-
-// Fetch wallet balance
-$wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
-$balance = $wallet ? number_format($wallet['balance'], 2) : '0.00';
-
-// Fetch reputation
-$rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
-$rep_score = $rep ? $rep['current_score'] : '5.00';
-$mentor_level = $rep ? $rep['mentor_level'] : 'Novice';
-
-// Count sessions
-$total_sessions = $conn->query("SELECT COUNT(*) as cnt FROM exchange_sessions WHERE (requester_id = $user_id OR provider_id = $user_id) AND status = 'completed'")->fetch_assoc()['cnt'];
+// --- VIEW: vw_user_dashboard ---
+// Single query replaces 4 separate queries (users, wallet, reputation, session count)
+// using LEFT JOINs, COALESCE, and correlated scalar subqueries.
+$user = $conn->query("SELECT * FROM vw_user_dashboard WHERE user_id = $user_id")->fetch_assoc();
+$balance = $user ? number_format($user['wallet_balance'], 2) : '0.00';
+$rep_score = $user ? $user['reputation_score'] : '5.00';
+$mentor_level = $user ? $user['mentor_level'] : 'Novice';
+$total_sessions = $user ? $user['total_completed_sessions'] : 0;
 
 // Upcoming sessions (JOIN with users and skills)
 $upcoming_q = $conn->query("
@@ -58,11 +52,11 @@ $sort = trim($_GET['sort'] ?? 'date');
 $order = trim($_GET['order'] ?? 'desc');
 
 $allowed_sorts = [
-    'amount' => 't.final_amount',
-    'date' => 't.timestamp'
+    'amount' => 'final_amount',
+    'date' => 'timestamp'
 ];
 
-$sort_col = $allowed_sorts[$sort] ?? 't.timestamp';
+$sort_col = $allowed_sorts[$sort] ?? 'timestamp';
 $order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
 
 // Sort URL generator
@@ -99,15 +93,45 @@ function renderSortButtons($col, $current_sort, $current_order) {
     }
 }
 
-// Recent transactions
+// --- VIEW: vw_transaction_ledger ---
+// Uses the transaction ledger view with CASE WHEN for readable categories.
+// Replaces manual JOIN with a pre-built view that joins transactions,
+// users, exchange_sessions, and skills tables.
 $recent_txn = $conn->query("
-    SELECT t.*, u_from.name AS from_name, u_to.name AS to_name
-    FROM transactions t
-    JOIN users u_from ON t.from_user_id = u_from.user_id
-    JOIN users u_to ON t.to_user_id = u_to.user_id
-    WHERE t.from_user_id = $user_id OR t.to_user_id = $user_id
+    SELECT * FROM vw_transaction_ledger
+    WHERE from_user_id = $user_id OR to_user_id = $user_id
     ORDER BY $sort_col $order
     LIMIT 5
+");
+
+// --- COMPLEX QUERY CQ-7: User Activity Timeline ---
+// Uses UNION ALL to merge events from 4 different tables into
+// a single chronological activity feed. Each subquery contributes
+// a different event type with standardized columns.
+$activity_timeline = $conn->query("
+    (SELECT 'session_booked' AS event_type, es.scheduled_time AS event_time,
+            CONCAT('Booked session for ', s.skill_name) AS description
+     FROM exchange_sessions es
+     JOIN skills s ON es.skill_id = s.skill_id
+     WHERE es.requester_id = $user_id)
+    UNION ALL
+    (SELECT 'session_taught', es.completion_time,
+            CONCAT('Taught ', s.skill_name)
+     FROM exchange_sessions es
+     JOIN skills s ON es.skill_id = s.skill_id
+     WHERE es.provider_id = $user_id AND es.status = 'completed')
+    UNION ALL
+    (SELECT 'task_completed', ct.completed_at,
+            CONCAT('Completed task: ', ct.task_type)
+     FROM community_task ct
+     WHERE ct.user_id = $user_id AND ct.status = 'completed')
+    UNION ALL
+    (SELECT 'credit_received', t.timestamp,
+            CONCAT('Received ', t.final_amount, ' TC')
+     FROM transactions t
+     WHERE t.to_user_id = $user_id)
+    ORDER BY event_time DESC
+    LIMIT 10
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -240,10 +264,10 @@ include __DIR__ . '/../includes/header.php';
                         <tbody>
                             <?php while ($txn = $recent_txn->fetch_assoc()): ?>
                                 <tr>
-                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($txn['type']); ?></span>
+                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($txn['transaction_category']); ?></span>
                                     </td>
-                                    <td><?php echo htmlspecialchars($txn['from_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($txn['to_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($txn['sender_name'] ?? 'System'); ?></td>
+                                    <td><?php echo htmlspecialchars($txn['receiver_name']); ?></td>
                                     <td><?php echo number_format($txn['final_amount'], 2); ?> TC</td>
                                     <td><?php echo date('M d, Y', strtotime($txn['timestamp'])); ?></td>
                                 </tr>
@@ -254,6 +278,35 @@ include __DIR__ . '/../includes/header.php';
             <?php else: ?>
                 <div class="empty-state">
                     <p>No transactions yet.</p>
+                </div>
+            <?php endif; ?>
+        <!-- CQ-7: Activity Timeline (UNION ALL query) -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3>Activity Timeline</h3>
+                <span style="font-size:0.8rem; color:var(--text-muted);">Powered by UNION ALL across 4 tables</span>
+            </div>
+            <?php if ($activity_timeline && $activity_timeline->num_rows > 0): ?>
+                <?php while ($event = $activity_timeline->fetch_assoc()):
+                    $icon = '📌';
+                    $badge = 'badge-info';
+                    if ($event['event_type'] === 'session_booked') { $icon = '📅'; $badge = 'badge-warning'; }
+                    elseif ($event['event_type'] === 'session_taught') { $icon = '🎓'; $badge = 'badge-success'; }
+                    elseif ($event['event_type'] === 'task_completed') { $icon = '✅'; $badge = 'badge-primary'; }
+                    elseif ($event['event_type'] === 'credit_received') { $icon = '💰'; $badge = 'badge-orange'; }
+                ?>
+                    <div class="session-card">
+                        <div class="avatar"><?php echo $icon; ?></div>
+                        <div class="session-info">
+                            <h4><?php echo htmlspecialchars($event['description']); ?></h4>
+                            <p><?php echo $event['event_time'] ? date('M d, Y h:i A', strtotime($event['event_time'])) : 'N/A'; ?></p>
+                        </div>
+                        <span class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
+                    </div>
+                <?php endwhile; ?>
+            <?php else: ?>
+                <div class="empty-state">
+                    <p>No activity yet. Start learning or teaching!</p>
                 </div>
             <?php endif; ?>
         </div>
