@@ -833,28 +833,181 @@ table tr:last-child td {
     background: var(--bg-primary);
 }
 
-/* ---------- Wallet Card ---------- */
-.wallet-balance {
-    text-align: center;
-    padding: 30px;
+/* ---------- Wallet Card (Redesigned) ---------- */
+.wallet-hero {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
     box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
 
-.wallet-balance .balance-amount {
-    font-size: 2.5rem;
+.wallet-hero-top {
+    text-align: center;
+    padding: 32px 30px 20px;
+}
+
+.wallet-hero-top .balance-amount {
+    font-size: 2.8rem;
     font-weight: 700;
     font-family: var(--font-headline);
     color: var(--secondary);
+    line-height: 1.1;
 }
 
-.wallet-balance .balance-label {
+.wallet-hero-top .balance-label {
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 4px;
+    font-size: 0.88rem;
+    margin-top: 6px;
+}
+
+.wallet-inline-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--border-light);
+}
+
+.wallet-inline-stats .w-stat {
+    text-align: center;
+    padding: 16px 10px;
+    border-right: 1px solid var(--border-light);
+    transition: background 0.2s ease;
+}
+
+.wallet-inline-stats .w-stat:last-child {
+    border-right: none;
+}
+
+.wallet-inline-stats .w-stat:hover {
+    background: var(--bg-hover);
+}
+
+.wallet-inline-stats .w-stat-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-family: var(--font-headline);
+    display: block;
+    line-height: 1.2;
+}
+
+.wallet-inline-stats .w-stat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    margin-top: 3px;
+    display: block;
+}
+
+/* ---------- Wallet Tabs ---------- */
+.wallet-tabs {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    margin-bottom: 28px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.wallet-tab-nav {
+    display: flex;
+    border-bottom: 2px solid var(--border-light);
+    background: var(--bg-secondary);
+}
+
+.wallet-tab-btn {
+    flex: 1;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    text-align: center;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+}
+
+.wallet-tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.wallet-tab-btn.active {
+    color: var(--primary);
+    background: var(--bg-card);
+    border-bottom-color: var(--primary);
+}
+
+.wallet-tab-btn .tab-icon {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 2px;
+}
+
+.wallet-tab-panel {
+    display: none;
+    padding: 24px;
+    animation: tabFadeIn 0.3s ease;
+}
+
+.wallet-tab-panel.active {
+    display: block;
+}
+
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Wallet Section Headers ---------- */
+.wallet-section-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+/* ---------- Loan Info Grid ---------- */
+.loan-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.loan-info-item {
+    text-align: center;
+    padding: 12px 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.loan-info-item .info-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-family: var(--font-headline);
+    display: block;
+    color: var(--text-primary);
+}
+
+.loan-info-item .info-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+    margin-top: 2px;
+    display: block;
 }
 
 /* ---------- Session Card ---------- */
@@ -1215,6 +1368,28 @@ table tr:last-child td {
 
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .wallet-inline-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .wallet-inline-stats .w-stat:nth-child(2) {
+        border-right: none;
+    }
+
+    .wallet-inline-stats .w-stat:nth-child(1),
+    .wallet-inline-stats .w-stat:nth-child(2) {
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .wallet-tab-btn {
+        font-size: 0.78rem;
+        padding: 12px 8px;
+    }
+
+    .loan-info-grid {
+        grid-template-columns: 1fr;
     }
 
     .admin-layout {

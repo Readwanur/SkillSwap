@@ -32,6 +32,77 @@ $growth = $conn->query("
     LIMIT 12
 ");
 
+// --- OLAP STAR-SCHEMA ANALYTICS ---
+// 1. Quarter-over-Quarter (QoQ) Growth
+$qoq_result = $conn->query("
+    WITH quarterly_totals AS (
+        SELECT 
+            t.year, 
+            t.quarter, 
+            SUM(f.credits) AS total_credits,
+            COUNT(f.session_id) AS total_sessions
+        FROM vw_fact_sessions f
+        JOIN vw_dim_time t ON f.date_key = t.date_key
+        WHERE f.status = 'completed'
+        GROUP BY t.year, t.quarter
+    )
+    SELECT 
+        year, 
+        quarter, 
+        total_credits, 
+        total_sessions,
+        LAG(total_credits) OVER (ORDER BY year, quarter) AS prev_quarter_credits,
+        ROUND(
+            (total_credits - LAG(total_credits) OVER (ORDER BY year, quarter)) * 100.0 / 
+            COALESCE(LAG(total_credits) OVER (ORDER BY year, quarter), 1),
+            1
+        ) AS qoq_growth_pct
+    FROM quarterly_totals
+    ORDER BY year DESC, quarter DESC
+    LIMIT 8
+");
+
+// 2. OLAP Cube Pivot (WITH ROLLUP)
+$rollup_result = $conn->query("
+    SELECT 
+        s.category,
+        s.difficulty_level,
+        SUM(f.minutes) AS total_minutes,
+        SUM(f.credits) AS total_credits,
+        COUNT(f.session_id) AS session_count
+    FROM vw_fact_sessions f
+    JOIN vw_dim_skills s ON f.skill_id = s.skill_id
+    WHERE f.status = 'completed'
+    GROUP BY s.category, s.difficulty_level WITH ROLLUP
+    LIMIT 25
+");
+
+// 3. 7-Day Moving Average
+$moving_avg_result = $conn->query("
+    WITH daily_totals AS (
+        SELECT 
+            t.full_date,
+            SUM(f.credits) AS daily_credits
+        FROM vw_fact_sessions f
+        JOIN vw_dim_time t ON f.date_key = t.date_key
+        WHERE f.status = 'completed'
+        GROUP BY t.full_date
+    )
+    SELECT 
+        full_date,
+        daily_credits,
+        ROUND(
+            AVG(daily_credits) OVER (
+                ORDER BY full_date 
+                ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+            ),
+            2
+        ) AS moving_avg
+    FROM daily_totals
+    ORDER BY full_date DESC
+    LIMIT 10
+");
+
 // --- COMPLEX QUERY: CQ-1 ---
 // Rank users by total hours taught (Window Function + CTE)
 $top_providers = $conn->query("
@@ -558,6 +629,159 @@ include __DIR__ . '/../includes/admin_header.php';
                     <?php endwhile; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OLAP DATA WAREHOUSE REPORTS -->
+<!-- ============================================================ -->
+<div class="card mb-3" style="border: 2px solid var(--primary);">
+    <div class="card-header" style="background: var(--primary-glow); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
+        <div>
+            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">📊 OLAP Data Warehouse Analytics</h2>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced reporting engine executing cross-dimensional aggregations over Fact & Dimension views.</p>
+        </div>
+        <span class="badge badge-success" style="font-size: 0.75rem;">Star-Schema Architecture</span>
+    </div>
+    
+    <div style="padding: 20px;">
+        <div class="grid-2 mb-3">
+            <!-- Quarter-over-Quarter Growth -->
+            <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+                <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">Quarter-over-Quarter (QoQ) Growth</h4>
+                </div>
+                <div class="table-wrapper">
+                    <table style="font-size: 0.8rem; background: var(--bg-secondary);">
+                        <thead>
+                            <tr style="background: var(--bg-primary);">
+                                <th>Quarter</th>
+                                <th style="text-align: right;">Total Credits</th>
+                                <th style="text-align: center;">Sessions</th>
+                                <th style="text-align: right;">QoQ Growth</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($qoq_result && $qoq_result->num_rows > 0): ?>
+                                <?php while ($q = $qoq_result->fetch_assoc()): 
+                                    $growth = $q['qoq_growth_pct'];
+                                    $growth_color = 'var(--text-secondary)';
+                                    $growth_text = $growth . '%';
+                                    if ($growth > 0) {
+                                        $growth_color = 'var(--success)';
+                                        $growth_text = '▲ +' . $growth . '%';
+                                    } elseif ($growth < 0) {
+                                        $growth_color = 'var(--danger)';
+                                        $growth_text = '▼ ' . $growth . '%';
+                                    }
+                                ?>
+                                    <tr style="border-bottom: 1px solid var(--border-light);">
+                                        <td><strong><?php echo $q['year'] . ' Q' . $q['quarter']; ?></strong></td>
+                                        <td style="text-align: right; font-weight: 600;"><?php echo number_format($q['total_credits'], 2); ?> TC</td>
+                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $q['total_sessions']; ?></td>
+                                        <td style="text-align: right; font-weight: bold; color: <?php echo $growth_color; ?>;"><?php echo $growth_text; ?></td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 15px;">No historical quarter data available.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 7-Day Moving Average -->
+            <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+                <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">7-Day Moving Average of Exchanges</h4>
+                </div>
+                <div class="table-wrapper">
+                    <table style="font-size: 0.8rem; background: var(--bg-secondary);">
+                        <thead>
+                            <tr style="background: var(--bg-primary);">
+                                <th>Date</th>
+                                <th style="text-align: right;">Daily Credits</th>
+                                <th style="text-align: right;">7-Day Moving Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($moving_avg_result && $moving_avg_result->num_rows > 0): ?>
+                                <?php while ($m = $moving_avg_result->fetch_assoc()): ?>
+                                    <tr style="border-bottom: 1px solid var(--border-light);">
+                                        <td><strong><?php echo date('M d, Y', strtotime($m['full_date'])); ?></strong></td>
+                                        <td style="text-align: right; color: var(--text-secondary);"><?php echo number_format($m['daily_credits'], 2); ?> TC</td>
+                                        <td style="text-align: right; font-weight: bold; color: var(--info);"><?php echo number_format($m['moving_avg'], 2); ?> TC</td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">No recent exchange session history.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Dimensional Roll-up Pivot -->
+        <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
+            <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">OLAP Roll-up Pivot (Category & Difficulty)</h4>
+            </div>
+            <div class="table-wrapper">
+                <table style="font-size: 0.8rem; background: var(--bg-secondary);">
+                    <thead>
+                        <tr style="background: var(--bg-primary);">
+                            <th>Skill Category</th>
+                            <th>Difficulty Level</th>
+                            <th style="text-align: center;">Total Hours</th>
+                            <th style="text-align: right;">Total Credits</th>
+                            <th style="text-align: center;">Completed Sessions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($rollup_result && $rollup_result->num_rows > 0): ?>
+                            <?php while ($r = $rollup_result->fetch_assoc()): 
+                                $is_category_total = is_null($r['difficulty_level']) && !is_null($r['category']);
+                                $is_grand_total = is_null($r['category']) && is_null($r['difficulty_level']);
+                                
+                                $row_bg = 'transparent';
+                                $font_weight = 'normal';
+                                $cat_display = htmlspecialchars($r['category'] ?? '');
+                                $diff_display = htmlspecialchars($r['difficulty_level'] ?? '');
+                                
+                                if ($is_grand_total) {
+                                    $row_bg = 'var(--primary-glow)';
+                                    $font_weight = 'bold';
+                                    $cat_display = '✨ GRAND TOTAL';
+                                    $diff_display = 'All Difficulties';
+                                } elseif ($is_category_total) {
+                                    $row_bg = 'var(--bg-hover)';
+                                    $font_weight = '600';
+                                    $cat_display = '📁 ' . $cat_display;
+                                    $diff_display = 'Subtotal';
+                                }
+                            ?>
+                                <tr style="background: <?php echo $row_bg; ?>; font-weight: <?php echo $font_weight; ?>; border-bottom: 1px solid var(--border-light);">
+                                    <td><strong><?php echo $cat_display; ?></strong></td>
+                                    <td><?php echo $diff_display; ?></td>
+                                    <td style="text-align: center;"><?php echo round($r['total_minutes'] / 60.0, 1); ?>h</td>
+                                    <td style="text-align: right;"><?php echo number_format($r['total_credits'], 2); ?> TC</td>
+                                    <td style="text-align: center; color: var(--text-muted);"><?php echo $r['session_count']; ?></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No aggregated OLAP cube data found.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

@@ -150,7 +150,7 @@ CREATE INDEX idx_reputation_score ON reputation(current_score);
 CREATE TABLE IF NOT EXISTS wallet (
     wallet_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNIQUE NOT NULL,
-    balance DECIMAL(15, 2) DEFAULT 0.00,
+    balance DECIMAL(15, 2) DEFAULT 0.00 CHECK (balance >= 0.00),
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
@@ -208,9 +208,9 @@ CREATE TABLE IF NOT EXISTS exchange_sessions (
     comment TEXT,
     bonus_multiplier DECIMAL(3, 2) DEFAULT 1.00,
     completion_otp VARCHAR(10) NULL,
-    FOREIGN KEY (requester_id) REFERENCES users(user_id),
-    FOREIGN KEY (provider_id) REFERENCES users(user_id),
-    FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+    FOREIGN KEY (requester_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (provider_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (skill_id) REFERENCES skills(skill_id) ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_session_requester ON exchange_sessions(requester_id);
@@ -234,13 +234,13 @@ CREATE TABLE IF NOT EXISTS transactions (
     from_user_id INT NULL,
     to_user_id INT NULL,
     type VARCHAR(50),
-    base_amount DECIMAL(10, 2),
-    final_amount DECIMAL(10, 2),
+    base_amount DECIMAL(10, 2) CHECK (base_amount > 0.00),
+    final_amount DECIMAL(10, 2) CHECK (final_amount >= 0.00),
     note TEXT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES exchange_sessions(session_id) ON DELETE SET NULL,
-    FOREIGN KEY (from_user_id) REFERENCES users(user_id),
-    FOREIGN KEY (to_user_id) REFERENCES users(user_id)
+    FOREIGN KEY (from_user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (to_user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_txn_session ON transactions(session_id);
@@ -248,8 +248,6 @@ CREATE INDEX idx_txn_from_user ON transactions(from_user_id);
 CREATE INDEX idx_txn_to_user ON transactions(to_user_id);
 CREATE INDEX idx_txn_type ON transactions(type);
 CREATE INDEX idx_txn_timestamp ON transactions(timestamp);
-
-
 
 
 INSERT INTO skills (skill_name, catagory, description, difficulty_level) VALUES
@@ -364,11 +362,42 @@ CREATE TABLE IF NOT EXISTS wallet_audit_log (
     old_balance DECIMAL(15,2),
     new_balance DECIMAL(15,2),
     change_amount DECIMAL(15,2),
-    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wallet_id) REFERENCES wallet(wallet_id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_audit_user ON wallet_audit_log(user_id);
 CREATE INDEX idx_audit_time ON wallet_audit_log(changed_at);
+
+-- =========================
+-- AUDIT TABLE: system_audit_log
+-- =========================
+CREATE TABLE IF NOT EXISTS system_audit_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    action_type VARCHAR(50) NOT NULL,
+    table_affected VARCHAR(50) NOT NULL,
+    record_id INT NOT NULL,
+    details TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+CREATE INDEX idx_sys_audit_table ON system_audit_log(table_affected);
+
+-- =========================
+-- ENTITY: notifications
+-- =========================
+CREATE TABLE IF NOT EXISTS notifications (
+    notif_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_notif_user_read ON notifications(user_id, is_read);
 
 
 -- ============================================================
@@ -379,6 +408,7 @@ CREATE INDEX idx_audit_time ON wallet_audit_log(changed_at);
 -- =========================
 -- TRIGGER TR-1: Auto-create wallet & reputation on new user
 -- =========================
+DROP TRIGGER IF EXISTS trg_after_user_insert;
 DELIMITER //
 CREATE TRIGGER trg_after_user_insert
 AFTER INSERT ON users
@@ -394,6 +424,7 @@ DELIMITER ;
 -- =========================
 -- TRIGGER TR-2: Update reputation score on session rating
 -- =========================
+DROP TRIGGER IF EXISTS trg_after_session_rated;
 DELIMITER //
 CREATE TRIGGER trg_after_session_rated
 AFTER UPDATE ON exchange_sessions
@@ -415,6 +446,7 @@ DELIMITER ;
 -- =========================
 -- TRIGGER TR-3: Auto-update mentor level on reputation change
 -- =========================
+DROP TRIGGER IF EXISTS trg_before_reputation_update;
 DELIMITER //
 CREATE TRIGGER trg_before_reputation_update
 BEFORE UPDATE ON reputation
@@ -436,6 +468,7 @@ DELIMITER ;
 -- =========================
 -- TRIGGER TR-4: Prevent booking session with yourself
 -- =========================
+DROP TRIGGER IF EXISTS trg_before_session_insert;
 DELIMITER //
 CREATE TRIGGER trg_before_session_insert
 BEFORE INSERT ON exchange_sessions
@@ -452,6 +485,7 @@ DELIMITER ;
 -- =========================
 -- TRIGGER TR-5: Log wallet balance changes (audit trail)
 -- =========================
+DROP TRIGGER IF EXISTS trg_after_wallet_update;
 DELIMITER //
 CREATE TRIGGER trg_after_wallet_update
 AFTER UPDATE ON wallet
@@ -464,11 +498,121 @@ BEGIN
 END //
 DELIMITER ;
 
+-- =========================
+-- TRIGGER TR-6: Audit users status and score updates
+-- =========================
+DROP TRIGGER IF EXISTS trg_after_users_update;
+DELIMITER //
+CREATE TRIGGER trg_after_users_update
+AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+    IF OLD.status != NEW.status OR OLD.reliability_score != NEW.reliability_score THEN
+        INSERT INTO system_audit_log (user_id, action_type, table_affected, record_id, details)
+        VALUES (NEW.user_id, 'UPDATE', 'users', NEW.user_id, 
+                CONCAT('Status: ', OLD.status, ' -> ', NEW.status, 
+                       ', Reliability: ', OLD.reliability_score, ' -> ', NEW.reliability_score));
+    END IF;
+END //
+DELIMITER ;
+
+-- =========================
+-- TRIGGER TR-7: Audit session status changes & trigger notifications
+-- =========================
+DROP TRIGGER IF EXISTS trg_after_sessions_update;
+DELIMITER //
+CREATE TRIGGER trg_after_sessions_update
+AFTER UPDATE ON exchange_sessions
+FOR EACH ROW
+BEGIN
+    IF OLD.status != NEW.status THEN
+        INSERT INTO system_audit_log (user_id, action_type, table_affected, record_id, details)
+        VALUES (NEW.requester_id, 'UPDATE', 'exchange_sessions', NEW.session_id, 
+                CONCAT('Session status change: ', OLD.status, ' -> ', NEW.status));
+        
+        -- Notification dispatch
+        IF NEW.status = 'completed' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, 'Your exchange session has been marked as completed!', 'session_update');
+        ELSEIF NEW.status = 'cancelled' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'A scheduled session has been cancelled.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, 'Your scheduled session has been cancelled.', 'session_update');
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+-- =========================
+-- TRIGGER TR-8: Notify provider on new session booking
+-- =========================
+DROP TRIGGER IF EXISTS trg_after_session_insert;
+DELIMITER //
+CREATE TRIGGER trg_after_session_insert
+AFTER INSERT ON exchange_sessions
+FOR EACH ROW
+BEGIN
+    DECLARE v_req_name VARCHAR(100);
+    SELECT name INTO v_req_name FROM users WHERE user_id = NEW.requester_id;
+    INSERT INTO notifications (user_id, message, type)
+    VALUES (NEW.provider_id, CONCAT(v_req_name, ' booked a session with you for ', NEW.scheduled_time), 'booking');
+END //
+DELIMITER ;
+
 
 -- ============================================================
 -- VIEWS
 -- ============================================================
 
+
+-- =========================
+-- STAR-SCHEMA DATA WAREHOUSE VIEWS
+-- =========================
+CREATE OR REPLACE VIEW vw_dim_users AS
+SELECT user_id, name, email, location, reliability_score, created_at
+FROM users;
+
+CREATE OR REPLACE VIEW vw_dim_skills AS
+SELECT skill_id, skill_name, catagory AS category, difficulty_level
+FROM skills;
+
+CREATE OR REPLACE VIEW vw_dim_time AS
+SELECT DISTINCT
+    timestamp AS date_key,
+    DATE(timestamp) AS full_date,
+    YEAR(timestamp) AS year,
+    QUARTER(timestamp) AS quarter,
+    MONTH(timestamp) AS month,
+    MONTHNAME(timestamp) AS month_name,
+    DAY(timestamp) AS day,
+    WEEK(timestamp) AS week_of_year
+FROM transactions
+UNION
+SELECT DISTINCT
+    scheduled_time AS date_key,
+    DATE(scheduled_time) AS full_date,
+    YEAR(scheduled_time) AS year,
+    QUARTER(scheduled_time) AS quarter,
+    MONTH(scheduled_time) AS month,
+    MONTHNAME(scheduled_time) AS month_name,
+    DAY(scheduled_time) AS day,
+    WEEK(scheduled_time) AS week_of_year
+FROM exchange_sessions;
+
+CREATE OR REPLACE VIEW vw_fact_sessions AS
+SELECT
+    es.session_id,
+    es.requester_id,
+    es.provider_id,
+    es.skill_id,
+    es.scheduled_time AS date_key,
+    es.status,
+    es.session_duration AS minutes,
+    es.time_credit_transfer AS credits,
+    es.rating,
+    es.bonus_multiplier
+FROM exchange_sessions es;
 
 -- =========================
 -- VIEW: vw_user_dashboard
@@ -634,6 +778,9 @@ DELIMITER ;
 -- =========================
 -- PROCEDURE: sp_book_session
 -- =========================
+-- Fixes applied:
+-- [Flaw 7] Defaulted loans block session booking
+-- =========================
 DELIMITER //
 CREATE PROCEDURE sp_book_session(
     IN p_requester_id INT,
@@ -648,6 +795,8 @@ BEGIN
     DECLARE v_balance DECIMAL(15,2);
     DECLARE v_credit_cost DECIMAL(10,2);
     DECLARE v_otp VARCHAR(10);
+    DECLARE v_has_defaulted_loan BOOLEAN;
+    DECLARE v_has_conflict BOOLEAN;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -662,7 +811,34 @@ BEGIN
     -- Check balance using subquery
     SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id;
 
-    IF v_balance IS NULL OR v_balance < v_credit_cost THEN
+    -- [Flaw 7] Check for defaulted loans
+    SELECT EXISTS (
+        SELECT 1 FROM loans
+        WHERE user_id = p_requester_id AND status = 'defaulted'
+    ) INTO v_has_defaulted_loan;
+
+    -- Check for overlapping active sessions (double-booking protection)
+    SELECT EXISTS (
+        SELECT 1 FROM exchange_sessions
+        WHERE status = 'scheduled'
+          AND (
+             requester_id = p_requester_id 
+             OR provider_id = p_requester_id
+             OR requester_id = p_provider_id
+             OR provider_id = p_provider_id
+          )
+          AND p_scheduled_time < DATE_ADD(scheduled_time, INTERVAL session_duration MINUTE)
+          AND DATE_ADD(p_scheduled_time, INTERVAL p_duration MINUTE) > scheduled_time
+    ) INTO v_has_conflict;
+
+    IF v_has_defaulted_loan THEN
+        -- [Flaw 7] Block session booking for defaulted users
+        SET p_status = 'error';
+        SET p_message = 'Your account has a defaulted loan. Please repay it before booking new sessions.';
+    ELSEIF v_has_conflict THEN
+        SET p_status = 'error';
+        SET p_message = 'Schedule conflict detected. Either you or the provider has an overlapping active session scheduled at this time.';
+    ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
         SET p_status = 'error';
         SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC, have ', COALESCE(v_balance, 0), ' TC.');
     ELSEIF p_scheduled_time <= NOW() THEN
@@ -833,22 +1009,34 @@ DELIMITER ;
 -- =========================
 -- ENTITY: loans
 -- =========================
+-- Fixes applied:
+-- [Flaw 2] Added interest_rate and total_due (generated column) for interest tracking
+-- [Flaw 4] Added repaid_at timestamp to track when a loan was repaid
+-- =========================
 CREATE TABLE IF NOT EXISTS loans (
     loan_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    amount DECIMAL(10, 2) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0.00),
+    interest_rate DECIMAL(5, 2) NOT NULL DEFAULT 5.00,
+    total_due DECIMAL(10, 2) GENERATED ALWAYS AS (amount * (1 + interest_rate / 100)) STORED,
     due_date DATETIME NOT NULL,
     status ENUM('active', 'paid', 'defaulted') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    repaid_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_loans_user ON loans(user_id);
 CREATE INDEX idx_loans_status ON loans(status);
+CREATE INDEX idx_loans_due_date ON loans(due_date);
 
 
 -- =========================
 -- PROCEDURE SP-5: Request Credit Loan
+-- =========================
+-- Fixes applied:
+-- [Flaw 3] Race condition fix — SELECT ... FOR UPDATE inside transaction
+-- [Flaw 6] Gift → Loan cooldown — 7-day block after receiving a gift
 -- =========================
 DELIMITER //
 CREATE PROCEDURE sp_request_loan(
@@ -862,6 +1050,8 @@ BEGIN
     DECLARE v_completed_sessions INT;
     DECLARE v_reliability DECIMAL(5,2);
     DECLARE v_max_limit DECIMAL(10,2);
+    DECLARE v_recent_gift_received BOOLEAN;
+    DECLARE v_wallet_balance DECIMAL(15,2);
     
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -882,6 +1072,14 @@ BEGIN
     -- Credit limit is dynamically set: reliability_score * 5.00
     SET v_max_limit = COALESCE(v_reliability, 5.00) * 5.00;
 
+    -- [Flaw 6] Check if user received a gift in the last 7 days
+    SELECT EXISTS (
+        SELECT 1 FROM transactions
+        WHERE to_user_id = p_user_id
+          AND type = 'gift'
+          AND timestamp > DATE_SUB(NOW(), INTERVAL 7 DAY)
+    ) INTO v_recent_gift_received;
+
     IF v_active_loans > 0 THEN
         SET p_status = 'error';
         SET p_message = 'You have an outstanding active or defaulted credit loan.';
@@ -891,8 +1089,18 @@ BEGIN
     ELSEIF p_amount <= 0 OR p_amount > v_max_limit THEN
         SET p_status = 'error';
         SET p_message = CONCAT('Invalid loan amount. Your maximum borrow limit is ', v_max_limit, ' TC.');
+    ELSEIF v_recent_gift_received THEN
+        -- [Flaw 6] Cooldown period after receiving gifts
+        SET p_status = 'error';
+        SET p_message = 'Loan cooldown: You received a gift in the last 7 days. Please wait before borrowing to prevent credit cycling.';
     ELSE
+        -- [Flaw 3] Start transaction and lock wallet row
         START TRANSACTION;
+
+        SELECT balance INTO v_wallet_balance
+        FROM wallet
+        WHERE user_id = p_user_id
+        FOR UPDATE;
 
         -- 1. Insert loan record
         INSERT INTO loans (user_id, amount, due_date) 
@@ -916,6 +1124,10 @@ DELIMITER ;
 -- =========================
 -- PROCEDURE SP-6: Repay Credit Loan
 -- =========================
+-- Fixes applied:
+-- [Flaw 2] Repayment uses total_due (principal + interest) instead of base amount
+-- [Flaw 4] Records repaid_at timestamp on repayment
+-- =========================
 DELIMITER //
 CREATE PROCEDURE sp_repay_loan(
     IN p_user_id INT,
@@ -924,7 +1136,8 @@ CREATE PROCEDURE sp_repay_loan(
     OUT p_message VARCHAR(255)
 )
 BEGIN
-    DECLARE v_amount DECIMAL(10,2);
+    DECLARE v_base_amount DECIMAL(10,2);
+    DECLARE v_total_due DECIMAL(10,2);
     DECLARE v_loan_status VARCHAR(20);
     DECLARE v_balance DECIMAL(15,2);
     
@@ -935,39 +1148,40 @@ BEGIN
         SET p_message = 'Loan repayment failed due to a database error.';
     END;
 
-    -- Fetch loan details
-    SELECT amount, status INTO v_amount, v_loan_status 
+    -- Fetch loan details including total_due (with interest)
+    SELECT amount, total_due, status INTO v_base_amount, v_total_due, v_loan_status 
     FROM loans 
     WHERE loan_id = p_loan_id AND user_id = p_user_id;
     
     -- Fetch wallet balance
     SELECT balance INTO v_balance FROM wallet WHERE user_id = p_user_id;
 
-    IF v_amount IS NULL THEN
+    IF v_base_amount IS NULL THEN
         SET p_status = 'error';
         SET p_message = 'Loan record not found.';
     ELSEIF v_loan_status = 'paid' THEN
         SET p_status = 'error';
         SET p_message = 'This loan is already fully repaid.';
-    ELSEIF v_balance < v_amount THEN
+    ELSEIF v_balance < v_total_due THEN
         SET p_status = 'error';
-        SET p_message = CONCAT('Insufficient balance. Repayment requires ', v_amount, ' TC, but your balance is ', v_balance, ' TC.');
+        SET p_message = CONCAT('Insufficient balance. Repayment requires ', v_total_due, ' TC (includes interest), but your balance is ', v_balance, ' TC.');
     ELSE
         START TRANSACTION;
 
-        -- 1. Mark loan as paid
-        UPDATE loans SET status = 'paid' WHERE loan_id = p_loan_id;
+        -- 1. Mark loan as paid with repayment timestamp [Flaw 4]
+        UPDATE loans SET status = 'paid', repaid_at = NOW() WHERE loan_id = p_loan_id;
         
-        -- 2. Deduct from user's wallet
-        UPDATE wallet SET balance = balance - v_amount WHERE user_id = p_user_id;
+        -- 2. Deduct total_due (principal + interest) from user's wallet
+        UPDATE wallet SET balance = balance - v_total_due WHERE user_id = p_user_id;
         
-        -- 3. Log transaction (to_user_id is NULL representing repayment to system)
+        -- 3. Log transaction — base_amount is the principal, final_amount includes interest
         INSERT INTO transactions (from_user_id, to_user_id, type, base_amount, final_amount, note)
-        VALUES (p_user_id, NULL, 'loan_repayment', v_amount, v_amount, 'Platform credit loan repayment');
+        VALUES (p_user_id, NULL, 'loan_repayment', v_base_amount, v_total_due, 
+                CONCAT('Loan repayment: ', v_base_amount, ' TC principal + ', (v_total_due - v_base_amount), ' TC interest'));
 
         COMMIT;
         SET p_status = 'success';
-        SET p_message = CONCAT('Loan of ', v_amount, ' TC has been fully repaid.');
+        SET p_message = CONCAT('Loan repaid! ', v_total_due, ' TC deducted (', v_base_amount, ' principal + ', (v_total_due - v_base_amount), ' interest).');
     END IF;
 END //
 DELIMITER ;
@@ -975,6 +1189,11 @@ DELIMITER ;
 
 -- =========================
 -- PROCEDURE SP-7: Gift Time Credits
+-- =========================
+-- Fixes applied:
+-- [Flaw 1] Loaned credits cannot be gifted — deducts active loan debt from giftable balance
+-- [Flaw 3] Race condition fix — SELECT ... FOR UPDATE inside transaction
+-- [Flaw 5] Daily (50 TC) and per-transaction (25 TC) gift caps
 -- =========================
 DELIMITER //
 CREATE PROCEDURE sp_gift_credits(
@@ -989,6 +1208,9 @@ BEGIN
     DECLARE v_from_balance DECIMAL(15, 2);
     DECLARE v_has_mutual_session BOOLEAN;
     DECLARE v_both_established BOOLEAN;
+    DECLARE v_loan_debt DECIMAL(15, 2);
+    DECLARE v_giftable_balance DECIMAL(15, 2);
+    DECLARE v_daily_gifted DECIMAL(15, 2);
     
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -999,25 +1221,8 @@ BEGIN
 
     -- Get recipient ID (only active users)
     SELECT user_id INTO v_to_user_id FROM users WHERE email = p_to_user_email AND status = 'active';
-    
-    -- Get donor balance
-    SELECT balance INTO v_from_balance FROM wallet WHERE user_id = p_from_user_id;
-    
-    -- Complex Subquery 1: Verify if they have completed a session together (mutual collaboration)
-    SELECT EXISTS (
-        SELECT 1 FROM exchange_sessions
-        WHERE status = 'completed'
-          AND ((requester_id = p_from_user_id AND provider_id = v_to_user_id) 
-            OR (requester_id = v_to_user_id AND provider_id = p_from_user_id))
-    ) INTO v_has_mutual_session;
 
-    -- Complex Subquery 2: Verify if both donor and recipient are established community members (completed >= 3 sessions globally)
-    SELECT EXISTS (
-        SELECT 1 FROM reputation WHERE user_id = p_from_user_id AND completed_sessions >= 3
-    ) AND EXISTS (
-        SELECT 1 FROM reputation WHERE user_id = v_to_user_id AND completed_sessions >= 3
-    ) INTO v_both_established;
-
+    -- === Pre-validation (no transaction needed) ===
     IF v_to_user_id IS NULL THEN
         SET p_status = 'error';
         SET p_message = 'Recipient email not found or account is suspended.';
@@ -1027,28 +1232,218 @@ BEGIN
     ELSEIF p_amount <= 0 THEN
         SET p_status = 'error';
         SET p_message = 'Gift amount must be greater than zero.';
-    ELSEIF v_from_balance < p_amount THEN
+    ELSEIF p_amount > 25 THEN
+        -- [Flaw 5] Per-transaction cap
         SET p_status = 'error';
-        SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
-    ELSEIF NOT v_has_mutual_session AND NOT v_both_established THEN
-        SET p_status = 'error';
-        SET p_message = 'Gifting blocked. Both accounts must be established (3+ completed sessions globally) or have completed a mutual session together.';
+        SET p_message = 'Maximum gift amount per transaction is 25 TC.';
     ELSE
+        -- === [Flaw 3] Start transaction and lock wallet row ===
         START TRANSACTION;
 
-        -- 1. Deduct from donor
-        UPDATE wallet SET balance = balance - p_amount WHERE user_id = p_from_user_id;
-        
-        -- 2. Add to recipient
-        UPDATE wallet SET balance = balance + p_amount WHERE user_id = v_to_user_id;
-        
-        -- 3. Log transaction
-        INSERT INTO transactions (from_user_id, to_user_id, type, base_amount, final_amount, note)
-        VALUES (p_from_user_id, v_to_user_id, 'gift', p_amount, p_amount, 'Peer-to-peer time credit gift');
+        -- Lock the sender's wallet row to prevent race conditions
+        SELECT balance INTO v_from_balance 
+        FROM wallet 
+        WHERE user_id = p_from_user_id 
+        FOR UPDATE;
 
-        COMMIT;
-        SET p_status = 'success';
-        SET p_message = CONCAT('Successfully gifted ', p_amount, ' TC to ', p_to_user_email);
+        -- [Flaw 1] Calculate outstanding loan debt
+        SELECT COALESCE(SUM(amount), 0) INTO v_loan_debt
+        FROM loans
+        WHERE user_id = p_from_user_id AND status = 'active';
+
+        -- Giftable balance = actual balance minus reserved loan debt
+        SET v_giftable_balance = v_from_balance - v_loan_debt;
+
+        -- [Flaw 5] Check daily gift total
+        SELECT COALESCE(SUM(final_amount), 0) INTO v_daily_gifted
+        FROM transactions
+        WHERE from_user_id = p_from_user_id 
+          AND type = 'gift' 
+          AND DATE(timestamp) = CURDATE();
+
+        -- Complex Subquery 1: Verify mutual session collaboration
+        SELECT EXISTS (
+            SELECT 1 FROM exchange_sessions
+            WHERE status = 'completed'
+              AND ((requester_id = p_from_user_id AND provider_id = v_to_user_id) 
+                OR (requester_id = v_to_user_id AND provider_id = p_from_user_id))
+        ) INTO v_has_mutual_session;
+
+        -- Complex Subquery 2: Both must be established (3+ completed sessions globally)
+        SELECT EXISTS (
+            SELECT 1 FROM reputation WHERE user_id = p_from_user_id AND completed_sessions >= 3
+        ) AND EXISTS (
+            SELECT 1 FROM reputation WHERE user_id = v_to_user_id AND completed_sessions >= 3
+        ) INTO v_both_established;
+
+        -- === Validation inside transaction ===
+        IF v_giftable_balance < p_amount THEN
+            -- [Flaw 1] Insufficient giftable balance (accounts for loan reservation)
+            ROLLBACK;
+            SET p_status = 'error';
+            IF v_loan_debt > 0 THEN
+                SET p_message = CONCAT('Insufficient giftable balance. You have ', v_from_balance, ' TC but ', v_loan_debt, ' TC is reserved for loan repayment. Available: ', v_giftable_balance, ' TC.');
+            ELSE
+                SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
+            END IF;
+        ELSEIF (v_daily_gifted + p_amount) > 50 THEN
+            -- [Flaw 5] Daily cap exceeded
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = CONCAT('Daily gift limit exceeded. You have already gifted ', v_daily_gifted, ' TC today. Daily limit is 50 TC.');
+        ELSEIF NOT v_has_mutual_session AND NOT v_both_established THEN
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = 'Gifting blocked. Both established or mutual session history required.';
+        ELSE
+            -- 1. Deduct from donor
+            UPDATE wallet SET balance = balance - p_amount WHERE user_id = p_from_user_id;
+            
+            -- 2. Add to recipient
+            UPDATE wallet SET balance = balance + p_amount WHERE user_id = v_to_user_id;
+            
+            -- 3. Log transaction
+            INSERT INTO transactions (from_user_id, to_user_id, type, base_amount, final_amount, note)
+            VALUES (p_from_user_id, v_to_user_id, 'gift', p_amount, p_amount, 'Peer-to-peer time credit gift');
+
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Successfully gifted ', p_amount, ' TC to ', p_to_user_email);
+        END IF;
     END IF;
 END //
 DELIMITER ;
+
+
+-- ============================================================
+-- LOAN ENFORCEMENT & AUDIT EXTENSIONS
+-- ============================================================
+
+-- =========================
+-- [Flaw 8] AUDIT TABLE: loan_audit_log
+-- =========================
+-- Tracks every loan status change (active → paid, active → defaulted)
+-- Populated automatically by trg_after_loan_status_change trigger.
+-- =========================
+CREATE TABLE IF NOT EXISTS loan_audit_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id INT NOT NULL,
+    user_id INT NOT NULL,
+    old_status VARCHAR(20),
+    new_status VARCHAR(20),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (loan_id) REFERENCES loans(loan_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_loan_audit_loan ON loan_audit_log(loan_id);
+CREATE INDEX idx_loan_audit_user ON loan_audit_log(user_id);
+
+
+-- =========================
+-- [Flaw 8] TRIGGER: trg_after_loan_status_change
+-- =========================
+-- Automatically logs any loan status transition to loan_audit_log.
+-- =========================
+DROP TRIGGER IF EXISTS trg_after_loan_status_change;
+DELIMITER //
+CREATE TRIGGER trg_after_loan_status_change
+AFTER UPDATE ON loans
+FOR EACH ROW
+BEGIN
+    IF OLD.status != NEW.status THEN
+        INSERT INTO loan_audit_log (loan_id, user_id, old_status, new_status)
+        VALUES (NEW.loan_id, NEW.user_id, OLD.status, NEW.status);
+        
+        IF NEW.status = 'defaulted' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.user_id, '⚠️ Alert: Your loan has defaulted! Complete repayment immediately to unlock platform booking.', 'loan_default');
+        ELSEIF NEW.status = 'paid' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.user_id, '✅ Success: Your loan has been fully repaid. Thank you for maintaining good credit.', 'loan_repaid');
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+
+-- =========================
+-- [Flaw 2] EVENT: evt_check_overdue_loans
+-- =========================
+-- Runs daily to automatically:
+-- 1. Mark overdue active loans as 'defaulted'
+-- 2. Penalize the user's reliability_score by -1.0 (min 0)
+-- Requires: SET GLOBAL event_scheduler = ON;
+-- =========================
+DELIMITER //
+CREATE EVENT IF NOT EXISTS evt_check_overdue_loans
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+DO
+BEGIN
+    -- Step 1: Penalize reliability score for users whose loans are about to be defaulted
+    UPDATE users u
+    JOIN loans l ON u.user_id = l.user_id
+    SET u.reliability_score = GREATEST(u.reliability_score - 1.0, 0)
+    WHERE l.status = 'active' AND l.due_date < NOW();
+
+    -- Step 2: Mark overdue active loans as defaulted
+    -- (This triggers trg_after_loan_status_change to log the audit entry)
+    UPDATE loans 
+    SET status = 'defaulted'
+    WHERE status = 'active' AND due_date < NOW();
+END //
+DELIMITER ;
+
+-- (Duplicate audit triggers removed; defined in main triggers section above)
+
+
+-- ============================================================
+-- STAR-SCHEMA OLAP WAREHOUSE VIEWS
+-- ============================================================
+
+CREATE OR REPLACE VIEW vw_dim_users AS
+SELECT user_id, name, email, location, reliability_score, created_at
+FROM users;
+
+CREATE OR REPLACE VIEW vw_dim_skills AS
+SELECT skill_id, skill_name, catagory AS category, difficulty_level
+FROM skills;
+
+CREATE OR REPLACE VIEW vw_dim_time AS
+SELECT DISTINCT
+    timestamp AS date_key,
+    DATE(timestamp) AS full_date,
+    YEAR(timestamp) AS year,
+    QUARTER(timestamp) AS quarter,
+    MONTH(timestamp) AS month,
+    MONTHNAME(timestamp) AS month_name,
+    DAY(timestamp) AS day,
+    WEEK(timestamp) AS week_of_year
+FROM transactions
+UNION
+SELECT DISTINCT
+    scheduled_time AS date_key,
+    DATE(scheduled_time) AS full_date,
+    YEAR(scheduled_time) AS year,
+    QUARTER(scheduled_time) AS quarter,
+    MONTH(scheduled_time) AS month,
+    MONTHNAME(scheduled_time) AS month_name,
+    DAY(scheduled_time) AS day,
+    WEEK(scheduled_time) AS week_of_year
+FROM exchange_sessions;
+
+CREATE OR REPLACE VIEW vw_fact_sessions AS
+SELECT
+    es.session_id,
+    es.requester_id,
+    es.provider_id,
+    es.skill_id,
+    es.scheduled_time AS date_key,
+    es.status,
+    es.session_duration AS minutes,
+    es.time_credit_transfer AS credits,
+    es.rating,
+    es.bonus_multiplier
+FROM exchange_sessions es;
+

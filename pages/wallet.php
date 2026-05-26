@@ -68,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $wallet = $conn->query("SELECT * FROM wallet WHERE user_id = $user_id")->fetch_assoc();
 $balance = $wallet ? $wallet['balance'] : 0;
 
-// Fetch active loans
-$active_loan = $conn->query("SELECT * FROM loans WHERE user_id = $user_id AND status = 'active' LIMIT 1")->fetch_assoc();
+// Fetch active or defaulted loans (show most urgent first)
+$active_loan = $conn->query("SELECT * FROM loans WHERE user_id = $user_id AND status IN ('active', 'defaulted') ORDER BY FIELD(status, 'defaulted', 'active') LIMIT 1")->fetch_assoc();
 
 // Calculate max borrow limit based on user reliability score
 $user_reliability = $conn->query("SELECT reliability_score FROM users WHERE user_id = $user_id")->fetch_assoc()['reliability_score'];
@@ -184,38 +184,181 @@ include __DIR__ . '/../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <!-- Balance Card -->
-        <div class="wallet-balance">
-            <div class="balance-amount"><?php echo number_format($balance, 2); ?> TC</div>
-            <div class="balance-label">Current Balance (Time Credits)</div>
-            <?php if ($above_avg): ?>
-                <span class="badge badge-success mt-1">&#10003; Above Platform Average</span>
+        <!-- Section 1: Balance + Compact Stats Bar -->
+        <div class="wallet-hero">
+            <div class="wallet-hero-top">
+                <div class="balance-amount"><?php echo number_format($balance, 2); ?> TC</div>
+                <div class="balance-label">Current Balance (Time Credits)</div>
+                <div style="margin-top: 10px;">
+                    <?php if ($above_avg): ?>
+                        <span class="badge badge-success">&#10003; Above Platform Average</span>
+                    <?php else: ?>
+                        <span class="badge badge-warning">Below Platform Average</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="wallet-inline-stats">
+                <div class="w-stat">
+                    <span class="w-stat-value" style="color: var(--success);"><?php echo number_format($earned, 2); ?> TC</span>
+                    <span class="w-stat-label">Total Earned</span>
+                </div>
+                <div class="w-stat">
+                    <span class="w-stat-value" style="color: var(--danger);"><?php echo number_format($spent, 2); ?> TC</span>
+                    <span class="w-stat-label">Total Spent</span>
+                </div>
+                <div class="w-stat">
+                    <span class="w-stat-value"><?php echo $hours_taught; ?> hrs</span>
+                    <span class="w-stat-label">Hours Taught</span>
+                </div>
+                <div class="w-stat">
+                    <span class="w-stat-value" style="color: var(--primary);"><?php echo $completed_sess; ?></span>
+                    <span class="w-stat-label">Sessions Completed</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Actions Panel (Tabbed) -->
+        <div class="wallet-tabs">
+            <div class="wallet-tab-nav">
+                <?php if ($active_loan): ?>
+                    <button class="wallet-tab-btn active" data-tab="loan-tab">
+                        <span class="tab-icon">📋</span> Active Loan
+                    </button>
+                <?php else: ?>
+                    <button class="wallet-tab-btn active" data-tab="borrow-tab">
+                        <span class="tab-icon">🏦</span> Borrow Credits
+                    </button>
+                <?php endif; ?>
+                <button class="wallet-tab-btn" data-tab="gift-tab">
+                    <span class="tab-icon">🎁</span> Gift Credits
+                </button>
+            </div>
+
+            <!-- Tab Content: Active Loan (if active) -->
+            <?php if ($active_loan): ?>
+                <div class="wallet-tab-panel active" id="loan-tab">
+                    <div class="wallet-section-title">Active Loan Details</div>
+                    <div class="card" style="border: 1px solid <?php echo $active_loan['status'] === 'defaulted' ? 'var(--danger)' : 'var(--border-light)'; ?>; background: <?php echo $active_loan['status'] === 'defaulted' ? 'rgba(186, 26, 26, 0.02)' : 'var(--bg-secondary)'; ?>; margin: 0; box-shadow: none;">
+                        <div class="card-header" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+                            <h3 style="font-size: 1.1rem;"><?php echo $active_loan['status'] === 'defaulted' ? '⚠️ Overdue Loan Notification' : 'Outstanding Balance'; ?></h3>
+                            <span class="badge <?php echo $active_loan['status'] === 'defaulted' ? 'badge-danger' : 'badge-warning'; ?>">
+                                <?php echo $active_loan['status'] === 'defaulted' ? 'DEFAULTED' : 'UNPAID'; ?>
+                            </span>
+                        </div>
+                        
+                        <?php if ($active_loan['status'] === 'defaulted'): ?>
+                            <p style="color: var(--danger); font-size: 0.85rem; margin-top: 10px; font-weight: 500; line-height: 1.4;">
+                                ⚠️ This loan is overdue and has been marked as defaulted. Your reliability score has been penalized. Session booking is blocked until repayment.
+                            </p>
+                        <?php endif; ?>
+                        
+                        <!-- Loan Info Grid -->
+                        <div class="loan-info-grid">
+                            <div class="loan-info-item">
+                                <span class="info-value"><?php echo number_format($active_loan['amount'], 2); ?> TC</span>
+                                <span class="info-label">Principal</span>
+                            </div>
+                            <div class="loan-info-item">
+                                <span class="info-value"><?php echo number_format($active_loan['interest_rate'], 1); ?>%</span>
+                                <span class="info-label">Interest</span>
+                            </div>
+                            <div class="loan-info-item">
+                                <span class="info-value" style="color: var(--danger);"><?php echo number_format($active_loan['total_due'], 2); ?> TC</span>
+                                <span class="info-label">Total Due</span>
+                            </div>
+                        </div>
+
+                        <p style="color: var(--text-muted); font-size: 0.8rem; margin: 12px 0 20px;">
+                            Repayment Due Date: <strong><?php echo date('M d, Y', strtotime($active_loan['due_date'])); ?></strong>
+                            <?php if ($active_loan['status'] === 'defaulted'): ?>
+                                <span style="color: var(--danger); font-weight: 600;"> (OVERDUE)</span>
+                            <?php endif; ?>
+                        </p>
+                        
+                        <form method="POST" action="">
+                            <input type="hidden" name="action" value="repay_loan">
+                            <input type="hidden" name="loan_id" value="<?php echo $active_loan['loan_id']; ?>">
+                            <button type="submit" class="btn btn-primary" style="background: var(--primary); color: white; width:100%; padding: 12px; border-radius:var(--radius-md); border:none; font-weight:600; cursor:pointer; font-size: 0.95rem; transition: background 0.2s;">
+                                Repay <?php echo number_format($active_loan['total_due'], 2); ?> TC
+                            </button>
+                        </form>
+                    </div>
+                </div>
             <?php else: ?>
-                <span class="badge badge-warning mt-1">Below Platform Average</span>
+                <!-- Tab Content: Request Loan -->
+                <div class="wallet-tab-panel active" id="borrow-tab">
+                    <div class="wallet-section-title">Borrow Time Credits</div>
+                    <?php if ($completed_sess >= 2): ?>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px; line-height: 1.4;">
+                            You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
+                        </p>
+                        <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; line-height: 1.4;">
+                            📌 A <strong>5% interest rate</strong> applies. Repayment is due within <strong>30 days</strong>. Overdue loans are automatically marked as defaulted and result in a reliability penalty.
+                        </p>
+                        <form method="POST" action="">
+                            <input type="hidden" name="action" value="request_loan">
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label for="borrow_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Borrow (TC)</label>
+                                <input type="number" id="borrow_amount" name="amount" class="form-control" 
+                                       min="1" max="<?php echo $max_borrow_limit; ?>" step="0.5" 
+                                       placeholder="e.g. 10"
+                                       style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="background: var(--primary); color: white; width:100%; padding: 12px; border-radius:var(--radius-md); border:none; font-weight:600; cursor:pointer; font-size: 0.95rem;">
+                                Request Loan
+                            </button>
+                        </form>
+                    <?php else: ?>
+                        <div class="locked-state" style="background: rgba(115, 119, 129, 0.03); border: 1px dashed var(--border-light); padding: 24px; border-radius: var(--radius-md); text-align: center;">
+                            <div style="font-size: 2rem; margin-bottom: 12px;">🔒</div>
+                            <p style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 6px;">
+                                Borrowing Option Locked
+                            </p>
+                            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; max-width: 320px; margin: 0 auto;">
+                                Complete at least 2 exchange sessions to unlock credit borrowing.<br>
+                                <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_sess; ?> / 2</span>
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                </div>
             <?php endif; ?>
+
+            <!-- Tab Content: Gift Credits -->
+            <div class="wallet-tab-panel" id="gift-tab">
+                <div class="wallet-section-title">Gift Time Credits</div>
+                <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 20px; line-height: 1.4;">
+                    Transfer credits to a collaborator. Maximum <strong>25 TC</strong> per transfer, <strong>50 TC</strong> daily limit. 
+                    Gifts are restricted to collaborators with mutual session history or established accounts.
+                </p>
+                <form method="POST" action="">
+                    <input type="hidden" name="action" value="gift_credits">
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label for="recipient_email" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Recipient Email</label>
+                        <input type="email" id="recipient_email" name="recipient_email" class="form-control" 
+                               placeholder="collaborator@example.com" 
+                               style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
+                               required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Gift (TC)</label>
+                        <input type="number" id="gift_amount" name="amount" class="form-control" 
+                               min="0.5" step="0.5" placeholder="e.g. 5"
+                               style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
+                               required>
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="width:100%; padding: 12px; border-radius:var(--radius-md); border: 1px solid var(--border-color); font-weight:600; cursor:pointer; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">
+                        Send Gift
+                    </button>
+                </form>
+            </div>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-value" style="color: var(--success);"><?php echo number_format($earned, 2); ?></span>
-                <span class="stat-label">Total Earned (TC)</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" style="color: var(--danger);"><?php echo number_format($spent, 2); ?></span>
-                <span class="stat-label">Total Spent (TC)</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value"><?php echo $hours_taught; ?></span>
-                <span class="stat-label">Hours Taught</span>
-            </div>
-        </div>
-
-        <!-- Grid Layout for Transaction History & Top Earners -->
+        <!-- Section 3: History & Insights (Grid-2 layout) -->
         <div class="grid-2" style="align-items: start;">
             
             <!-- Left: Transaction History -->
-            <div class="card">
+            <div class="card" style="margin-bottom: 0;">
                 <div class="card-header">
                     <h3>Transaction History</h3>
                 </div>
@@ -250,10 +393,15 @@ include __DIR__ . '/../includes/header.php';
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php while ($t = $transactions->fetch_assoc()):
+                                <?php 
+                                $cnt = 0;
+                                while ($t = $transactions->fetch_assoc()):
                                     $is_incoming = ($t['to_user_id'] == $user_id);
+                                    $cnt++;
+                                    $row_style = ($cnt > 5) ? 'display: none;' : '';
+                                    $row_class = ($cnt > 5) ? 'hidden-txn-row' : '';
                                     ?>
-                                    <tr>
+                                    <tr class="<?php echo $row_class; ?>" style="<?php echo $row_style; ?>">
                                         <td>#<?php echo $t['transcation_id']; ?></td>
                                         <td>
                                             <?php if ($is_incoming): ?>
@@ -276,6 +424,14 @@ include __DIR__ . '/../includes/header.php';
                             </tbody>
                         </table>
                     </div>
+                    <?php if ($transactions->num_rows > 5): ?>
+                        <div style="text-align: center; padding: 12px; border-top: 1px solid var(--border-light); background: var(--bg-primary); border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);">
+                            <button id="toggleTxnBtn" style="background: none; border: none; color: var(--primary); font-family: var(--font-main); font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; outline: none; transition: var(--transition); padding: 6px 12px; border-radius: var(--radius-sm);">
+                                <span id="toggleTxnText">Show More Transactions</span>
+                                <span id="toggleTxnIcon" style="font-size: 0.7rem; transition: transform 0.3s; display: inline-block;">▼</span>
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="empty-state">
                         <div class="icon">&#128176;</div>
@@ -284,148 +440,111 @@ include __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </div>
 
-            <!-- Right: Actions & Leaderboards -->
-            <div style="display: flex; flex-direction: column; gap: 24px;">
-
-                <!-- Active Loan Card -->
-                <?php if ($active_loan): ?>
-                    <div class="card" style="border: 1px solid var(--border-color); background: rgba(0, 56, 108, 0.02);">
-                        <div class="card-header">
-                            <h3>Active Loan</h3>
-                            <span class="badge badge-danger">Unpaid</span>
-                        </div>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px;">
-                            You currently have an outstanding credit loan of <strong><?php echo number_format($active_loan['amount'], 2); ?> TC</strong> from the platform.
-                        </p>
-                        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 5px; margin-bottom: 20px;">
-                            Due date: <?php echo date('M d, Y', strtotime($active_loan['due_date'])); ?>
-                        </p>
-                        <form method="POST" action="">
-                            <input type="hidden" name="action" value="repay_loan">
-                            <input type="hidden" name="loan_id" value="<?php echo $active_loan['loan_id']; ?>">
-                            <button type="submit" class="btn btn-primary btn-block" style="background: var(--primary); color: white; width:100%; padding: 10px; border-radius:var(--radius-sm); border:none; font-weight:600; cursor:pointer;">
-                                Repay <?php echo number_format($active_loan['amount'], 2); ?> TC
-                            </button>
-                        </form>
+            <!-- Right: Top Net Earners Leaderboard (CQ-4) -->
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header">
+                    <h3>Top Net Earners</h3>
+                    <span class="badge badge-orange">Net Positive</span>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 15px;">
+                    Users who have contributed more time credits to the platform than they have spent.
+                </p>
+                <?php if ($net_earners && $net_earners->num_rows > 0): ?>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th style="text-align: right;">Net Surplus</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $rank = 1;
+                                while ($ne = $net_earners->fetch_assoc()): 
+                                    $net_surplus = $ne['total_earned'] - $ne['total_spent'];
+                                    $is_current_user = ($ne['user_id'] == $user_id);
+                                    ?>
+                                    <tr style="<?php echo $is_current_user ? 'background: var(--primary-glow); font-weight: 600;' : ''; ?>">
+                                        <td>
+                                            <span style="font-weight: bold; color: var(--secondary); margin-right: 5px;"><?php echo $rank++; ?>.</span>
+                                            <?php echo htmlspecialchars($ne['name']); ?>
+                                            <?php if ($is_current_user): ?>
+                                                <span class="badge badge-success" style="font-size:0.6rem; padding: 2px 6px;">You</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="text-align: right; color: var(--success); font-weight: 600;">
+                                            +<?php echo number_format($net_surplus, 1); ?> TC
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php else: ?>
-                    <!-- Borrow Card -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>Borrow Time Credits</h3>
-                            <span class="badge badge-success">Available</span>
-                        </div>
-                        
-                        <?php if ($completed_sess >= 2): ?>
-                            <p style="color: var(--text-secondary); font-size: 0.88rem; margin-top: 10px; margin-bottom: 15px;">
-                                You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
-                            </p>
-                            <form method="POST" action="">
-                                <input type="hidden" name="action" value="request_loan">
-                                <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="borrow_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 5px;">Amount to Borrow (TC)</label>
-                                    <input type="number" id="borrow_amount" name="amount" class="form-control" 
-                                           min="1" max="<?php echo $max_borrow_limit; ?>" step="0.5" 
-                                           style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary);" 
-                                           required>
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-block" style="background: var(--primary); color: white; width:100%; padding: 10px; border-radius:var(--radius-sm); border:none; font-weight:600; cursor:pointer;">
-                                    Request Loan
-                                </button>
-                            </form>
-                        <?php else: ?>
-                            <div class="locked-state" style="background: rgba(115, 119, 129, 0.05); padding: 16px; border-radius: var(--radius-md); text-align: center; margin-top: 10px;">
-                                <div style="font-size: 1.5rem; margin-bottom: 8px;">🔒</div>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
-                                    Loan Locked. Complete at least 2 sessions to unlock credit borrowing (Current completed: <?php echo $completed_sess; ?>).
-                                </p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No net earners recorded yet.</p>
                 <?php endif; ?>
-
-                <!-- Gift Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Gift Time Credits</h3>
-                        <span class="badge badge-orange">Transfer</span>
-                    </div>
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 5px; margin-bottom: 15px;">
-                        Transfer credits to a collaborator. Locked until you have completed a session together.
-                    </p>
-                    <form method="POST" action="">
-                        <input type="hidden" name="action" value="gift_credits">
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label for="recipient_email" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 5px;">Recipient Email</label>
-                            <input type="email" id="recipient_email" name="recipient_email" class="form-control" 
-                                   placeholder="collaborator@example.com" 
-                                   style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary);" 
-                                   required>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 5px;">Amount to Gift (TC)</label>
-                            <input type="number" id="gift_amount" name="amount" class="form-control" 
-                                   min="0.5" step="0.5" 
-                                   style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary);" 
-                                   required>
-                        </div>
-                        <button type="submit" class="btn btn-secondary btn-block" style="width:100%; padding: 10px; border-radius:var(--radius-sm); border: 1px solid var(--border-color); font-weight:600; cursor:pointer;">
-                            Send Gift
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Top Net Earners Leaderboard (CQ-4) -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Top Net Earners</h3>
-                        <span class="badge badge-orange">Net Positive</span>
-                    </div>
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 15px;">
-                        Users who have contributed more time credits to the platform than they have spent.
-                    </p>
-                    <?php if ($net_earners && $net_earners->num_rows > 0): ?>
-                        <div class="table-wrapper">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>User</th>
-                                        <th style="text-align: right;">Net Surplus</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $rank = 1;
-                                    while ($ne = $net_earners->fetch_assoc()): 
-                                        $net_surplus = $ne['total_earned'] - $ne['total_spent'];
-                                        $is_current_user = ($ne['user_id'] == $user_id);
-                                        ?>
-                                        <tr style="<?php echo $is_current_user ? 'background: var(--primary-glow); font-weight: 600;' : ''; ?>">
-                                            <td>
-                                                <span style="font-weight: bold; color: var(--secondary); margin-right: 5px;"><?php echo $rank++; ?>.</span>
-                                                <?php echo htmlspecialchars($ne['name']); ?>
-                                                <?php if ($is_current_user): ?>
-                                                    <span class="badge badge-success" style="font-size:0.6rem; padding: 2px 6px;">You</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td style="text-align: right; color: var(--success); font-weight: 600;">
-                                                +<?php echo number_format($net_surplus, 1); ?> TC
-                                            </td>
-                                        </tr>
-                                    <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No net earners recorded yet.</p>
-                    <?php endif; ?>
-                </div>
-
             </div>
 
         </div>
 
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Wallet Tab Switching
+    const tabBtns = document.querySelectorAll('.wallet-tab-btn');
+    const tabPanels = document.querySelectorAll('.wallet-tab-panel');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active class from all buttons and panels
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanels.forEach(p => p.classList.remove('active'));
+
+            // Add active class to clicked button
+            this.classList.add('active');
+
+            // Show target panel
+            const targetTab = this.getAttribute('data-tab');
+            const targetPanel = document.getElementById(targetTab);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+        });
+    });
+
+    // Collapsible Transaction History
+    const toggleBtn = document.getElementById('toggleTxnBtn');
+    if (toggleBtn) {
+        let expanded = false;
+        const hiddenRows = document.querySelectorAll('.hidden-txn-row');
+        const textSpan = document.getElementById('toggleTxnText');
+        const iconSpan = document.getElementById('toggleTxnIcon');
+
+        toggleBtn.addEventListener('click', function() {
+            expanded = !expanded;
+            hiddenRows.forEach(row => {
+                if (expanded) {
+                    row.style.display = 'table-row';
+                    row.style.opacity = '0';
+                    setTimeout(() => {
+                        row.style.transition = 'opacity 0.25s ease-in-out';
+                        row.style.opacity = '1';
+                    }, 20);
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Adjust button look
+            textSpan.textContent = expanded ? 'Show Less Transactions' : 'Show More Transactions';
+            iconSpan.style.transform = expanded ? 'rotate(180deg)' : 'rotate(0deg)';
+            toggleBtn.style.color = expanded ? 'var(--info)' : 'var(--primary)';
+        });
+    }
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

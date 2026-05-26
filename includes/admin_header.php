@@ -19,6 +19,9 @@ $page_titles = [
     'disputes' => 'Reports',
     'community_tasks' => 'Community Tasks',
     'analytics' => 'Analytics',
+    'system_audit' => 'System Audit Logs',
+    'transaction_simulator' => 'ACID Transaction Simulator',
+    'stress_test' => 'Stress Test & Index Profiler',
 ];
 $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
 ?>
@@ -86,10 +89,26 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </li>
             </ul>
 
+            <div class="sidebar-section-label" style="margin-top: 20px;">DBMS SHOWCASE</div>
+            <ul class="sidebar-menu">
+                <li><a href="../admin/system_audit.php"
+                        class="<?php echo $current_page === 'system_audit' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon">🛡️</span> Audit Logs</a>
+                </li>
+                <li><a href="../admin/transaction_simulator.php"
+                        class="<?php echo $current_page === 'transaction_simulator' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon">⚡</span> ACID Simulator</a>
+                </li>
+                <li><a href="../admin/stress_test.php"
+                        class="<?php echo $current_page === 'stress_test' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon">🚀</span> Stress Test</a>
+                </li>
+            </ul>
+
             <div class="sidebar-section-label" style="margin-top: 20px;">QUICK LINKS</div>
             <ul class="sidebar-menu">
-                <li><a href="../pages/login.php" target="_blank" style="font-size:0.82rem;">
-                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span> View Site</a>
+                <li><a href="../index.php" target="_blank" style="font-size:0.82rem;">
+                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span> View Site</a>
                 </li>
             </ul>
         </aside>
