@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         // Admin login — admin is NOT a user, just a site manager
         if (strcasecmp($email, 'Admin@SkillSwap.com') === 0 && $password === 'Admin123') {
+            session_regenerate_id(true);
             $_SESSION['user_id'] = 0;
             $_SESSION['user_name'] = 'Administrator';
             $_SESSION['user_email'] = $email;
@@ -32,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($user['status'] === 'suspended') {
                     $error = 'Your account has been suspended by an administrator.';
                 } else {
+                    session_regenerate_id(true);
                     $_SESSION['user_id'] = $user['user_id'];
                     $_SESSION['user_name'] = $user['name'];
                     $_SESSION['user_email'] = $user['email'];
@@ -64,8 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-wrapper">
         <div class="auth-card">
             <div class="auth-logo">
-
-                <img src="../assets/skillswap.png" alt="Logo" class="auth-logo-img">
+                <a href="../index.php?v=<?=time()?>"><img src="../assets/skillswap.png" alt="Logo" class="auth-logo-img"></a>
                 <p>Exchange Skills, Earn Time Credits</p>
             </div>
 
@@ -91,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="auth-footer">
                 Don't have an account? <a href="../pages/register.php">Sign Up</a>
+                <br><br>
+                <a href="../index.php?v=<?=time()?>" style="font-size:0.8rem; color:var(--text-muted);">&larr; Back to Home</a>
             </div>
         </div>
     </div>

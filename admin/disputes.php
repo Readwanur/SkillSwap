@@ -82,72 +82,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if (empty($refund_reason)) {
             $error = "Refund reason is required.";
         } else {
-            $session = $conn->query("SELECT * FROM exchange_sessions WHERE session_id = $session_id")->fetch_assoc();
-
-            if (!$session) {
-                $error = "Session #$session_id not found.";
-            } elseif ($session['status'] !== 'completed') {
-                $error = "Session #$session_id is not completed — cannot refund.";
-            } elseif ($session['time_credit_transfer'] <= 0) {
-                $error = "Session #$session_id has no credits to refund.";
+            // --- STORED PROCEDURE: sp_issue_refund ---
+            // Handles all validation (time window, amount bounds, provider balance)
+            // and atomically updates wallets, session status, reputation, and
+            // logs the refund transaction. Uses TIMESTAMPDIFF, IF(), GREATEST.
+            $stmt = $conn->prepare("CALL sp_issue_refund(?, ?, ?, ?, @sp_status, @sp_message)");
+            $window = REFUND_WINDOW_DAYS;
+            $stmt->bind_param("idsi", $session_id, $refund_amount, $refund_reason, $window);
+            $stmt->execute();
+            $stmt->close();
+            $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
+            if ($result['status'] === 'success') {
+                $success = "Session #$session_id: " . $result['message'];
             } else {
-                $max_amount = $session['time_credit_transfer'];
-                $requester_id = $session['requester_id'];
-                $provider_id = $session['provider_id'];
-
-                // #2 — Time window check (7 days)
-                $completion = $session['completion_time'] ?? $session['scheduled_time'];
-                $days_since = (time() - strtotime($completion)) / 86400;
-                if ($days_since > REFUND_WINDOW_DAYS) {
-                    $error = "Refund window expired. Sessions can only be refunded within " . REFUND_WINDOW_DAYS . " days of completion (" . round($days_since, 1) . " days ago).";
-                }
-                // #4 — Partial refund validation
-                elseif ($refund_amount <= 0 || $refund_amount > $max_amount) {
-                    $error = "Refund amount must be between 0.01 and $max_amount TC.";
-                } else {
-                    // Check provider has enough balance
-                    $provider_wallet = $conn->query("SELECT balance FROM wallet WHERE user_id = $provider_id")->fetch_assoc();
-                    if (!$provider_wallet || $provider_wallet['balance'] < $refund_amount) {
-                        $pbal = $provider_wallet ? $provider_wallet['balance'] : 0;
-                        $error = "Provider balance ($pbal TC) is insufficient to refund $refund_amount TC.";
-                    } else {
-                        // Start atomic transaction
-                        $conn->begin_transaction();
-                        try {
-                            // Return credits to requester
-                            $conn->query("UPDATE wallet SET balance = balance + $refund_amount WHERE user_id = $requester_id");
-                            // Deduct from provider
-                            $conn->query("UPDATE wallet SET balance = balance - $refund_amount WHERE user_id = $provider_id");
-
-                            // #5 — Mark session as 'refunded' (distinct from cancelled)
-                            $conn->query("UPDATE exchange_sessions SET status = 'refunded' WHERE session_id = $session_id");
-
-                            // #3 — Reduce provider reputation: decrement completed_sessions, increment cancelled
-                            $conn->query("UPDATE reputation SET completed_sessions = GREATEST(completed_sessions - 1, 0), cancelled_sessions = cancelled_sessions + 1 WHERE user_id = $provider_id");
-
-                            // #3 — Clear the rating from this session (it's no longer valid)
-                            $conn->query("UPDATE exchange_sessions SET rating = NULL, comment = NULL WHERE session_id = $session_id");
-
-                            // #1 — Log the refund transaction with reason
-                            $refund_type = ($refund_amount < $max_amount) ? 'partial_refund' : 'full_refund';
-                            $stmt = $conn->prepare("INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                            $stmt->bind_param("iiisdds", $session_id, $provider_id, $requester_id, $refund_type, $max_amount, $refund_amount, $refund_reason);
-                            $stmt->execute();
-                            $stmt->close();
-
-                            $conn->commit();
-
-                            $refund_label = ($refund_amount < $max_amount) ? "Partial refund" : "Full refund";
-                            $success = "$refund_label of $refund_amount TC for Session #$session_id processed. Credits returned to requester. Provider reputation updated.";
-                        } catch (Exception $e) {
-                            $conn->rollback();
-                            $error = "Refund failed: " . $e->getMessage();
-                        }
-                    }
-                }
+                $error = $result['message'];
             }
         }
     }
+
 }
 
 // Status filter

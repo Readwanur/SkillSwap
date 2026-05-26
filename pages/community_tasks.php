@@ -67,6 +67,24 @@ $available_tasks = $conn->query("
     ORDER BY credit_reward DESC
 ");
 
+// --- COMPLEX QUERY: CQ-12 ---
+// Community Task Leaderboard (CTE + Window Function DENSE_RANK)
+$task_leaderboard = $conn->query("
+    WITH task_ranks AS (
+        SELECT
+            u.name,
+            u.user_id,
+            COUNT(ct.task_id) AS tasks_completed,
+            SUM(ct.credit_reward) AS total_rewards,
+            DENSE_RANK() OVER (ORDER BY COUNT(ct.task_id) DESC) as task_rank
+        FROM community_task ct
+        JOIN users u ON ct.user_id = u.user_id
+        WHERE ct.status = 'completed'
+        GROUP BY ct.user_id
+    )
+    SELECT * FROM task_ranks WHERE task_rank <= 5
+");
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -95,87 +113,141 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- My Tasks -->
-        <h2 class="section-title">My Tasks</h2>
-        <?php if ($my_tasks->num_rows > 0): ?>
-            <?php while ($t = $my_tasks->fetch_assoc()):
-                $status_class = 'badge-warning';
-                if ($t['status'] === 'completed')
-                    $status_class = 'badge-success';
-                elseif ($t['status'] === 'in-progress')
-                    $status_class = 'badge-info';
-                elseif ($t['status'] === 'under-review')
-                    $status_class = 'badge-primary';
-                elseif ($t['status'] === 'cancelled')
-                    $status_class = 'badge-danger';
-                ?>
-                <div class="task-card">
-                    <div class="task-header">
-                        <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
-                        <span class="badge <?php echo $status_class; ?>">
-                            <?php 
-                            if ($t['status'] === 'under-review') echo 'Under Review';
-                            else echo ucfirst($t['status']); 
-                            ?>
-                        </span>
-                    </div>
-                    <p><?php echo htmlspecialchars($t['description']); ?></p>
-                    <div class="task-meta">
-                        <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
-                        <span>&#128176; +<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
-                        <span>Assigned: <?php echo date('M d, Y', strtotime($t['assigned_at'])); ?></span>
-                        <?php if ($t['completed_at']): ?>
-                            <span>Completed: <?php echo date('M d, Y', strtotime($t['completed_at'])); ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <?php if ($t['status'] === 'in-progress'): ?>
-                        <div class="alert alert-info mt-2" style="font-size:0.8rem; padding:8px;">
-                            &#x23F0; You have 24 hours to complete this task from the time of assignment, or it will be automatically returned to the pool.
+        <div class="grid-2" style="align-items: start;">
+            
+            <!-- Left: Tasks List -->
+            <div>
+                <!-- My Tasks -->
+                <h2 class="section-title" style="margin-top:0;">My Tasks</h2>
+                <?php if ($my_tasks->num_rows > 0): ?>
+                    <?php while ($t = $my_tasks->fetch_assoc()):
+                        $status_class = 'badge-warning';
+                        if ($t['status'] === 'completed')
+                            $status_class = 'badge-success';
+                        elseif ($t['status'] === 'in-progress')
+                            $status_class = 'badge-info';
+                        elseif ($t['status'] === 'under-review')
+                            $status_class = 'badge-primary';
+                        elseif ($t['status'] === 'cancelled')
+                            $status_class = 'badge-danger';
+                        ?>
+                        <div class="task-card">
+                            <div class="task-header">
+                                <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
+                                <span class="badge <?php echo $status_class; ?>">
+                                    <?php 
+                                    if ($t['status'] === 'under-review') echo 'Under Review';
+                                    else echo ucfirst($t['status']); 
+                                    ?>
+                                </span>
+                            </div>
+                            <p><?php echo htmlspecialchars($t['description']); ?></p>
+                            <div class="task-meta">
+                                <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
+                                <span>&#128176; +<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
+                            </div>
+                            <div class="task-meta mt-1" style="font-size: 0.75rem;">
+                                <span>Assigned: <?php echo date('M d, Y', strtotime($t['assigned_at'])); ?></span>
+                                <?php if ($t['completed_at']): ?>
+                                    <span>Completed: <?php echo date('M d, Y', strtotime($t['completed_at'])); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if ($t['status'] === 'in-progress'): ?>
+                                <div class="alert alert-info mt-2" style="font-size:0.8rem; padding:8px;">
+                                    &#x23F0; You have 24 hours to complete this task from the time of assignment, or it will be automatically returned to the pool.
+                                </div>
+                                <button type="button" class="btn btn-sm btn-success mt-2" onclick="openSubmitModal(<?php echo $t['task_id']; ?>)">Submit for Review</button>
+                            <?php elseif ($t['status'] === 'under-review' && !empty($t['submission_note'])): ?>
+                                <div style="margin-top:10px; background:var(--bg-hover); padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; border-left:3px solid var(--primary);">
+                                    <strong>Your Submission:</strong><br>
+                                    <?php echo nl2br(htmlspecialchars($t['submission_note'])); ?>
+                                </div>
+                            <?php endif; ?>
                         </div>
-                        <button type="button" class="btn btn-sm btn-success mt-2" onclick="openSubmitModal(<?php echo $t['task_id']; ?>)">Submit for Review</button>
-                    <?php elseif ($t['status'] === 'under-review' && !empty($t['submission_note'])): ?>
-                        <div style="margin-top:10px; background:var(--bg-hover); padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; border-left:3px solid var(--primary);">
-                            <strong>Your Submission:</strong><br>
-                            <?php echo nl2br(htmlspecialchars($t['submission_note'])); ?>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="card mb-3">
+                        <div class="empty-state">
+                            <p>You have no assigned tasks.</p>
                         </div>
-                    <?php endif; ?>
-                </div>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <div class="card mb-3">
-                <div class="empty-state">
-                    <p>You have no assigned tasks.</p>
-                </div>
-            </div>
-        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
-        <!-- Available Tasks -->
-        <h2 class="section-title mt-3">Available Tasks</h2>
-        <?php if ($available_tasks->num_rows > 0): ?>
-            <?php while ($t = $available_tasks->fetch_assoc()): ?>
-                <div class="task-card">
-                    <div class="task-header">
-                        <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
-                        <span class="badge badge-orange">+<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
+                <!-- Available Tasks -->
+                <h2 class="section-title mt-3">Available Tasks</h2>
+                <?php if ($available_tasks->num_rows > 0): ?>
+                    <?php while ($t = $available_tasks->fetch_assoc()): ?>
+                        <div class="task-card">
+                            <div class="task-header">
+                                <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
+                                <span class="badge badge-orange">+<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
+                            </div>
+                            <p><?php echo htmlspecialchars($t['description']); ?></p>
+                            <div class="task-meta">
+                                <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
+                            </div>
+                            <form method="POST" class="mt-2">
+                                <input type="hidden" name="action" value="accept_task">
+                                <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
+                                <button type="submit" class="btn btn-sm btn-primary">Accept Task</button>
+                            </form>
+                        </div>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="card">
+                        <div class="empty-state">
+                            <p>No community tasks available at the moment.</p>
+                        </div>
                     </div>
-                    <p><?php echo htmlspecialchars($t['description']); ?></p>
-                    <div class="task-meta">
-                        <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
-                    </div>
-                    <form method="POST" class="mt-2">
-                        <input type="hidden" name="action" value="accept_task">
-                        <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                        <button type="submit" class="btn btn-sm btn-primary">Accept Task</button>
-                    </form>
-                </div>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <div class="card">
-                <div class="empty-state">
-                    <p>No community tasks available at the moment.</p>
-                </div>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+
+            <!-- Right: Task Leaderboard -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Top Contributors</h3>
+                    <span class="badge badge-orange">Leaderboard</span>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom: 15px;">
+                    Users who have earned the most credits by completing community tasks.
+                </p>
+                <?php if ($task_leaderboard && $task_leaderboard->num_rows > 0): ?>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Contributor</th>
+                                    <th style="text-align: right;">Rewards</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php while ($tl = $task_leaderboard->fetch_assoc()): 
+                                    $is_current_user = ($tl['user_id'] == $user_id);
+                                    ?>
+                                    <tr style="<?php echo $is_current_user ? 'background: var(--primary-glow); font-weight: 600;' : ''; ?>">
+                                        <td><strong>#<?php echo $tl['task_rank']; ?></strong></td>
+                                        <td>
+                                            <?php echo htmlspecialchars($tl['name']); ?>
+                                            <?php if ($is_current_user): ?>
+                                                <span class="badge badge-success" style="font-size:0.6rem; padding: 2px 6px;">You</span>
+                                            <?php endif; ?>
+                                            <br><small style="color:var(--text-muted); font-size:0.75rem;"><?php echo $tl['tasks_completed']; ?> task<?php echo $tl['tasks_completed'] == 1 ? '' : 's'; ?></small>
+                                        </td>
+                                        <td style="text-align: right; color: var(--success); font-weight: 600;">
+                                            +<?php echo number_format($tl['total_rewards'], 1); ?> TC
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No task contributors recorded yet.</p>
+                <?php endif; ?>
+            </div>
+
+        </div>
 
     </div>
 </div>

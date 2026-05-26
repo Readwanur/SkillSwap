@@ -1,0 +1,297 @@
+<?php
+require_once __DIR__ . '/../config/db.php';
+
+header('Content-Type: application/json');
+
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+$user_id = intval($_SESSION['user_id']);
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    if (isset($_GET['conversation_id'])) {
+        // Fetch thread history
+        $conversation_id = intval($_GET['conversation_id']);
+        
+        // Verify user is member of this conversation
+        $check_stmt = $conn->prepare("
+            SELECT 1 FROM conversation_members 
+            WHERE conversation_id = ? AND user_id = ? 
+            LIMIT 1
+        ");
+        $check_stmt->bind_param("ii", $conversation_id, $user_id);
+        $check_stmt->execute();
+        $check_res = $check_stmt->get_result();
+        
+        if ($check_res->num_rows === 0) {
+            $check_stmt->close();
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            exit;
+        }
+        $check_stmt->close();
+        
+        // Mark messages as read (where sender is not current user)
+        $mark_stmt = $conn->prepare("
+            UPDATE messages 
+            SET is_read = 1 
+            WHERE conversation_id = ? AND sender_id != ? AND is_read = 0
+        ");
+        $mark_stmt->bind_param("ii", $conversation_id, $user_id);
+        $mark_stmt->execute();
+        $mark_stmt->close();
+        
+        // Get messages
+        $msg_stmt = $conn->prepare("
+            SELECT message_id, sender_id, message_text, is_read, sent_at 
+            FROM messages 
+            WHERE conversation_id = ? 
+            ORDER BY sent_at ASC, message_id ASC 
+            LIMIT 100
+        ");
+        $msg_stmt->bind_param("i", $conversation_id);
+        $msg_stmt->execute();
+        $msg_res = $msg_stmt->get_result();
+        
+        $messages = [];
+        while ($row = $msg_res->fetch_assoc()) {
+            $messages[] = [
+                'message_id' => intval($row['message_id']),
+                'sender_id' => intval($row['sender_id']),
+                'message_text' => htmlspecialchars($row['message_text']),
+                'is_read' => (bool)$row['is_read'],
+                'sent_at' => $row['sent_at']
+            ];
+        }
+        $msg_stmt->close();
+        
+        echo json_encode([
+            'status' => 'success',
+            'conversation_id' => $conversation_id,
+            'messages' => $messages
+        ]);
+        exit;
+    } else {
+        // Fetch all active conversations for the current user
+        // Order by last message time DESC, or conversation creation if empty
+        $q = "
+            SELECT 
+                c.conversation_id,
+                u.user_id AS other_user_id,
+                u.name AS other_user_name,
+                u.profile_photo AS other_user_photo,
+                m.message_text AS last_message_text,
+                m.sent_at AS last_message_time,
+                m.sender_id AS last_message_sender_id,
+                (SELECT COUNT(*) FROM messages m2 
+                 WHERE m2.conversation_id = c.conversation_id 
+                   AND m2.is_read = 0 
+                   AND m2.sender_id != ?) AS unread_count
+            FROM conversations c
+            INNER JOIN conversation_members cm1 ON c.conversation_id = cm1.conversation_id AND cm1.user_id = ?
+            INNER JOIN conversation_members cm2 ON c.conversation_id = cm2.conversation_id AND cm2.user_id != ?
+            INNER JOIN users u ON cm2.user_id = u.user_id
+            LEFT JOIN messages m ON m.message_id = (
+                SELECT message_id FROM messages 
+                WHERE conversation_id = c.conversation_id 
+                ORDER BY sent_at DESC, message_id DESC 
+                LIMIT 1
+            )
+            ORDER BY COALESCE(m.sent_at, c.created_at) DESC
+        ";
+        
+        $stmt = $conn->prepare($q);
+        $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        
+        $conversations = [];
+        while ($row = $res->fetch_assoc()) {
+            $conversations[] = [
+                'conversation_id' => intval($row['conversation_id']),
+                'other_user_id' => intval($row['other_user_id']),
+                'other_user_name' => htmlspecialchars($row['other_user_name']),
+                'other_user_photo' => $row['other_user_photo'],
+                'last_message_text' => $row['last_message_text'] ? htmlspecialchars($row['last_message_text']) : null,
+                'last_message_time' => $row['last_message_time'],
+                'last_message_sender_id' => $row['last_message_sender_id'] ? intval($row['last_message_sender_id']) : null,
+                'unread_count' => intval($row['unread_count'])
+            ];
+        }
+        $stmt->close();
+        
+        echo json_encode([
+            'status' => 'success',
+            'conversations' => $conversations
+        ]);
+        exit;
+    }
+} else if ($method === 'POST') {
+    // Send message or mark read
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    // Fallback to $_POST if JSON body is empty (e.g. standard form post)
+    if (empty($input)) {
+        $input = $_POST;
+    }
+    
+    $action = $input['action'] ?? 'send';
+    
+    if ($action === 'mark_read') {
+        $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : 0;
+        if ($conversation_id > 0) {
+            $stmt = $conn->prepare("
+                UPDATE messages 
+                SET is_read = 1 
+                WHERE conversation_id = ? AND sender_id != ? AND is_read = 0
+            ");
+            $stmt->bind_param("ii", $conversation_id, $user_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            echo json_encode(['status' => 'success', 'message' => 'Thread marked as read']);
+            exit;
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid conversation ID']);
+            exit;
+        }
+    }
+    
+    // Default action: send message
+    $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : 0;
+    $recipient_id = isset($input['recipient_id']) ? intval($input['recipient_id']) : 0;
+    $message_text = trim($input['message_text'] ?? '');
+    
+    if ($message_text === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Message text cannot be empty']);
+        exit;
+    }
+    
+    // Resolve conversation ID if recipient_id was provided
+    if ($conversation_id === 0 && $recipient_id > 0) {
+        if ($recipient_id === $user_id) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Cannot start conversation with yourself']);
+            exit;
+        }
+        
+        // Check if recipient exists
+        $user_check = $conn->prepare("SELECT 1 FROM users WHERE user_id = ? LIMIT 1");
+        $user_check->bind_param("i", $recipient_id);
+        $user_check->execute();
+        if ($user_check->get_result()->num_rows === 0) {
+            $user_check->close();
+            http_response_code(404);
+            echo json_encode(['error' => 'Recipient not found']);
+            exit;
+        }
+        $user_check->close();
+        
+        // Check if conversation already exists between these two users
+        $conv_check = $conn->prepare("
+            SELECT cm1.conversation_id 
+            FROM conversation_members cm1
+            INNER JOIN conversation_members cm2 ON cm1.conversation_id = cm2.conversation_id
+            WHERE cm1.user_id = ? AND cm2.user_id = ?
+            LIMIT 1
+        ");
+        $conv_check->bind_param("ii", $user_id, $recipient_id);
+        $conv_check->execute();
+        $conv_res = $conv_check->get_result();
+        
+        if ($conv_res->num_rows > 0) {
+            $conversation_id = intval($conv_res->fetch_assoc()['conversation_id']);
+        }
+        $conv_check->close();
+        
+        // If not exists, create it
+        if ($conversation_id === 0) {
+            $conn->begin_transaction();
+            try {
+                $conn->query("INSERT INTO conversations () VALUES ()");
+                $conversation_id = $conn->insert_id;
+                
+                $member_stmt = $conn->prepare("INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)");
+                
+                // Add current user
+                $member_stmt->bind_param("ii", $conversation_id, $user_id);
+                $member_stmt->execute();
+                
+                // Add recipient
+                $member_stmt->bind_param("ii", $conversation_id, $recipient_id);
+                $member_stmt->execute();
+                
+                $member_stmt->close();
+                $conn->commit();
+            } catch (Exception $e) {
+                $conn->rollback();
+                http_response_code(500);
+                echo json_encode(['error' => 'Failed to initialize conversation: ' . $e->getMessage()]);
+                exit;
+            }
+        }
+    }
+    
+    // Ensure we have a valid conversation ID at this stage
+    if ($conversation_id <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing conversation_id or recipient_id']);
+        exit;
+    }
+    
+    // Verify user membership in conversation
+    $check_stmt = $conn->prepare("
+        SELECT 1 FROM conversation_members 
+        WHERE conversation_id = ? AND user_id = ? 
+        LIMIT 1
+    ");
+    $check_stmt->bind_param("ii", $conversation_id, $user_id);
+    $check_stmt->execute();
+    if ($check_stmt->get_result()->num_rows === 0) {
+        $check_stmt->close();
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    $check_stmt->close();
+    
+    // Insert new message
+    $msg_stmt = $conn->prepare("
+        INSERT INTO messages (conversation_id, sender_id, message_text) 
+        VALUES (?, ?, ?)
+    ");
+    $msg_stmt->bind_param("iis", $conversation_id, $user_id, $message_text);
+    if ($msg_stmt->execute()) {
+        $message_id = $conn->insert_id;
+        $sent_at = date('Y-m-d H:i:s');
+        
+        $msg_stmt->close();
+        
+        echo json_encode([
+            'status' => 'success',
+            'message' => [
+                'message_id' => $message_id,
+                'conversation_id' => $conversation_id,
+                'sender_id' => $user_id,
+                'message_text' => htmlspecialchars($message_text),
+                'sent_at' => $sent_at,
+                'is_read' => false
+            ]
+        ]);
+        exit;
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to send message']);
+        exit;
+    }
+} else {
+    http_response_code(405);
+    echo json_encode(['error' => 'Method Not Allowed']);
+    exit;
+}
