@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 $user = $conn->query("
     SELECT u.name, u.location, u.bio, u.created_at, u.last_active_at, r.current_score, r.completed_sessions, r.mentor_level
-    FROM users u
+    FROM vw_public_users u
     LEFT JOIN reputation r ON u.user_id = r.user_id
     WHERE u.user_id = $profile_id
 ")->fetch_assoc();
@@ -82,7 +82,10 @@ include __DIR__ . '/../includes/header.php';
                 <div class="avatar avatar-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
                 <div style="flex:1;">
                     <h1 style="margin:0; font-size:1.8rem;"><?php echo htmlspecialchars($user['name']); ?></h1>
-                    <p style="color:var(--text-secondary);"><?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
+                    <p style="color:var(--text-secondary); margin-bottom: 8px;"><?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
+                    <a href="messages.php?start_with_user_id=<?php echo $profile_id; ?>" class="btn btn-secondary btn-sm" style="display:inline-block; text-decoration:none;">
+                        💬 Message User
+                    </a>
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">&#11088; <?php echo $user['current_score'] ?? '5.00'; ?></div>

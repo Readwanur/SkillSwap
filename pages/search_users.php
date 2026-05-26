@@ -15,14 +15,13 @@ if ($query !== '') {
     $escaped = $conn->real_escape_string($query);
     $users = $conn->query("
         SELECT u.user_id, u.name, u.location, u.bio, r.current_score, r.mentor_level
-        FROM users u
+        FROM vw_public_users u
         LEFT JOIN reputation r ON u.user_id = r.user_id
         WHERE u.name LIKE '%$escaped%' AND u.user_id != $user_id
         ORDER BY r.current_score DESC
     ");
 } else {
-    // --- COMPLEX QUERY: CQ-2 ---
-    // Recommend providers who offer skills that the current user has requested
+    // --- COMPLEX QUERY: Recommend providers via vw_public_users ---
     $recommended_providers = $conn->query("
         SELECT DISTINCT
             u.user_id,
@@ -34,7 +33,7 @@ if ($query !== '') {
             r.mentor_level
         FROM user_skills_requested usr
         JOIN user_skills_offered uso ON usr.skill_id = uso.skill_id
-        JOIN users u ON uso.user_id = u.user_id
+        JOIN vw_public_users u ON uso.user_id = u.user_id
         JOIN skills s ON usr.skill_id = s.skill_id
         LEFT JOIN reputation r ON u.user_id = r.user_id
         WHERE usr.user_id = $user_id
@@ -44,28 +43,20 @@ if ($query !== '') {
         LIMIT 6
     ");
 
-    // --- COMPLEX QUERY: CQ-3 ---
-    // Find mutual skill exchanges (Direct bidirectional match)
+    // --- SMART MATCHMAKING VIEW: Mutual skill exchanges via vw_smart_matches ---
     $mutual_exchanges = $conn->query("
-        SELECT DISTINCT
-            u.user_id,
-            u.name,
-            u.location,
-            s1.skill_name AS they_teach_me,
-            s2.skill_name AS i_teach_them,
+        SELECT 
+            m.user_b_id AS user_id,
+            m.user_b_name AS name,
+            m.user_b_location AS location,
+            m.user_a_requests_skill_name AS they_teach_me,
+            m.user_b_requests_skill_name AS i_teach_them,
             r.current_score,
             r.mentor_level
-        FROM user_skills_requested my_req
-        JOIN user_skills_offered their_off ON my_req.skill_id = their_off.skill_id
-        JOIN user_skills_requested their_req ON their_off.user_id = their_req.user_id
-        JOIN user_skills_offered my_off ON their_req.skill_id = my_off.skill_id AND my_off.user_id = my_req.user_id
-        JOIN users u ON their_off.user_id = u.user_id
-        JOIN skills s1 ON my_req.skill_id = s1.skill_id
-        JOIN skills s2 ON their_req.skill_id = s2.skill_id
-        LEFT JOIN reputation r ON u.user_id = r.user_id
-        WHERE my_req.user_id = $user_id
-          AND u.user_id != $user_id
-          AND u.status = 'active'
+        FROM vw_smart_matches m
+        LEFT JOIN reputation r ON m.user_b_id = r.user_id
+        WHERE m.user_a_id = $user_id
+        ORDER BY m.match_rank ASC
         LIMIT 6
     ");
 }
