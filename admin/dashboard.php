@@ -46,41 +46,41 @@ include __DIR__ . '/../includes/admin_header.php';
         <p style="color:#ffffff; margin-top:4px;">Here's what's happening on your platform today.</p>
     </div>
     <div class="admin-quick-actions">
-        <a href="../admin/users.php" class="btn btn-sm btn-secondary">&#x1F465; Manage Users</a>
-        <a href="../admin/skills.php" class="btn btn-sm btn-secondary">&#x1F4DA; Add Skill</a>
-        <a href="../admin/disputes.php" class="btn btn-sm btn-primary">&#x1F4CB; View Reports</a>
+        <a href="../admin/users.php" class="btn btn-sm btn-secondary"><i data-lucide="users" class="lucide-sm"></i> Manage Users</a>
+        <a href="../admin/skills.php" class="btn btn-sm btn-secondary"><i data-lucide="book-open" class="lucide-sm"></i> Add Skill</a>
+        <a href="../admin/disputes.php" class="btn btn-sm btn-primary"><i data-lucide="clipboard-list" class="lucide-sm"></i> View Reports</a>
     </div>
 </div>
 
 <!-- Platform Stats -->
 <div class="stats-grid">
     <div class="stat-card stat-card-accent" style="--accent: var(--primary);">
-        <div class="stat-icon">&#x1F465;</div>
+        <div class="stat-icon"><i data-lucide="users" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo $total_users; ?></span>
         <span class="stat-label">Total Users</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--info);">
-        <div class="stat-icon">&#x1F4DA;</div>
+        <div class="stat-icon"><i data-lucide="book-open" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo $total_skills; ?></span>
         <span class="stat-label">Skills Listed</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--success);">
-        <div class="stat-icon">&#x2705;</div>
+        <div class="stat-icon"><i data-lucide="check-circle" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo $completed_sessions; ?></span>
         <span class="stat-label">Completed</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--warning);">
-        <div class="stat-icon">&#x23F3;</div>
+        <div class="stat-icon"><i data-lucide="hourglass" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo $pending_sessions; ?></span>
         <span class="stat-label">Pending</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: #6b5ce7;">
-        <div class="stat-icon">&#x23F1;</div>
+        <div class="stat-icon"><i data-lucide="clock" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo $total_hours; ?>h</span>
         <span class="stat-label">Hours Exchanged</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--secondary);">
-        <div class="stat-icon">&#x1F4B0;</div>
+        <div class="stat-icon"><i data-lucide="coins" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo number_format($total_wallet, 0); ?></span>
         <span class="stat-label">Total Credits</span>
     </div>
@@ -91,13 +91,13 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="admin-alerts mb-3">
     <?php if ($pending_sessions > 0): ?>
         <div class="alert alert-warning" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>&#x26A0;&#xFE0F; <strong><?php echo $pending_sessions; ?> session(s)</strong> are awaiting action.</span>
+            <span><i data-lucide="alert-triangle" class="lucide-sm"></i> <strong><?php echo $pending_sessions; ?> session(s)</strong> are awaiting action.</span>
             <a href="../admin/disputes.php" class="btn btn-sm btn-secondary">Review Now</a>
         </div>
     <?php endif; ?>
     <?php if ($pending_tasks > 0): ?>
         <div class="alert alert-info" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>&#x1F4CB; <strong><?php echo $pending_tasks; ?> community task(s)</strong> are pending assignment.</span>
+            <span><i data-lucide="clipboard-list" class="lucide-sm"></i> <strong><?php echo $pending_tasks; ?> community task(s)</strong> are pending assignment.</span>
             <a href="../admin/community_tasks.php" class="btn btn-sm btn-secondary">View</a>
         </div>
     <?php endif; ?>
@@ -108,7 +108,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <!-- Recent Sessions -->
     <div class="card">
         <div class="card-header">
-            <h3>&#x1F4C5; Recent Sessions</h3>
+            <h3><i data-lucide="calendar" class="lucide-sm"></i> Recent Sessions</h3>
             <a href="../admin/disputes.php" class="btn btn-sm btn-secondary">View All &rarr;</a>
         </div>
         <?php if ($recent_sessions->num_rows > 0): ?>
@@ -150,7 +150,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <!-- Recent Users -->
     <div class="card">
         <div class="card-header">
-            <h3>&#x1F464; Recent Users</h3>
+            <h3><i data-lucide="user" class="lucide-sm"></i> Recent Users</h3>
             <a href="../admin/users.php" class="btn btn-sm btn-secondary">View All &rarr;</a>
         </div>
         <?php while ($u = $recent_users->fetch_assoc()): ?>

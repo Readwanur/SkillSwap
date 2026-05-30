@@ -191,7 +191,7 @@ include __DIR__ . '/../includes/admin_header.php';
 ?>
 
 <div class="page-header">
-    <h1 class="page-title" style="margin:0;">⭐ Skill Classification</h1>
+    <h1 class="page-title" style="margin:0;"><i data-lucide="star" class="lucide-sm"></i> Skill Classification</h1>
     <button class="btn btn-primary" onclick="document.getElementById('add-skill-modal').classList.add('active')">+ Add New Skill</button>
 </div>
 

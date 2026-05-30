@@ -173,7 +173,7 @@ include __DIR__ . '/../includes/admin_header.php';
         <!-- P2P Transfer Simulator Card -->
         <div class="card mb-3">
             <div class="card-header">
-                <h3>⚡ Peer-to-Peer Transfer Simulator</h3>
+                <h3><i data-lucide="zap" class="lucide-sm"></i> Peer-to-Peer Transfer Simulator</h3>
             </div>
             <div style="padding: 20px;">
                 <form method="POST">
@@ -212,7 +212,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     <div style="margin-bottom: 20px; background: #fff5f5; border: 1px solid #ffd1d1; padding: 12px; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" name="inject_failure" value="1" id="fail_transfer" style="width: 18px; height: 18px; cursor: pointer;">
                         <label for="fail_transfer" style="color: var(--danger); font-weight: 600; font-size: 0.85rem; cursor: pointer; user-select: none;">
-                            🚨 Inject failure midway (Force ROLLBACK)
+                            <i data-lucide="siren" class="lucide-sm"></i> Inject failure midway (Force ROLLBACK)
                         </label>
                     </div>
 
@@ -224,7 +224,7 @@ include __DIR__ . '/../includes/admin_header.php';
         <!-- Platform Loan Simulator Card -->
         <div class="card">
             <div class="card-header">
-                <h3>💵 Platform Loan Request Simulator</h3>
+                <h3><i data-lucide="banknote" class="lucide-sm"></i> Platform Loan Request Simulator</h3>
             </div>
             <div style="padding: 20px;">
                 <form method="POST">
@@ -251,7 +251,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     <div style="margin-bottom: 20px; background: #fff5f5; border: 1px solid #ffd1d1; padding: 12px; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" name="inject_failure" value="1" id="fail_loan" style="width: 18px; height: 18px; cursor: pointer;">
                         <label for="fail_loan" style="color: var(--danger); font-weight: 600; font-size: 0.85rem; cursor: pointer; user-select: none;">
-                            🚨 Inject failure midway (Force ROLLBACK)
+                            <i data-lucide="siren" class="lucide-sm"></i> Inject failure midway (Force ROLLBACK)
                         </label>
                     </div>
 
@@ -305,7 +305,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <div class="card" style="background: <?php echo $outcome_bg; ?>; border: 1px solid <?php echo $outcome_border; ?>;">
                 <div style="padding: 20px;">
                     <h3 style="color: <?php echo $outcome_text; ?>; margin-bottom: 8px;">
-                        <?php echo $simulation_result['status'] === 'committed' ? '✅ SUCCESS: COMMITTED' : '🚨 REVERTED: ROLLED BACK'; ?>
+                        <?php echo $simulation_result['status'] === 'committed' ? '<i data-lucide="check-circle" class="lucide-sm"></i> SUCCESS: COMMITTED' : '<i data-lucide="siren" class="lucide-sm"></i> REVERTED: ROLLED BACK'; ?>
                     </h3>
                     <p style="color: var(--text-secondary); font-size: 0.88rem; font-weight: 500;"><?php echo htmlspecialchars($simulation_result['message']); ?></p>
                     

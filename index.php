@@ -17,8 +17,12 @@ header("Pragma: no-cache");
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
     <style>
+        html {
+            scroll-behavior: smooth;
+        }
         /* Modern Design System Tokens */
         :root {
             --primary: #00386c;
@@ -739,10 +743,10 @@ header("Pragma: no-cache");
     <header class="hero">
         <div class="container">
             <div class="hero-grid">
-                <div class="hero-text">
+                <div class="hero-text" data-aos="fade-right" data-aos-duration="1000">
                     <h1>Time as <span>Currency.</span></h1>
                     <p>
-                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not dollars. Exchange your knowledge, build your reputation, and invest in your growth.
+                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not Taka. Exchange your knowledge, build your reputation, and invest in your growth.
                     </p>
                     <div class="hero-actions">
                         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']): ?>
@@ -755,13 +759,13 @@ header("Pragma: no-cache");
                         <a href="#how-it-works" class="btn btn-secondary">How it Works</a>
                     </div>
                 </div>
-                <div class="hero-image">
+                <div class="hero-image" data-aos="fade-left" data-aos-duration="1000" data-aos-delay="200">
                     <!-- Embedded Vector illustration generated previously -->
                     <img src="assets/landing_hero.png" alt="SkillSwap Illustration">
                     
                     <!-- Floating Current Balance Badge -->
                     <div class="balance-badge">
-                        <span class="icon">⏱️</span>
+                        <span class="icon"><i data-lucide="clock"></i></span>
                         <div>
                             <div class="label">Current Balance</div>
                             <div class="value">12.5 Hours</div>
@@ -775,7 +779,7 @@ header("Pragma: no-cache");
     <!-- Exchange Process section (How it Works) -->
     <section class="section" id="how-it-works" style="background: var(--bg-secondary);">
         <div class="container">
-            <div class="section-header">
+            <div class="section-header" data-aos="fade-up">
                 <h2>The Exchange Process</h2>
                 <p>Simple, equitable, and transparent time-banking.</p>
             </div>
@@ -784,9 +788,9 @@ header("Pragma: no-cache");
                 <div class="process-line"></div>
                 
                 <!-- Step 1: Request -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="100">
                     <div class="badge-icon badge-blue">
-                        <span>✏️</span>
+                        <span><i data-lucide="edit-3"></i></span>
                     </div>
                     <h3>1. Request</h3>
                     <div class="card-bar"></div>
@@ -796,9 +800,9 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Step 2: Session -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="200">
                     <div class="badge-icon badge-yellow">
-                        <span>👥</span>
+                        <span><i data-lucide="users"></i></span>
                     </div>
                     <h3>2. Session</h3>
                     <div class="card-bar"></div>
@@ -808,9 +812,9 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Step 3: Transfer -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="300">
                     <div class="badge-icon badge-grey">
-                        <span>🔄</span>
+                        <span><i data-lucide="refresh-cw"></i></span>
                     </div>
                     <h3>3. Transfer</h3>
                     <div class="card-bar"></div>
@@ -825,7 +829,7 @@ header("Pragma: no-cache");
     <!-- Features Showcase section -->
     <section class="section" id="features">
         <div class="container">
-            <div class="section-header">
+            <div class="section-header" data-aos="fade-up">
                 <h2>Built for Students & Peer Learning</h2>
                 <p>A complete framework for exchange, collaboration, and growth.</p>
             </div>
@@ -834,7 +838,7 @@ header("Pragma: no-cache");
             <div class="features-grid">
                 
                 <!-- Scholarly Reliability -->
-                <div class="feature-card reliability-card">
+                <div class="feature-card reliability-card" data-aos="fade-right" data-aos-delay="100">
                     <span class="badge badge-orange" style="text-transform:uppercase; letter-spacing:0.5px; font-size:0.65rem;">Reputation System</span>
                     <h3 style="margin-top: 10px; font-size:1.5rem;">Scholarly Reliability</h3>
                     <p style="color:var(--text-secondary); font-size:0.92rem; margin-top:8px;">
@@ -853,15 +857,15 @@ header("Pragma: no-cache");
                     </div>
 
                     <div class="meta-badges">
-                        <span class="meta-badge">🏆 Top Mentor</span>
-                        <span class="meta-badge">✔️ 50+ Sessions</span>
+                        <span class="meta-badge"><i data-lucide="award" class="lucide-sm"></i> Top Mentor</span>
+                        <span class="meta-badge"><i data-lucide="check-circle" class="lucide-sm"></i> 50+ Sessions</span>
                     </div>
                 </div>
 
                 <!-- Community Tasks -->
-                <div class="feature-card tasks-card">
+                <div class="feature-card tasks-card" data-aos="fade-left" data-aos-delay="200">
                     <div>
-                        <div class="icon-header">📋</div>
+                        <div class="icon-header"><i data-lucide="clipboard-list"></i></div>
                         <h3>Community Tasks</h3>
                         <p>
                             Earn hours by contributing to university projects or helping peers with short-form tasks.
@@ -881,8 +885,8 @@ header("Pragma: no-cache");
             <div class="features-grid">
                 
                 <!-- Smart Matching -->
-                <div class="feature-card matching-card">
-                    <div class="badge-icon">🔍</div>
+                <div class="feature-card matching-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="badge-icon"><i data-lucide="search"></i></div>
                     <h3>Smart Matching</h3>
                     <p>
                         Our AI suggests skills you might need based on your academic path and current gaps.
@@ -890,13 +894,13 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Transaction Transparency -->
-                <div class="feature-card transparency-card">
+                <div class="feature-card transparency-card" data-aos="fade-up" data-aos-delay="200">
                     <h3>Transaction Transparency</h3>
                     
                     <div class="transparency-list">
                         <div class="transparency-item">
                             <div class="details">
-                                <div class="icon">📖</div>
+                                <div class="icon"><i data-lucide="book-open"></i></div>
                                 <div class="name">Advanced Python Tutoring</div>
                             </div>
                             <div class="amount amount-plus">+2.0h</div>
@@ -904,7 +908,7 @@ header("Pragma: no-cache");
 
                         <div class="transparency-item">
                             <div class="details">
-                                <div class="icon">🎨</div>
+                                <div class="icon"><i data-lucide="palette"></i></div>
                                 <div class="name">UI Design Review</div>
                             </div>
                             <div class="amount amount-minus">-1.5h</div>
@@ -916,7 +920,7 @@ header("Pragma: no-cache");
     </section>
 
     <!-- Footer CTA Call to Action Section -->
-    <section class="cta-section">
+    <section class="cta-section" data-aos="zoom-in" data-aos-duration="1000">
         <div class="container">
             <h2>Ready to exchange your time?</h2>
             <p>
@@ -927,7 +931,7 @@ header("Pragma: no-cache");
             <?php elseif (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0): ?>
                 <a href="pages/dashboard.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Go to Dashboard</a>
             <?php else: ?>
-                <a href="pages/register.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Exchange Time Now</a>
+                <a href="pages/login.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Exchange Time Now</a>
             <?php endif; ?>
         </div>
     </section>
@@ -940,5 +944,21 @@ header("Pragma: no-cache");
         </div>
     </footer>
 
+    <!-- AOS Scripts -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        AOS.init({
+            once: true,
+            offset: 50,
+            duration: 800,
+            easing: 'ease-out-cubic'
+        });
+        
+        // Initialize Lucide Icons
+        document.addEventListener("DOMContentLoaded", function() {
+            lucide.createIcons();
+        });
+    </script>
 </body>
 </html>

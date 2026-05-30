@@ -178,6 +178,7 @@ include __DIR__ . '/../includes/header.php';
             <?php while ($s = $sessions->fetch_assoc()):
                 $is_requester = ($s['requester_id'] == $user_id);
                 $partner_name = $is_requester ? $s['provider_name'] : $s['requester_name'];
+                $partner_id = $is_requester ? $s['provider_id'] : $s['requester_id'];
                 $role = $is_requester ? 'Learner' : 'Teacher';
 
                 $status_class = 'badge-warning';
@@ -205,6 +206,8 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="session-actions">
                         <span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($s['status']); ?></span>
+                        
+                        <a href="../pages/messages.php?start_with_user_id=<?php echo $partner_id; ?>" class="btn btn-secondary btn-sm" style="margin-left: 5px;">Message User</a>
 
                         <?php if ($s['status'] === 'scheduled' || $s['status'] === 'under-review'): ?>
                             <?php if ($s['status'] === 'scheduled' && !$is_requester): ?>

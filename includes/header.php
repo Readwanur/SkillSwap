@@ -39,10 +39,27 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
     <meta name="description"
         content="SkillSwap - Exchange skills, earn time credits. A community-driven skill sharing platform.">
     <title>SkillSwap<?php echo isset($page_title) ? ' — ' . $page_title : ''; ?></title>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
 </head>
 
 <body>
+
+    <!-- Preloader -->
+    <div id="page-preloader" class="preloader" style="opacity: 0; visibility: hidden;">
+        <div class="preloader-content">
+            <img src="../assets/loading.png" alt="SkillSwap Loading" class="preloader-logo">
+            <div class="preloader-progress"><div class="preloader-progress-bar"></div></div>
+        </div>
+    </div>
+    <script>
+        window.preloaderTimer = setTimeout(function() {
+            var p = document.getElementById("page-preloader");
+            if (p) {
+                p.style.visibility = "visible";
+                p.style.opacity = "1";
+            }
+        }, 300);
+    </script>
 
     <!-- Navbar -->
     <nav class="navbar">
@@ -59,22 +76,34 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                     <ul class="nav-links">
                         <li><a href="../pages/dashboard.php"
                                 class="<?php echo $current_page == 'dashboard' ? 'active' : ''; ?>">Dashboard</a></li>
-                        <li><a href="../pages/skills.php"
-                                class="<?php echo $current_page == 'skills' ? 'active' : ''; ?>">Skills</a></li>
+                        <li class="nav-item-dropdown">
+                            <a href="#"
+                                class="<?php echo ($current_page == 'skills' || $current_page == 'smart_matches' || $current_page == 'market_trends') ? 'active' : ''; ?>">Browse ▾</a>
+                            <ul class="nav-dropdown-menu">
+                                <li><a href="../pages/skills.php"
+                                        class="<?php echo $current_page == 'skills' ? 'active' : ''; ?>">Skills</a></li>
+                                <li><a href="../pages/smart_matches.php"
+                                        class="<?php echo $current_page == 'smart_matches' ? 'active' : ''; ?>">Smart Matches</a></li>
+                                <li><a href="../pages/market_trends.php"
+                                        class="<?php echo $current_page == 'market_trends' ? 'active' : ''; ?>">Insights</a></li>
+                            </ul>
+                        </li>
                         <li><a href="../pages/sessions.php"
                                 class="<?php echo $current_page == 'sessions' ? 'active' : ''; ?>">Sessions</a></li>
                         <li><a href="../pages/wallet.php"
                                 class="<?php echo $current_page == 'wallet' ? 'active' : ''; ?>">Wallet</a></li>
-                        <li><a href="../pages/community_tasks.php"
-                                class="<?php echo $current_page == 'community_tasks' ? 'active' : ''; ?>">Community</a></li>
+                        <li class="nav-item-dropdown">
+                            <a href="#"
+                                class="<?php echo ($current_page == 'community_tasks' || $current_page == 'leaderboard') ? 'active' : ''; ?>">Activity ▾</a>
+                            <ul class="nav-dropdown-menu">
+                                <li><a href="../pages/community_tasks.php"
+                                        class="<?php echo $current_page == 'community_tasks' ? 'active' : ''; ?>">Community Tasks</a></li>
+                                <li><a href="../pages/leaderboard.php"
+                                        class="<?php echo $current_page == 'leaderboard' ? 'active' : ''; ?>">Leaderboard</a></li>
+                            </ul>
+                        </li>
                         <li><a href="../pages/profile.php"
                                 class="<?php echo $current_page == 'profile' ? 'active' : ''; ?>">Profile</a></li>
-                        <li><a href="../pages/messages.php"
-                                class="<?php echo $current_page == 'messages' ? 'active' : ''; ?>">Messages
-                                <?php if ($unread_msg_count > 0): ?>
-                                    <span class="badge badge-orange" style="font-size:0.65rem; padding: 2px 5px; border-radius: 50%; display:inline-block; vertical-align:middle; line-height:1;"><?php echo $unread_msg_count; ?></span>
-                                <?php endif; ?>
-                            </a></li>
                     </ul>
                     <?php if ($user_id > 0): ?>
                         <form action="../pages/search_users.php" method="GET" style="display:inline-block; position:relative;" id="headerSearchForm">
@@ -113,6 +142,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                                             `;
                                                         });
                                                         suggestionsBox.innerHTML = html;
+                                                        if (window.lucide) lucide.createIcons();
                                                         suggestionsBox.style.display = 'block';
                                                     } else {
                                                         suggestionsBox.innerHTML = '<div style="padding: 8px 10px; font-size: 0.85rem; color: var(--text-muted);">No users found</div>';
@@ -137,10 +167,20 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
 
             <div class="nav-user" style="display:flex; align-items:center;">
                 <?php if ($user_id > 0 && !$is_admin): ?>
+                <!-- Messages Icon -->
+                <a href="../pages/messages.php" class="notif-bell-wrapper" style="position: relative; margin-right: 15px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 5px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#043A72" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.13 2 11.23C2 14.12 3.53 16.69 5.86 18.31V22L9.36 19.98C10.2 20.25 11.08 20.41 12 20.41C17.52 20.41 22 16.29 22 11.23C22 6.13 17.52 2 12 2ZM13.06 14.28L10.74 11.75L6.2 14.28L11.16 8.75L13.56 11.21L17.96 8.75L13.06 14.28Z"/>
+                    </svg>
+                    <?php if ($unread_msg_count > 0): ?>
+                        <span style="position: absolute; top: -2px; right: -2px; background: var(--danger); color: #ffffff; font-size: 0.65rem; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm);"><?php echo $unread_msg_count; ?></span>
+                    <?php endif; ?>
+                </a>
+
                 <!-- Notification Bell -->
                 <div class="notif-bell-wrapper" style="position: relative; margin-right: 18px; display: inline-block;">
                     <button id="notifBellBtn" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 5px; position: relative; color: var(--text-secondary); transition: var(--transition); display: flex; align-items: center; justify-content: center; outline: none;">
-                        🔔
+                        <i data-lucide="bell" class="lucide-sm"></i>
                         <span id="notifCountBadge" style="position: absolute; top: -2px; right: -2px; background: var(--danger); color: #ffffff; font-size: 0.65rem; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); display: none;">0</span>
                     </button>
                     <!-- Dropdown Content -->
@@ -160,7 +200,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                     <span class="user-name" style="font-weight: 700; font-size: 1rem; color: var(--text-primary);"><?php echo htmlspecialchars($user_name); ?></span>
                     <?php if (!$is_admin && $user_id > 0): ?>
                         <span style="font-size: 0.75rem; color: var(--info); font-weight: 600;">
-                            ⏱️ <?php echo number_format($time_credits, 2); ?> TC
+                            <i data-lucide="clock" class="lucide-sm"></i> <?php echo number_format($time_credits, 2); ?> TC
                         </span>
                     <?php endif; ?>
                 </div>
@@ -242,11 +282,11 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
 
             let html = '';
             notifications.forEach(n => {
-                let icon = '🔔';
-                if (n.type === 'booking') icon = '📅';
-                else if (n.type === 'session_update') icon = '💬';
-                else if (n.type === 'loan_default') icon = '⚠️';
-                else if (n.type === 'loan_repaid') icon = '✅';
+                let icon = '<i data-lucide="bell" class="lucide-sm"></i>';
+                if (n.type === 'booking') icon = '<i data-lucide="calendar" class="lucide-sm"></i>';
+                else if (n.type === 'session_update') icon = '<i data-lucide="message-square" class="lucide-sm"></i>';
+                else if (n.type === 'loan_default') icon = '<i data-lucide="alert-triangle" class="lucide-sm"></i>';
+                else if (n.type === 'loan_repaid') icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
 
                 html += `
                     <div class="notif-item" data-id="${n.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; gap: 10px; transition: var(--transition); background: var(--bg-card);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='var(--bg-card)'">
@@ -259,6 +299,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                 `;
             });
             notifItemsList.innerHTML = html;
+            if (window.lucide) lucide.createIcons();
         }
 
         function markAsRead(notifId, element) {
