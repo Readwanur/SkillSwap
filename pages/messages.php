@@ -418,7 +418,7 @@ include __DIR__ . '/../includes/header.php';
 
                 <!-- Chat Empty State -->
                 <div class="chat-empty" id="chatEmptyState">
-                    <div class="chat-empty-icon">💬</div>
+                    <div class="chat-empty-icon"><i data-lucide="message-square" class="lucide-sm"></i></div>
                     <h3>Select a conversation</h3>
                     <p>Pick someone from your inbox or visit their profile to start coordinating your next skill swap.</p>
                 </div>

@@ -201,7 +201,7 @@ include __DIR__ . '/../includes/admin_header.php';
 ?>
 
 <div class="page-header">
-    <h1 class="page-title" style="margin:0;">&#x1F4CB; Community Tasks</h1>
+    <h1 class="page-title" style="margin:0;"><i data-lucide="clipboard-list" class="lucide-sm"></i> Community Tasks</h1>
     <button class="btn btn-primary" onclick="document.getElementById('add-task-modal').classList.add('active')">+ Create New Task</button>
 </div>
 
@@ -364,7 +364,7 @@ function buildTabUrl($status, $sort, $order) {
                                         <input type="hidden" name="action" value="approve_task">
                                         <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-success" title="Approve Task and Award Credits"
-                                            onclick="return confirm('Approve this task? This will award <?php echo $t['credit_reward']; ?> TC to <?php echo htmlspecialchars($t['assigned_user']); ?>.')">&#x2705;</button>
+                                            onclick="return confirm('Approve this task? This will award <?php echo $t['credit_reward']; ?> TC to <?php echo htmlspecialchars($t['assigned_user']); ?>.')"><i data-lucide="check-circle" class="lucide-sm"></i></button>
                                     </form>
                                     <!-- Reject -->
                                     <form method="POST" style="display:inline;">

@@ -111,7 +111,7 @@ include __DIR__ . '/../includes/header.php';
                 </p>
 
                 <!-- 1. Direct Mutual Exchanges (CQ-3) -->
-                <h3 class="mb-2" style="color: var(--secondary);">✨ Mutual Exchange Partners</h3>
+                <h3 class="mb-2" style="color: var(--secondary);"><i data-lucide="sparkles" class="lucide-sm"></i> Mutual Exchange Partners</h3>
                 <?php if ($mutual_exchanges && $mutual_exchanges->num_rows > 0): ?>
                     <div class="grid-3 mb-3">
                         <?php while ($me = $mutual_exchanges->fetch_assoc()): ?>
@@ -126,8 +126,8 @@ include __DIR__ . '/../includes/header.php';
                                 <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:8px;"><?php echo htmlspecialchars($me['location'] ?? 'Unknown location'); ?></p>
                                 
                                 <div class="mt-2" style="font-size:0.8rem; background: var(--bg-hover); padding: 8px; border-radius: var(--radius-sm);">
-                                    <div style="color: var(--success); font-weight: 500;">📖 Teaches: <?php echo htmlspecialchars($me['they_teach_me']); ?></div>
-                                    <div style="color: var(--primary); font-weight: 500; margin-top:3px;">🎓 Learns: <?php echo htmlspecialchars($me['i_teach_them']); ?></div>
+                                    <div style="color: var(--success); font-weight: 500;"><i data-lucide="book-open" class="lucide-sm"></i> Teaches: <?php echo htmlspecialchars($me['they_teach_me']); ?></div>
+                                    <div style="color: var(--primary); font-weight: 500; margin-top:3px;"><i data-lucide="graduation-cap" class="lucide-sm"></i> Learns: <?php echo htmlspecialchars($me['i_teach_them']); ?></div>
                                 </div>
                                 <div class="mt-2" style="font-size:0.85rem;">
                                     &#11088; <?php echo $me['current_score'] ?? '5.00'; ?>/5
@@ -142,7 +142,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
 
                 <!-- 2. Recommended Providers (CQ-2) -->
-                <h3 class="mb-2 mt-3" style="color: var(--primary);">🎯 Recommended for You</h3>
+                <h3 class="mb-2 mt-3" style="color: var(--primary);"><i data-lucide="target" class="lucide-sm"></i> Recommended for You</h3>
                 <?php if ($recommended_providers && $recommended_providers->num_rows > 0): ?>
                     <div class="grid-3">
                         <?php while ($rp = $recommended_providers->fetch_assoc()): ?>

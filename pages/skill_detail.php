@@ -96,6 +96,7 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Providers -->
         <h2 class="section-title">Available Providers</h2>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-12px; margin-bottom:12px;"><i data-lucide="lightbulb" class="lucide-sm"></i> Dynamic pricing based on provider demand (surge multiplier calculated via SQL subqueries)</p>
 
         <?php if ($providers && $providers->num_rows > 0): ?>
             <?php while ($providers && $p = $providers->fetch_assoc()): ?>
@@ -119,6 +120,8 @@ include __DIR__ . '/../includes/header.php';
                                 <span
                                     class="badge badge-orange"><?php echo htmlspecialchars($p['mentor_level'] ?? 'Novice'); ?></span>
                             </div>
+                            <!-- Surge pricing badge (Feature 6) -->
+                            <span id="surge-badge-<?php echo $p['user_id']; ?>" class="badge" style="display:none; margin-left:8px;"></span>
                         </div>
                         <div>
                             <?php if ($p['user_id'] == $user_id): ?>
@@ -126,6 +129,7 @@ include __DIR__ . '/../includes/header.php';
                                     This is You
                                 </button>
                             <?php else: ?>
+                                <a href="../pages/messages.php?start_with_user_id=<?php echo $p['user_id']; ?>" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Message User</a>
                                 <button class="btn btn-primary btn-sm"
                                     onclick="openBooking(<?php echo $p['user_id']; ?>, '<?php echo htmlspecialchars($p['name']); ?>')">
                                     Book Session
@@ -157,27 +161,31 @@ include __DIR__ . '/../includes/header.php';
         <form method="POST">
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" id="modal_provider_id">
-            <p style="color:var(--text-secondary); margin-bottom:16px;">Provider: <strong
+            <p style="color:var(--text-secondary); margin-bottom:8px;">Provider: <strong
                     id="modal_provider_name"></strong></p>
+            <div id="surge-info" style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;"></div>
             <div class="form-group">
                 <label for="scheduled_time">Preferred Date & Time</label>
                 <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
-                <select name="duration" id="duration" class="form-control">
-                    <option value="30">30 minutes (5 TC)</option>
-                    <option value="60" selected>60 minutes (10 TC)</option>
-                    <option value="90">90 minutes (15 TC)</option>
-                    <option value="120">120 minutes (20 TC)</option>
+                <select name="duration" id="duration" class="form-control" onchange="updateSurgeCost()">
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>60 minutes</option>
+                    <option value="90">90 minutes</option>
+                    <option value="120">120 minutes</option>
                 </select>
             </div>
+            <div id="cost-display" style="text-align:center; margin-bottom:12px; font-size:0.9rem; color:var(--text-secondary);">Estimated cost: <strong id="cost-value">10.00 TC</strong></div>
             <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
         </form>
     </div>
 </div>
 
 <script>
+    var currentSurgeMultiplier = 1.0;
+
     // Set min datetime to the user's local "now"
     function setMinDateTime() {
         var now = new Date();
@@ -189,10 +197,42 @@ include __DIR__ . '/../includes/header.php';
         document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
     }
 
+    function updateSurgeCost() {
+        var duration = parseInt(document.getElementById('duration').value);
+        var baseCost = (duration / 60) * 10;
+        var surgedCost = (baseCost * currentSurgeMultiplier).toFixed(2);
+        var costEl = document.getElementById('cost-value');
+        if (currentSurgeMultiplier > 1) {
+            costEl.innerHTML = '<span style="text-decoration:line-through;color:var(--text-muted);">' + baseCost.toFixed(2) + ' TC</span> → <span style="color:var(--danger);">' + surgedCost + ' TC</span>';
+        } else {
+            costEl.textContent = baseCost.toFixed(2) + ' TC';
+        }
+    }
+
     function openBooking(providerId, providerName) {
         document.getElementById('modal_provider_id').value = providerId;
         document.getElementById('modal_provider_name').textContent = providerName;
         setMinDateTime();
+        // Fetch surge pricing for this provider
+        fetch('../api/surge_pricing.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                currentSurgeMultiplier = data.surge_multiplier || 1.0;
+                var infoEl = document.getElementById('surge-info');
+                if (data.surge_multiplier > 1) {
+                    var level = data.demand_level;
+                    var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
+                    var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
+                    infoEl.style.display = 'block';
+                    infoEl.style.background = bgColor;
+                    infoEl.style.border = '1px solid ' + borderColor;
+                    infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
+                } else {
+                    infoEl.style.display = 'none';
+                }
+                updateSurgeCost();
+            })
+            .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
         document.getElementById('bookingModal').classList.add('active');
     }
 
@@ -224,6 +264,26 @@ include __DIR__ . '/../includes/header.php';
 
     document.getElementById('mentorInfoModal').addEventListener('click', function (e) {
         if (e.target === this) closeMentorInfo();
+    });
+
+    // --- Feature 6: Load surge badges for all providers on page load ---
+    document.addEventListener('DOMContentLoaded', function() {
+        var badges = document.querySelectorAll('[id^="surge-badge-"]');
+        badges.forEach(function(badge) {
+            var pid = badge.id.replace('surge-badge-', '');
+            fetch('../api/surge_pricing.php?provider_id=' + pid)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.surge_multiplier > 1) {
+                        badge.style.display = 'inline-block';
+                        var level = data.demand_level;
+                        if (level === 'extreme') { badge.className = 'badge badge-danger'; badge.textContent = '<i data-lucide="flame" class="lucide-sm"></i> ' + data.surge_multiplier + '× Demand'; }
+                        else if (level === 'high') { badge.className = 'badge badge-warning'; badge.textContent = '<i data-lucide="trending-up" class="lucide-sm"></i> ' + data.surge_multiplier + '× Demand'; }
+                        else { badge.className = 'badge badge-info'; badge.textContent = '↗ ' + data.surge_multiplier + '× Demand'; }
+                    }
+                })
+                .catch(() => {});
+        });
     });
 </script>
 

@@ -172,17 +172,17 @@ include __DIR__ . '/../includes/admin_header.php';
 <!-- Top statistics cards -->
 <div class="stats-grid mb-3">
     <div class="stat-card stat-card-accent" style="--accent: var(--primary);">
-        <div class="stat-icon">📊</div>
+        <div class="stat-icon"><i data-lucide="bar-chart" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo number_format($total_txns); ?></span>
         <span class="stat-label">Total Transactions</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--info);">
-        <div class="stat-icon">🧪</div>
+        <div class="stat-icon"><i data-lucide="flask-conical" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo number_format($seeded_txns); ?></span>
         <span class="stat-label">Seeded Stress Records</span>
     </div>
     <div class="stat-card stat-card-accent" style="--accent: var(--warning);">
-        <div class="stat-icon">⚡</div>
+        <div class="stat-icon"><i data-lucide="zap" class="lucide-sm"></i></div>
         <span class="stat-value"><?php echo ($total_txns > 10000) ? 'Ready' : 'Low Density'; ?></span>
         <span class="stat-label">Stress Level Status</span>
     </div>
@@ -193,7 +193,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div>
         <div class="card mb-3">
             <div class="card-header">
-                <h3>🚀 Stress Seed Engine</h3>
+                <h3><i data-lucide="rocket" class="lucide-sm"></i> Stress Seed Engine</h3>
             </div>
             <div style="padding: 20px;">
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
@@ -222,7 +222,7 @@ include __DIR__ . '/../includes/admin_header.php';
 
         <div class="card">
             <div class="card-header">
-                <h3>⚡ B-Tree Index Profiler Benchmark</h3>
+                <h3><i data-lucide="zap" class="lucide-sm"></i> B-Tree Index Profiler Benchmark</h3>
             </div>
             <div style="padding: 20px;">
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
@@ -231,7 +231,7 @@ include __DIR__ . '/../includes/admin_header.php';
                 
                 <?php if ($total_txns < 5000): ?>
                     <div class="alert alert-warning" style="font-size: 0.8rem; padding: 10px;">
-                        ⚠️ Warning: Low record density (less than 5,000 total records). Speed differences might be negligible. Please seed 50,000 records first for high fidelity benchmark profiling.
+                        <i data-lucide="alert-triangle" class="lucide-sm"></i> Warning: Low record density (less than 5,000 total records). Speed differences might be negligible. Please seed 50,000 records first for high fidelity benchmark profiling.
                     </div>
                 <?php endif; ?>
                 
@@ -246,7 +246,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <!-- Performance metrics -->
             <div class="card mb-3" style="background: var(--bg-secondary); border: 1px solid var(--border-light);">
                 <div class="card-header">
-                    <h3>📈 Profiler Performance Metrics</h3>
+                    <h3><i data-lucide="trending-up" class="lucide-sm"></i> Profiler Performance Metrics</h3>
                 </div>
                 <div style="padding: 20px;">
                     <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -289,7 +289,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <!-- EXPLAIN Visualizer -->
             <div class="card">
                 <div class="card-header">
-                    <h3>🔍 Execution Plan Explainer (EXPLAIN)</h3>
+                    <h3><i data-lucide="search" class="lucide-sm"></i> Execution Plan Explainer (EXPLAIN)</h3>
                 </div>
                 <div style="padding: 15px; overflow-x: auto;">
                     <h4 style="font-size: 0.85rem; color: var(--success); margin-bottom: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px;">Indexed Query Execution Details</h4>
@@ -347,7 +347,7 @@ include __DIR__ . '/../includes/admin_header.php';
             </div>
         <?php else: ?>
             <div style="padding: 40px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: var(--radius-md); background: var(--bg-secondary);">
-                <div style="font-size: 2.5rem; margin-bottom: 10px;">📉</div>
+                <div style="font-size: 2.5rem; margin-bottom: 10px;"><i data-lucide="trending-down" class="lucide-sm"></i></div>
                 <p>Run the Index Profiler to benchmark query optimization characteristics.</p>
             </div>
         <?php endif; ?>

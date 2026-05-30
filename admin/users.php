@@ -176,7 +176,7 @@ include __DIR__ . '/../includes/admin_header.php';
 ?>
 
 <div class="page-header">
-    <h1 class="page-title" style="margin:0;">&#x1F465; User Management</h1>
+    <h1 class="page-title" style="margin:0;"><i data-lucide="users" class="lucide-sm"></i> User Management</h1>
     <span class="badge badge-info" style="font-size:0.85rem; padding:6px 16px;"><?php echo $count_all; ?> Registered Users</span>
 </div>
 
@@ -207,7 +207,7 @@ include __DIR__ . '/../includes/admin_header.php';
 <?php if ($inactive_users && $inactive_users->num_rows > 0): ?>
     <div class="card mb-3" style="border: 1px solid var(--warning); background: rgba(115,92,0,0.02);">
         <div class="card-header" style="border-bottom: 1px solid rgba(115,92,0,0.15); margin-bottom: 15px;">
-            <h3 style="color: var(--warning); margin:0;">⚠️ Inactive Users Alert (30+ Days No Session)</h3>
+            <h3 style="color: var(--warning); margin:0;"><i data-lucide="alert-triangle" class="lucide-sm"></i> Inactive Users Alert (30+ Days No Session)</h3>
             <span class="badge badge-warning" style="background: rgba(115,92,0,0.15); color: var(--warning);"><?php echo $inactive_users->num_rows; ?> User(s)</span>
         </div>
         <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
@@ -347,7 +347,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                         <input type="hidden" name="action" value="activate_user">
                                         <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-success" title="Activate User"
-                                            onclick="return confirm('Activate User #<?php echo $u['user_id']; ?>?')">&#x2705; Activate</button>
+                                            onclick="return confirm('Activate User #<?php echo $u['user_id']; ?>?')"><i data-lucide="check-circle" class="lucide-sm"></i> Activate</button>
                                     </form>
                                 <?php endif; ?>
 

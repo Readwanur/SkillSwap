@@ -203,7 +203,7 @@ include __DIR__ . '/../includes/admin_header.php';
 ?>
 
 <div class="page-header">
-    <h1 class="page-title" style="margin:0;">&#x1F4CB; Session Reports</h1>
+    <h1 class="page-title" style="margin:0;"><i data-lucide="clipboard-list" class="lucide-sm"></i> Session Reports</h1>
     <span class="badge badge-info" style="padding:6px 14px; font-size:0.8rem;">Refund window: <?php echo REFUND_WINDOW_DAYS; ?> days</span>
 </div>
 
@@ -295,9 +295,9 @@ function buildTabUrl($status, $sort, $order) {
         </h3>
         <div class="admin-filter-tabs">
             <a href="<?php echo buildTabUrl('', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === '' ? 'active' : ''; ?>">All</a>
-            <a href="<?php echo buildTabUrl('scheduled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'scheduled' ? 'active' : ''; ?>">&#x23F3; Scheduled</a>
+            <a href="<?php echo buildTabUrl('scheduled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'scheduled' ? 'active' : ''; ?>"><i data-lucide="hourglass" class="lucide-sm"></i> Scheduled</a>
             <a href="<?php echo buildTabUrl('under-review', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'under-review' ? 'active' : ''; ?>">&#x1F50E; Under Review</a>
-            <a href="<?php echo buildTabUrl('completed', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>">&#x2705; Completed</a>
+            <a href="<?php echo buildTabUrl('completed', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'completed' ? 'active' : ''; ?>"><i data-lucide="check-circle" class="lucide-sm"></i> Completed</a>
             <a href="<?php echo buildTabUrl('cancelled', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'cancelled' ? 'active' : ''; ?>">&#x274C; Cancelled</a>
             <a href="<?php echo buildTabUrl('refunded', $sort, $order); ?>" class="filter-tab <?php echo $status_filter === 'refunded' ? 'active' : ''; ?>">&#x1F4B8; Refunded</a>
         </div>
@@ -420,7 +420,7 @@ function buildTabUrl($status, $sort, $order) {
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
                                         <input type="hidden" name="action" value="resolve_completed">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Force complete without credit transfer">&#x2705;</button>
+                                        <button type="submit" class="btn btn-sm btn-success" title="Force complete without credit transfer"><i data-lucide="check-circle" class="lucide-sm"></i></button>
                                     </form>
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
@@ -433,7 +433,7 @@ function buildTabUrl($status, $sort, $order) {
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">
                                         <input type="hidden" name="action" value="approve_completion">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Approve and Transfer Credits">&#x2705; Approve</button>
+                                        <button type="submit" class="btn btn-sm btn-success" title="Approve and Transfer Credits"><i data-lucide="check-circle" class="lucide-sm"></i> Approve</button>
                                     </form>
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="session_id" value="<?php echo $d['session_id']; ?>">

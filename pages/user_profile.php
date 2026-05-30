@@ -63,6 +63,29 @@ $page_title = $user['name'] . "'s Profile";
 $offered = $conn->query("SELECT s.skill_name, s.difficulty_level, s.skill_id FROM user_skills_offered uso JOIN skills s ON uso.skill_id = s.skill_id WHERE uso.user_id = $profile_id");
 $requested = $conn->query("SELECT s.skill_name FROM user_skills_requested usr JOIN skills s ON usr.skill_id = s.skill_id WHERE usr.user_id = $profile_id");
 
+// --- Feature 4: Get user's leaderboard badges ---
+// Uses CTE + DENSE_RANK() OVER (PARTITION BY category) to find
+// this user's rank across all skill categories
+$user_badges = $conn->query("
+    WITH provider_scores AS (
+        SELECT es.provider_id, s.catagory AS category,
+            DENSE_RANK() OVER (PARTITION BY s.catagory ORDER BY 
+                (COUNT(*) * 0.4) + (COALESCE(AVG(es.rating),0)*6*0.3) + (COALESCE(r.current_score,5)*4*0.2) + (COALESCE(SUM(es.session_duration),0)/60.0*0.1) DESC
+            ) AS rank_pos
+        FROM exchange_sessions es
+        JOIN skills s ON es.skill_id = s.skill_id
+        LEFT JOIN reputation r ON es.provider_id = r.user_id
+        WHERE es.status = 'completed' AND s.catagory IS NOT NULL
+        GROUP BY es.provider_id, s.catagory
+    )
+    SELECT category, rank_pos FROM provider_scores 
+    WHERE provider_id = $profile_id AND rank_pos <= 3
+");
+$profile_badges = [];
+if ($user_badges) {
+    while ($b = $user_badges->fetch_assoc()) { $profile_badges[] = $b; }
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -84,7 +107,7 @@ include __DIR__ . '/../includes/header.php';
                     <h1 style="margin:0; font-size:1.8rem;"><?php echo htmlspecialchars($user['name']); ?></h1>
                     <p style="color:var(--text-secondary); margin-bottom: 8px;"><?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
                     <a href="messages.php?start_with_user_id=<?php echo $profile_id; ?>" class="btn btn-secondary btn-sm" style="display:inline-block; text-decoration:none;">
-                        💬 Message User
+                        <i data-lucide="message-square" class="lucide-sm"></i> Message User
                     </a>
                 </div>
                 <div style="text-align: right;">
@@ -103,6 +126,22 @@ include __DIR__ . '/../includes/header.php';
                 Member since: <?php echo date('F j, Y', strtotime($user['created_at'])); ?> &middot; 
                 Last active: <?php echo date('M j, Y', strtotime($user['last_active_at'])); ?>
             </div>
+
+            <?php if (!empty($profile_badges)): ?>
+            <div class="mt-2" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;"><i data-lucide="award" class="lucide-sm"></i> Badges:</span>
+                <?php foreach ($profile_badges as $badge):
+                    $icon = '<i data-lucide="medal" class="lucide-sm"></i>'; $badge_cls = 'badge-info';
+                    if ($badge['rank_pos'] == 1) { $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>'; $badge_cls = 'badge-warning'; }
+                    elseif ($badge['rank_pos'] == 2) { $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>'; $badge_cls = 'badge-info'; }
+                    elseif ($badge['rank_pos'] == 3) { $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>'; $badge_cls = 'badge-orange'; }
+                ?>
+                    <span class="badge <?php echo $badge_cls; ?>" style="font-size:0.75rem;">
+                        <?php echo $icon; ?> #<?php echo $badge['rank_pos']; ?> <?php echo htmlspecialchars($badge['category']); ?>
+                    </span>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
         <div class="grid-2">

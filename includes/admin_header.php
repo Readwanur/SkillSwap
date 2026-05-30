@@ -23,6 +23,7 @@ $page_titles = [
     'transaction_simulator' => 'ACID Transaction Simulator',
     'stress_test' => 'Stress Test & Index Profiler',
     'formal_disputes' => 'Formal Disputes',
+    'fraud_detection' => 'Fraud Detection',
 ];
 $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
 ?>
@@ -34,10 +35,27 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SkillSwap Admin Panel">
     <title>SkillSwap Admin — <?php echo $breadcrumb_title; ?></title>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
 </head>
 
 <body>
+
+    <!-- Preloader -->
+    <div id="page-preloader" class="preloader" style="opacity: 0; visibility: hidden;">
+        <div class="preloader-content">
+            <img src="../assets/loading.png" alt="SkillSwap Loading" class="preloader-logo">
+            <div class="preloader-progress"><div class="preloader-progress-bar"></div></div>
+        </div>
+    </div>
+    <script>
+        window.preloaderTimer = setTimeout(function() {
+            var p = document.getElementById("page-preloader");
+            if (p) {
+                p.style.visibility = "visible";
+                p.style.opacity = "1";
+            }
+        }, 300);
+    </script>
 
     <nav class="navbar">
         <div class="container" style="max-width: 100%; padding: 0 30px;">
@@ -94,19 +112,23 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
             <ul class="sidebar-menu">
                 <li><a href="../admin/system_audit.php"
                         class="<?php echo $current_page === 'system_audit' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">🛡️</span> Audit Logs</a>
+                        <span class="sidebar-icon"><i data-lucide="shield" class="lucide-sm"></i></span> Audit Logs</a>
                 </li>
                 <li><a href="../admin/transaction_simulator.php"
                         class="<?php echo $current_page === 'transaction_simulator' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">⚡</span> ACID Simulator</a>
+                        <span class="sidebar-icon"><i data-lucide="zap" class="lucide-sm"></i></span> ACID Simulator</a>
                 </li>
                 <li><a href="../admin/stress_test.php"
                         class="<?php echo $current_page === 'stress_test' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">🚀</span> Stress Test</a>
+                        <span class="sidebar-icon"><i data-lucide="rocket" class="lucide-sm"></i></span> Stress Test</a>
                 </li>
                 <li><a href="../admin/formal_disputes.php"
                         class="<?php echo $current_page === 'formal_disputes' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">⚖️</span> Formal Disputes</a>
+                        <span class="sidebar-icon"><i data-lucide="scale" class="lucide-sm"></i></span> Formal Disputes</a>
+                </li>
+                <li><a href="../admin/fraud_detection.php"
+                        class="<?php echo $current_page === 'fraud_detection' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon"><i data-lucide="shield" class="lucide-sm"></i></span> Fraud Detection</a>
                 </li>
             </ul>
 
@@ -122,7 +144,7 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
             <!-- Breadcrumb -->
             <div class="admin-breadcrumb">
                 <a href="../admin/dashboard.php">Admin</a>
-                <span class="breadcrumb-sep">&#x276F;</span>
+                <span class="breadcrumb-sep"><i data-lucide="chevron-right" class="lucide-sm"></i></span>
                 <span class="breadcrumb-current"><?php echo $breadcrumb_title; ?></span>
             </div>
 

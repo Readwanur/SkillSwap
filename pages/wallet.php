@@ -222,15 +222,15 @@ include __DIR__ . '/../includes/header.php';
             <div class="wallet-tab-nav">
                 <?php if ($active_loan): ?>
                     <button class="wallet-tab-btn active" data-tab="loan-tab">
-                        <span class="tab-icon">📋</span> Active Loan
+                        <span class="tab-icon"><i data-lucide="clipboard" class="lucide-sm"></i></span> Active Loan
                     </button>
                 <?php else: ?>
                     <button class="wallet-tab-btn active" data-tab="borrow-tab">
-                        <span class="tab-icon">🏦</span> Borrow Credits
+                        <span class="tab-icon"><i data-lucide="landmark" class="lucide-sm"></i></span> Borrow Credits
                     </button>
                 <?php endif; ?>
                 <button class="wallet-tab-btn" data-tab="gift-tab">
-                    <span class="tab-icon">🎁</span> Gift Credits
+                    <span class="tab-icon"><i data-lucide="gift" class="lucide-sm"></i></span> Gift Credits
                 </button>
             </div>
 
@@ -240,7 +240,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="wallet-section-title">Active Loan Details</div>
                     <div class="card" style="border: 1px solid <?php echo $active_loan['status'] === 'defaulted' ? 'var(--danger)' : 'var(--border-light)'; ?>; background: <?php echo $active_loan['status'] === 'defaulted' ? 'rgba(186, 26, 26, 0.02)' : 'var(--bg-secondary)'; ?>; margin: 0; box-shadow: none;">
                         <div class="card-header" style="padding-top: 0; padding-left: 0; padding-right: 0;">
-                            <h3 style="font-size: 1.1rem;"><?php echo $active_loan['status'] === 'defaulted' ? '⚠️ Overdue Loan Notification' : 'Outstanding Balance'; ?></h3>
+                            <h3 style="font-size: 1.1rem;"><?php echo $active_loan['status'] === 'defaulted' ? '<i data-lucide="alert-triangle" class="lucide-sm"></i> Overdue Loan Notification' : 'Outstanding Balance'; ?></h3>
                             <span class="badge <?php echo $active_loan['status'] === 'defaulted' ? 'badge-danger' : 'badge-warning'; ?>">
                                 <?php echo $active_loan['status'] === 'defaulted' ? 'DEFAULTED' : 'UNPAID'; ?>
                             </span>
@@ -248,7 +248,7 @@ include __DIR__ . '/../includes/header.php';
                         
                         <?php if ($active_loan['status'] === 'defaulted'): ?>
                             <p style="color: var(--danger); font-size: 0.85rem; margin-top: 10px; font-weight: 500; line-height: 1.4;">
-                                ⚠️ This loan is overdue and has been marked as defaulted. Your reliability score has been penalized. Session booking is blocked until repayment.
+                                <i data-lucide="alert-triangle" class="lucide-sm"></i> This loan is overdue and has been marked as defaulted. Your reliability score has been penalized. Session booking is blocked until repayment.
                             </p>
                         <?php endif; ?>
                         
@@ -293,7 +293,7 @@ include __DIR__ . '/../includes/header.php';
                             You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
                         </p>
                         <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; line-height: 1.4;">
-                            📌 A <strong>5% interest rate</strong> applies. Repayment is due within <strong>30 days</strong>. Overdue loans are automatically marked as defaulted and result in a reliability penalty.
+                            <i data-lucide="pin" class="lucide-sm"></i> A <strong>5% interest rate</strong> applies. Repayment is due within <strong>30 days</strong>. Overdue loans are automatically marked as defaulted and result in a reliability penalty.
                         </p>
                         <form method="POST" action="">
                             <input type="hidden" name="action" value="request_loan">
@@ -311,7 +311,7 @@ include __DIR__ . '/../includes/header.php';
                         </form>
                     <?php else: ?>
                         <div class="locked-state" style="background: rgba(115, 119, 129, 0.03); border: 1px dashed var(--border-light); padding: 24px; border-radius: var(--radius-md); text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 12px;">🔒</div>
+                            <div style="font-size: 2rem; margin-bottom: 12px;"><i data-lucide="lock" class="lucide-sm"></i></div>
                             <p style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 6px;">
                                 Borrowing Option Locked
                             </p>

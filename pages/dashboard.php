@@ -134,6 +134,60 @@ $activity_timeline = $conn->query("
     LIMIT 10
 ");
 
+// --- FEATURE 3: COLLABORATIVE FILTERING RECOMMENDATIONS ---
+// CTE-based collaborative filtering: finds skills learned by users
+// who learned the same skills as the current user.
+// Step 1: CTE my_skills = skills current user has learned (completed sessions as requester)
+// Step 2: CTE similar_users = other users who also learned those same skills
+// Step 3: Find OTHER skills those similar users learned, excluding my_skills
+// Step 4: Rank by frequency (how many similar users learned each skill)
+$recommendations = $conn->query("
+    WITH my_skills AS (
+        SELECT DISTINCT skill_id 
+        FROM exchange_sessions
+        WHERE requester_id = $user_id AND status = 'completed'
+    ),
+    similar_users AS (
+        SELECT DISTINCT es.requester_id
+        FROM exchange_sessions es
+        JOIN my_skills ms ON es.skill_id = ms.skill_id
+        WHERE es.requester_id != $user_id AND es.status = 'completed'
+    )
+    SELECT s.skill_id, s.skill_name, s.catagory, s.difficulty_level, 
+           COUNT(*) AS learn_count,
+           (SELECT ROUND(AVG(es2.rating), 1) FROM exchange_sessions es2 
+            WHERE es2.skill_id = s.skill_id AND es2.rating IS NOT NULL) AS avg_rating
+    FROM exchange_sessions es
+    JOIN similar_users su ON es.requester_id = su.requester_id
+    JOIN skills s ON es.skill_id = s.skill_id
+    WHERE es.status = 'completed'
+      AND es.skill_id NOT IN (SELECT skill_id FROM my_skills)
+    GROUP BY s.skill_id
+    ORDER BY learn_count DESC
+    LIMIT 6
+");
+
+// --- Leaderboard badges for current user ---
+$my_badges = $conn->query("
+    WITH provider_scores AS (
+        SELECT es.provider_id, s.catagory AS category,
+            DENSE_RANK() OVER (PARTITION BY s.catagory ORDER BY 
+                (COUNT(*) * 0.4) + (COALESCE(AVG(es.rating),0)*6*0.3) + (COALESCE(r.current_score,5)*4*0.2) + (COALESCE(SUM(es.session_duration),0)/60.0*0.1) DESC
+            ) AS rank_pos
+        FROM exchange_sessions es
+        JOIN skills s ON es.skill_id = s.skill_id
+        LEFT JOIN reputation r ON es.provider_id = r.user_id
+        WHERE es.status = 'completed' AND s.catagory IS NOT NULL
+        GROUP BY es.provider_id, s.catagory
+    )
+    SELECT category, rank_pos FROM provider_scores 
+    WHERE provider_id = $user_id AND rank_pos <= 3
+");
+$badge_list = [];
+if ($my_badges) {
+    while ($b = $my_badges->fetch_assoc()) { $badge_list[] = $b; }
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <link rel="stylesheet" href="../assets/css/style.css">
@@ -193,6 +247,66 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 <?php else: ?>
                     <p class="empty-state">No skills listed yet.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Feature 3: Recommended Skills (Collaborative Filtering) & Badges -->
+        <div class="grid-2 mt-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i data-lucide="lightbulb" class="lucide-sm"></i> Recommended For You</h3>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Collaborative Filtering via CTEs</span>
+                </div>
+                <?php if ($recommendations && $recommendations->num_rows > 0): ?>
+                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">Users who learned the same skills as you also learned:</p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <?php while ($rec = $recommendations->fetch_assoc()): ?>
+                            <a href="skill_detail.php?id=<?php echo $rec['skill_id']; ?>" style="display:block; text-decoration:none; padding:10px 12px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); transition:var(--transition);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-light)'">
+                                <strong style="color:var(--primary); font-size:0.88rem;"><?php echo htmlspecialchars($rec['skill_name']); ?></strong>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                                    <span class="badge badge-orange" style="font-size:0.65rem;"><?php echo htmlspecialchars($rec['catagory']); ?></span>
+                                    <span style="font-size:0.75rem; color:var(--text-muted);">
+                                        <?php echo $rec['avg_rating'] ? '<i data-lucide="star" class="lucide-sm"></i> ' . $rec['avg_rating'] : ''; ?>
+                                        · <?php echo $rec['learn_count']; ?> similar
+                                    </span>
+                                </div>
+                            </a>
+                        <?php endwhile; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state" style="padding:20px;">
+                        <p>Complete some sessions to get personalized recommendations!</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Leaderboard Badges -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i data-lucide="award" class="lucide-sm"></i> Your Badges</h3>
+                    <a href="../pages/leaderboard.php" class="btn btn-sm btn-secondary">Full Leaderboard</a>
+                </div>
+                <?php if (!empty($badge_list)): ?>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                        <?php foreach ($badge_list as $badge):
+                            $icon = '<i data-lucide="medal" class="lucide-sm"></i>'; $color = 'var(--info)';
+                            if ($badge['rank_pos'] == 1) { $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>'; $color = 'var(--warning)'; }
+                            elseif ($badge['rank_pos'] == 2) { $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>'; $color = 'var(--info)'; }
+                            elseif ($badge['rank_pos'] == 3) { $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>'; $color = 'var(--primary)'; }
+                        ?>
+                            <div style="text-align:center; padding:12px 16px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); min-width:100px;">
+                                <span style="font-size:1.6rem;"><?php echo $icon; ?></span>
+                                <div style="font-weight:700; color:<?php echo $color; ?>; font-size:0.9rem;">#<?php echo $badge['rank_pos']; ?></div>
+                                <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;"><?php echo htmlspecialchars($badge['category']); ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state" style="padding:20px;">
+                        <p>Complete teaching sessions to earn category badges!</p>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 3 in any skill category earns <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i><i data-lucide="medal" style="color: silver;" class="lucide-sm"></i><i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i></p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -288,12 +402,12 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <?php if ($activity_timeline && $activity_timeline->num_rows > 0): ?>
                 <?php while ($event = $activity_timeline->fetch_assoc()):
-                    $icon = '📌';
+                    $icon = '<i data-lucide="pin" class="lucide-sm"></i>';
                     $badge = 'badge-info';
-                    if ($event['event_type'] === 'session_booked') { $icon = '📅'; $badge = 'badge-warning'; }
-                    elseif ($event['event_type'] === 'session_taught') { $icon = '🎓'; $badge = 'badge-success'; }
-                    elseif ($event['event_type'] === 'task_completed') { $icon = '✅'; $badge = 'badge-primary'; }
-                    elseif ($event['event_type'] === 'credit_received') { $icon = '💰'; $badge = 'badge-orange'; }
+                    if ($event['event_type'] === 'session_booked') { $icon = '<i data-lucide="calendar" class="lucide-sm"></i>'; $badge = 'badge-warning'; }
+                    elseif ($event['event_type'] === 'session_taught') { $icon = '<i data-lucide="graduation-cap" class="lucide-sm"></i>'; $badge = 'badge-success'; }
+                    elseif ($event['event_type'] === 'task_completed') { $icon = '<i data-lucide="check-circle" class="lucide-sm"></i>'; $badge = 'badge-primary'; }
+                    elseif ($event['event_type'] === 'credit_received') { $icon = '<i data-lucide="coins" class="lucide-sm"></i>'; $badge = 'badge-orange'; }
                 ?>
                     <div class="session-card">
                         <div class="avatar"><?php echo $icon; ?></div>

@@ -79,7 +79,7 @@ include __DIR__ . '/../includes/header.php';
                             
                             <div style="font-size:0.8rem; margin-bottom: 8px;">
                                 <?php if ($skill['avg_skill_rating'] !== null): ?>
-                                    <span style="color: var(--secondary); font-weight:600;">⭐ <?php echo number_format($skill['avg_skill_rating'], 1); ?></span>
+                                    <span style="color: var(--secondary); font-weight:600;"><i data-lucide="star" class="lucide-sm"></i> <?php echo number_format($skill['avg_skill_rating'], 1); ?></span>
                                     <span style="color: var(--text-muted); opacity: 0.8;">(<?php echo $skill['total_sessions']; ?> session<?php echo $skill['total_sessions'] == 1 ? '' : 's'; ?>)</span>
                                 <?php else: ?>
                                     <span style="color: var(--text-muted); font-style:italic; font-size:0.75rem;">No reviews yet</span>

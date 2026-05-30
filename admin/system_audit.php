@@ -68,7 +68,7 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="card mb-3">
     <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 15px;">
         <div>
-            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0;">🛡️ System Audit Trail</h2>
+            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0;"><i data-lucide="shield" class="lucide-sm"></i> System Audit Trail</h2>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Track database state modifications and automated trigger executions in real time.</p>
         </div>
     </div>
@@ -185,7 +185,7 @@ include __DIR__ . '/../includes/admin_header.php';
 
     <?php else: ?>
         <div style="padding: 40px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 2.5rem; margin-bottom: 10px;">📋</div>
+            <div style="font-size: 2.5rem; margin-bottom: 10px;"><i data-lucide="clipboard" class="lucide-sm"></i></div>
             <p>No audit log entries match your filter settings.</p>
         </div>
     <?php endif; ?>
