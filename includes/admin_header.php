@@ -118,7 +118,7 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </li>
             </ul>
 
-            <div class="sidebar-section-label" style="margin-top: 20px;">DBMS SHOWCASE</div>
+
             <ul class="sidebar-menu">
                 <li><a href="../admin/system_audit.php"
                         class="<?php echo $current_page === 'system_audit' ? 'active' : ''; ?>">

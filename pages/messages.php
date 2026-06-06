@@ -528,9 +528,13 @@ function renderConversationsList(conversations) {
             timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
+        let avatarHtml = conv.has_photo === 1 
+            ? `<img src="../api/user_photo.php?user_id=${conv.other_user_id}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;" alt="${conv.other_user_name}">` 
+            : `<div class="avatar" style="width: 45px; height: 45px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold;">${initials}</div>`;
+
         html += `
             <div class="chat-item ${isActive}" onclick="openConversation(${conv.conversation_id})" id="conv-item-${conv.conversation_id}">
-                <div class="avatar" style="width: 45px; height: 45px; font-size: 1.1rem;">${initials}</div>
+                ${avatarHtml}
                 <div class="chat-item-details">
                     <div class="chat-item-header">
                         <span class="chat-item-name">${conv.other_user_name}</span>

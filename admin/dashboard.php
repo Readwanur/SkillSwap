@@ -155,7 +155,11 @@ include __DIR__ . '/../includes/admin_header.php';
         </div>
         <?php while ($u = $recent_users->fetch_assoc()): ?>
             <div class="user-card mb-1">
-                <div class="avatar"><?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                <?php if (!empty($u['profile_photo'])): ?>
+                    <img src="../api/user_photo.php?user_id=<?php echo $u['user_id']; ?>" class="avatar" style="width:40px; height:40px; object-fit:cover; border-radius:50%;" alt="User">
+                <?php else: ?>
+                    <div class="avatar"><?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                <?php endif; ?>
                 <div class="user-info" style="flex:1;">
                     <h4><?php echo htmlspecialchars($u['name']); ?></h4>
                     <p><?php echo htmlspecialchars($u['email']); ?> &middot;

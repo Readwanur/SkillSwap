@@ -32,6 +32,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// Fetch current user location for city filtering
+$my_user = $conn->query("SELECT location FROM users WHERE user_id = $user_id")->fetch_assoc();
+$my_location = $my_user['location'] ?? '';
+
+$filter_city = isset($_GET['filter_city']) ? 1 : 0;
+$filter_time = isset($_GET['filter_time']) ? 1 : 0;
+
+$city_condition = "";
+if ($filter_city && !empty($my_location)) {
+    $city_condition = " AND sm.user_b_location = '" . $conn->real_escape_string($my_location) . "' ";
+}
+
 // ============================================================
 // FEATURE 2: TIMEZONE-AWARE PERFECT MATCH ENGINE
 // ============================================================
@@ -45,6 +57,7 @@ $matches = $conn->query("
         sm.user_b_id,
         sm.user_b_name,
         sm.user_b_location,
+        (SELECT IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) FROM users WHERE user_id = sm.user_b_id) AS has_photo,
         sm.user_b_reliability,
         sm.user_a_requests_skill_name,
         sm.user_a_requests_skill_id,
@@ -53,6 +66,7 @@ $matches = $conn->query("
         sm.match_rank
     FROM vw_smart_matches sm
     WHERE sm.user_a_id = $user_id
+    $city_condition
     ORDER BY sm.match_rank ASC
     LIMIT 20
 ");
@@ -98,6 +112,11 @@ if ($matches && $matches->num_rows > 0) {
         $m['overlaps'] = $overlaps;
         $m['completed_sessions'] = $rep['completed_sessions'] ?? 0;
         $m['mentor_level'] = $rep['mentor_level'] ?? 'Novice';
+        
+        if ($filter_time && empty($overlaps)) {
+            continue; // Skip this match if user filtered by same available slot
+        }
+        
         $match_data[] = $m;
     }
 }
@@ -121,6 +140,26 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <div class="card mt-3 mb-2" style="padding: 12px 16px;">
+            <form method="GET" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0;">
+                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-color);"><i data-lucide="filter" class="lucide-sm"></i> Filters:</span>
+                <label class="custom-checkbox">
+                    <input type="checkbox" name="filter_city" value="1" <?php echo $filter_city ? 'checked' : ''; ?>>
+                    <span class="checkmark"></span>
+                    Same City <?php echo $my_location ? '('.htmlspecialchars($my_location).')' : ''; ?>
+                </label>
+                <label class="custom-checkbox">
+                    <input type="checkbox" name="filter_time" value="1" <?php echo $filter_time ? 'checked' : ''; ?>>
+                    <span class="checkmark"></span>
+                    Same Available Slot
+                </label>
+                <button type="submit" class="btn btn-sm btn-primary" style="margin-left: auto;">Apply Filters</button>
+                <?php if ($filter_city || $filter_time): ?>
+                    <a href="smart_matches.php" class="btn btn-sm btn-secondary">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
+
         <?php if ($success): ?>
             <div class="alert alert-success mt-2"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
@@ -139,7 +178,11 @@ include __DIR__ . '/../includes/header.php';
                 <?php foreach ($match_data as $m): ?>
                     <div class="card mb-2" style="border-left: 3px solid var(--primary);">
                         <div class="flex gap-2" style="flex-wrap:wrap;">
-                            <div class="avatar avatar-lg"><?php echo strtoupper(substr($m['user_b_name'], 0, 1)); ?></div>
+                            <?php if (!empty($m['has_photo'])): ?>
+                                <img src="../api/user_photo.php?user_id=<?php echo $m['user_b_id']; ?>" class="avatar-img avatar-lg" alt="<?php echo htmlspecialchars($m['user_b_name']); ?>" style="object-fit:cover;">
+                            <?php else: ?>
+                                <div class="avatar avatar-lg"><?php echo strtoupper(substr($m['user_b_name'], 0, 1)); ?></div>
+                            <?php endif; ?>
                             <div style="flex:1; min-width:200px;">
                                 <div class="flex justify-between items-center" style="flex-wrap:wrap; gap:8px;">
                                     <div>

@@ -14,7 +14,7 @@ $users = null;
 if ($query !== '') {
     $escaped = $conn->real_escape_string($query);
     $users = $conn->query("
-        SELECT u.user_id, u.name, u.location, u.bio, r.current_score, r.mentor_level
+        SELECT u.user_id, u.name, u.location, u.bio, r.current_score, r.mentor_level, IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS has_photo
         FROM vw_public_users u
         LEFT JOIN reputation r ON u.user_id = r.user_id
         WHERE u.name LIKE '%$escaped%' AND u.user_id != $user_id
@@ -27,6 +27,7 @@ if ($query !== '') {
             u.user_id,
             u.name,
             u.location,
+            IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS has_photo,
             s.skill_name,
             s.catagory,
             r.current_score,
@@ -49,6 +50,7 @@ if ($query !== '') {
             m.user_b_id AS user_id,
             m.user_b_name AS name,
             m.user_b_location AS location,
+            (SELECT IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) FROM users WHERE user_id = m.user_b_id) AS has_photo,
             m.user_a_requests_skill_name AS they_teach_me,
             m.user_b_requests_skill_name AS i_teach_them,
             r.current_score,
@@ -83,7 +85,11 @@ include __DIR__ . '/../includes/header.php';
                     <?php while ($u = $users->fetch_assoc()): ?>
                         <div class="card">
                             <div class="flex gap-2 items-center mb-1">
-                                <div class="avatar avatar-md"><?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                                <?php if (!empty($u['has_photo'])): ?>
+                                    <img src="../api/user_photo.php?user_id=<?php echo $u['user_id']; ?>" class="avatar-img avatar-md" alt="<?php echo htmlspecialchars($u['name']); ?>" style="object-fit:cover;">
+                                <?php else: ?>
+                                    <div class="avatar avatar-md"><?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                                <?php endif; ?>
                                 <div>
                                     <h3 style="margin:0;"><a href="user_profile.php?id=<?php echo $u['user_id']; ?>" style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($u['name']); ?></a></h3>
                                     <span class="badge badge-orange" style="font-size:0.7rem;"><?php echo htmlspecialchars($u['mentor_level'] ?? 'Novice'); ?></span>
@@ -117,7 +123,11 @@ include __DIR__ . '/../includes/header.php';
                         <?php while ($me = $mutual_exchanges->fetch_assoc()): ?>
                             <div class="card" style="border: 1.5px solid var(--secondary); background: rgba(115,92,0,0.02);">
                                 <div class="flex gap-2 items-center mb-1">
-                                    <div class="avatar avatar-md" style="border-color: var(--secondary);"><?php echo strtoupper(substr($me['name'], 0, 1)); ?></div>
+                                    <?php if (!empty($me['has_photo'])): ?>
+                                        <img src="../api/user_photo.php?user_id=<?php echo $me['user_id']; ?>" class="avatar-img avatar-md" alt="<?php echo htmlspecialchars($me['name']); ?>" style="object-fit:cover; border-color: var(--secondary);">
+                                    <?php else: ?>
+                                        <div class="avatar avatar-md" style="border-color: var(--secondary);"><?php echo strtoupper(substr($me['name'], 0, 1)); ?></div>
+                                    <?php endif; ?>
                                     <div>
                                         <h3 style="margin:0;"><a href="user_profile.php?id=<?php echo $me['user_id']; ?>" style="color:var(--secondary); text-decoration:none;"><?php echo htmlspecialchars($me['name']); ?></a></h3>
                                         <span class="badge badge-warning" style="font-size:0.7rem;">Direct Match</span>
@@ -148,7 +158,11 @@ include __DIR__ . '/../includes/header.php';
                         <?php while ($rp = $recommended_providers->fetch_assoc()): ?>
                             <div class="card">
                                 <div class="flex gap-2 items-center mb-1">
-                                    <div class="avatar avatar-md"><?php echo strtoupper(substr($rp['name'], 0, 1)); ?></div>
+                                    <?php if (!empty($rp['has_photo'])): ?>
+                                        <img src="../api/user_photo.php?user_id=<?php echo $rp['user_id']; ?>" class="avatar-img avatar-md" alt="<?php echo htmlspecialchars($rp['name']); ?>" style="object-fit:cover;">
+                                    <?php else: ?>
+                                        <div class="avatar avatar-md"><?php echo strtoupper(substr($rp['name'], 0, 1)); ?></div>
+                                    <?php endif; ?>
                                     <div>
                                         <h3 style="margin:0;"><a href="user_profile.php?id=<?php echo $rp['user_id']; ?>" style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($rp['name']); ?></a></h3>
                                         <span class="badge badge-orange" style="font-size:0.7rem;"><?php echo htmlspecialchars($rp['mentor_level'] ?? 'Novice'); ?></span>

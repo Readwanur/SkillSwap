@@ -183,9 +183,12 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                                         let html = '<div style="padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-light);">Top Matches</div>';
                                                         data.forEach(user => {
                                                             let initial = user.name.charAt(0).toUpperCase();
+                                                            let avatarHtml = user.has_photo 
+                                                                ? `<img src="../api/user_photo.php?user_id=${user.id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(0, 56, 108, 0.1); flex-shrink: 0;" alt="Avatar">`
+                                                                : `<div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 56, 108, 0.06); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; border: 1px solid rgba(0, 56, 108, 0.1); flex-shrink: 0;">${initial}</div>`;
                                                             html += `
                                                                 <a href="../pages/user_profile.php?id=${user.id}" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; text-decoration: none; border-bottom: 1px solid var(--border-light); transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
-                                                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 56, 108, 0.06); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; border: 1px solid rgba(0, 56, 108, 0.1); flex-shrink: 0;">${initial}</div>
+                                                                    ${avatarHtml}
                                                                     <div style="flex: 1; min-width: 0;">
                                                                         <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.name}</div>
                                                                         <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
@@ -250,8 +253,8 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                         <span id="notifCountBadge" style="position: absolute; top: -2px; right: -2px; background: var(--danger); color: #ffffff; font-size: 0.65rem; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); display: none;">0</span>
                     </button>
                     <!-- Dropdown Content -->
-                    <div id="notifDropdown" style="display: none; position: absolute; top: 120%; right: -50px; width: 320px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 2001; overflow: hidden;">
-                        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary);">
+                    <div id="notifDropdown" style="display: none; position: absolute; top: 120%; right: -50px; width: 320px; background: var(--bg-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 2001; overflow: hidden;">
+                        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.02);">
                             <span style="font-family: var(--font-headline); font-weight: 700; font-size: 0.9rem; color: var(--primary);">Notifications</span>
                             <button id="notifMarkAllRead" style="background: none; border: none; color: var(--info); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 2px 5px; border-radius: var(--radius-sm); transition: var(--transition);">Mark all read</button>
                         </div>
@@ -355,7 +358,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                 else if (n.type === 'loan_repaid') icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
 
                 html += `
-                    <div class="notif-item" data-id="${n.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; gap: 10px; transition: var(--transition); background: var(--bg-card);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='var(--bg-card)'">
+                    <div class="notif-item" data-id="${n.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; gap: 10px; transition: var(--transition); background: transparent;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
                         <span style="font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;">${icon}</span>
                         <div style="flex-grow: 1; min-width: 0;">
                             <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem; line-height: 1.4; word-wrap: break-word;">${n.message}</p>

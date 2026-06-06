@@ -139,7 +139,9 @@ elseif ($filter === 'disputed')
 $sessions = $conn->query("
     SELECT es.*, s.skill_name,
            u_req.name AS requester_name,
-           u_prov.name AS provider_name
+           u_prov.name AS provider_name,
+           IF(u_req.profile_photo IS NOT NULL AND LENGTH(u_req.profile_photo) > 0, 1, 0) AS req_has_photo,
+           IF(u_prov.profile_photo IS NOT NULL AND LENGTH(u_prov.profile_photo) > 0, 1, 0) AS prov_has_photo
     FROM exchange_sessions es
     JOIN skills s ON es.skill_id = s.skill_id
     JOIN users u_req ON es.requester_id = u_req.user_id
@@ -184,6 +186,7 @@ include __DIR__ . '/../includes/header.php';
                 $is_requester = ($s['requester_id'] == $user_id);
                 $partner_name = $is_requester ? $s['provider_name'] : $s['requester_name'];
                 $partner_id = $is_requester ? $s['provider_id'] : $s['requester_id'];
+                $partner_has_photo = $is_requester ? $s['prov_has_photo'] : $s['req_has_photo'];
                 $role = $is_requester ? 'Learner' : 'Teacher';
 
                 $status_class = 'badge-warning';
@@ -195,7 +198,11 @@ include __DIR__ . '/../includes/header.php';
                     $status_class = 'badge-danger';
                 ?>
                 <div class="session-card">
-                    <div class="avatar"><?php echo strtoupper(substr($partner_name, 0, 1)); ?></div>
+                    <?php if (!empty($partner_has_photo)): ?>
+                        <img src="../api/user_photo.php?user_id=<?php echo $partner_id; ?>" class="avatar-img" alt="<?php echo htmlspecialchars($partner_name); ?>" style="object-fit:cover; width: 45px; height: 45px; flex-shrink: 0;">
+                    <?php else: ?>
+                        <div class="avatar"><?php echo strtoupper(substr($partner_name, 0, 1)); ?></div>
+                    <?php endif; ?>
                     <div class="session-info">
                         <h4><?php echo htmlspecialchars($s['skill_name']); ?></h4>
                         <p>
