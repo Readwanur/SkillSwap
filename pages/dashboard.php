@@ -105,10 +105,12 @@ $recent_txn = $conn->query("
 ");
 
 // --- COMPLEX QUERY CQ-7: User Activity Timeline ---
-// Uses UNION ALL to merge events from 4 different tables into
-// a single chronological activity feed. Each subquery contributes
-// a different event type with standardized columns.
-$activity_timeline = $conn->query("
+$activity_page = max(1, intval($_GET['activity_page'] ?? 1));
+$activity_limit = 5;
+$activity_offset = ($activity_page - 1) * $activity_limit;
+$activity_limit_plus_one = $activity_limit + 1;
+
+$activity_timeline_query = "
     (SELECT 'session_booked' AS event_type, es.scheduled_time AS event_time,
             CONCAT('Booked session for ', s.skill_name) AS description
      FROM exchange_sessions es
@@ -131,8 +133,20 @@ $activity_timeline = $conn->query("
      FROM transactions t
      WHERE t.to_user_id = $user_id)
     ORDER BY event_time DESC
-    LIMIT 10
-");
+    LIMIT $activity_limit_plus_one OFFSET $activity_offset
+";
+$activity_timeline_res = $conn->query($activity_timeline_query);
+
+$activities = [];
+if ($activity_timeline_res) {
+    while ($row = $activity_timeline_res->fetch_assoc()) {
+        $activities[] = $row;
+    }
+}
+$has_next_activity = count($activities) > $activity_limit;
+if ($has_next_activity) {
+    array_pop($activities); // Remove the N+1th element for display
+}
 
 // --- FEATURE 3: COLLABORATIVE FILTERING RECOMMENDATIONS ---
 // CTE-based collaborative filtering: finds skills learned by users
@@ -215,38 +229,78 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <div class="grid-2">
-            <!-- Skills Offered -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>Skills I Teach</h3>
-                    <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
-                </div>
-                <?php if ($skills_offered->num_rows > 0): ?>
-                    <div>
-                        <?php while ($s = $skills_offered->fetch_assoc()): ?>
-                            <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
-                        <?php endwhile; ?>
+        <div class="grid-2 mt-3">
+            <!-- First Column: Skills I Teach & Skills I Want to Learn -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Skills Offered -->
+                <div class="card" style="height: 100%;">
+                    <div class="card-header">
+                        <h3>Skills I Teach</h3>
+                        <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
                     </div>
-                <?php else: ?>
-                    <p class="empty-state">No skills listed yet.</p>
-                <?php endif; ?>
+                    <?php if ($skills_offered->num_rows > 0): ?>
+                        <div>
+                            <?php while ($s = $skills_offered->fetch_assoc()): ?>
+                                <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="empty-state">No skills listed yet.</p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Skills Requested -->
+                <div class="card" style="height: 100%;">
+                    <div class="card-header">
+                        <h3>Skills I Want to Learn</h3>
+                        <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
+                    </div>
+                    <?php if ($skills_requested->num_rows > 0): ?>
+                        <div>
+                            <?php while ($s = $skills_requested->fetch_assoc()): ?>
+                                <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="empty-state">No skills listed yet.</p>
+                    <?php endif; ?>
+                </div>
             </div>
 
-            <!-- Skills Requested -->
-            <div class="card">
+            <!-- Second Column: Upcoming Sessions -->
+            <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div class="card-header">
-                    <h3>Skills I Want to Learn</h3>
-                    <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
+                    <h3>Upcoming Sessions</h3>
+                    <a href="../pages/sessions.php" class="btn btn-sm btn-secondary">View All</a>
                 </div>
-                <?php if ($skills_requested->num_rows > 0): ?>
-                    <div>
-                        <?php while ($s = $skills_requested->fetch_assoc()): ?>
-                            <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+
+                <?php if ($upcoming_q->num_rows > 0): ?>
+                    <div style="flex-grow: 1;">
+                        <?php while ($session = $upcoming_q->fetch_assoc()): ?>
+                            <div class="session-card">
+                                <div class="avatar">
+                                    <?php
+                                    $partner_name = ($session['requester_id'] == $user_id) ? $session['provider_name'] : $session['requester_name'];
+                                    echo strtoupper(substr($partner_name, 0, 1));
+                                    ?>
+                                </div>
+                                <div class="session-info">
+                                    <h4><?php echo htmlspecialchars($session['skill_name']); ?></h4>
+                                    <p>
+                                        with <strong><?php echo htmlspecialchars($partner_name); ?></strong>
+                                        &middot; <?php echo date('M d, Y h:i A', strtotime($session['scheduled_time'])); ?>
+                                        &middot; <?php echo $session['session_duration']; ?> min
+                                    </p>
+                                </div>
+                                <span class="badge badge-warning">Scheduled</span>
+                            </div>
                         <?php endwhile; ?>
                     </div>
                 <?php else: ?>
-                    <p class="empty-state">No skills listed yet.</p>
+                    <div class="empty-state" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                        <div class="icon">&#128197;</div>
+                        <p>No upcoming sessions. <a href="../pages/skills.php">Browse skills</a> to book one!</p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -311,40 +365,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- Upcoming Sessions -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3>Upcoming Sessions</h3>
-                <a href="../pages/sessions.php" class="btn btn-sm btn-secondary">View All</a>
-            </div>
 
-            <?php if ($upcoming_q->num_rows > 0): ?>
-                <?php while ($session = $upcoming_q->fetch_assoc()): ?>
-                    <div class="session-card">
-                        <div class="avatar">
-                            <?php
-                            $partner_name = ($session['requester_id'] == $user_id) ? $session['provider_name'] : $session['requester_name'];
-                            echo strtoupper(substr($partner_name, 0, 1));
-                            ?>
-                        </div>
-                        <div class="session-info">
-                            <h4><?php echo htmlspecialchars($session['skill_name']); ?></h4>
-                            <p>
-                                with <strong><?php echo htmlspecialchars($partner_name); ?></strong>
-                                &middot; <?php echo date('M d, Y h:i A', strtotime($session['scheduled_time'])); ?>
-                                &middot; <?php echo $session['session_duration']; ?> min
-                            </p>
-                        </div>
-                        <span class="badge badge-warning">Scheduled</span>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="icon">&#128197;</div>
-                    <p>No upcoming sessions. <a href="../pages/skills.php">Browse skills</a> to book one!</p>
-                </div>
-            <?php endif; ?>
-        </div>
 
         <!-- Recent Transactions -->
         <div class="card mt-3">
@@ -395,13 +416,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             <?php endif; ?>
         <!-- CQ-7: Activity Timeline (UNION ALL query) -->
-        <div class="card mt-3">
+        <div class="card mt-3" id="timeline">
             <div class="card-header">
                 <h3>Activity Timeline</h3>
-                <span style="font-size:0.8rem; color:var(--text-muted);">Powered by UNION ALL across 4 tables</span>
             </div>
-            <?php if ($activity_timeline && $activity_timeline->num_rows > 0): ?>
-                <?php while ($event = $activity_timeline->fetch_assoc()):
+            <?php if (count($activities) > 0): ?>
+                <?php foreach ($activities as $event):
                     $icon = '<i data-lucide="pin" class="lucide-sm"></i>';
                     $badge = 'badge-info';
                     if ($event['event_type'] === 'session_booked') { $icon = '<i data-lucide="calendar" class="lucide-sm"></i>'; $badge = 'badge-warning'; }
@@ -417,7 +437,26 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <span class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
                     </div>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
+                
+                <!-- Pagination -->
+                <div class="flex justify-between items-center mt-3" style="border-top: 1px solid var(--border-light); padding-top: 16px;">
+                    <div>
+                        <?php if ($activity_page > 1): ?>
+                            <a href="dashboard.php?activity_page=<?php echo $activity_page - 1; ?>#timeline" class="btn btn-sm btn-secondary" style="border-radius: 99px;">&larr; Previous</a>
+                        <?php else: ?>
+                            <button class="btn btn-sm btn-secondary" disabled style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">&larr; Previous</button>
+                        <?php endif; ?>
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--text-muted); font-weight:500;">Page <?php echo $activity_page; ?></div>
+                    <div>
+                        <?php if ($has_next_activity): ?>
+                            <a href="dashboard.php?activity_page=<?php echo $activity_page + 1; ?>#timeline" class="btn btn-sm btn-secondary" style="border-radius: 99px;">Next &rarr;</a>
+                        <?php else: ?>
+                            <button class="btn btn-sm btn-secondary" disabled style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">Next &rarr;</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
             <?php else: ?>
                 <div class="empty-state">
                     <p>No activity yet. Start learning or teaching!</p>

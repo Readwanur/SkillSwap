@@ -40,6 +40,13 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
         content="SkillSwap - Exchange skills, earn time credits. A community-driven skill sharing platform.">
     <title>SkillSwap<?php echo isset($page_title) ? ' — ' . $page_title : ''; ?></title>
     <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
+    <script>
+        // Check local storage for theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
 </head>
 
 <body>
@@ -60,12 +67,47 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             }
         }, 300);
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeBtn = document.getElementById('themeToggleBtn');
+            const themeIcon = document.getElementById('themeIcon');
+            
+            // Init icon based on current theme
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            if (currentTheme === 'dark' && themeIcon) {
+                themeIcon.setAttribute('data-lucide', 'sun');
+            }
+
+            if (themeBtn) {
+                themeBtn.addEventListener('click', function() {
+                    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                    if (isDark) {
+                        document.documentElement.removeAttribute('data-theme');
+                        localStorage.setItem('theme', 'light');
+                        themeBtn.innerHTML = '<i data-lucide="moon" class="lucide-sm" id="themeIcon"></i>';
+                    } else {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        localStorage.setItem('theme', 'dark');
+                        themeBtn.innerHTML = '<i data-lucide="sun" class="lucide-sm" id="themeIcon"></i>';
+                    }
+                    if (window.lucide) {
+                        lucide.createIcons();
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 
     <!-- Navbar -->
     <nav class="navbar">
         <div class="container" style="max-width: 100%; padding: 0 30px;">
             <a href="../pages/dashboard.php" class="navbar-brand">
-                <img src="../assets/skillswap.png" alt="SkillSwap Logo">
+                <img src="../assets/loading.png" alt="SkillSwap Logo">
             </a>
 
             <button class="nav-toggle"
@@ -106,11 +148,15 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                 class="<?php echo $current_page == 'profile' ? 'active' : ''; ?>">Profile</a></li>
                     </ul>
                     <?php if ($user_id > 0): ?>
-                        <form action="../pages/search_users.php" method="GET" style="display:inline-block; position:relative;" id="headerSearchForm">
-                            <input type="text" name="q" id="headerSearchInput" placeholder="Search users..." autocomplete="off" style="padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; outline:none; background:var(--bg-secondary); color:var(--text-primary); width:180px;">
-                            <div id="headerSearchSuggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 4px; z-index: 1000; display: none; max-height: 300px; overflow-y: auto;">
-                            </div>
-                        </form>
+                        <div style="display:inline-block; position:relative; margin-right: 15px; margin-left: 10px;">
+                            <form action="../pages/search_users.php" method="GET" id="headerSearchForm" style="position:relative; display:flex; align-items:center;">
+                                <i data-lucide="search" style="position:absolute; left:14px; color:var(--text-muted); width:16px; height:16px; z-index:2; pointer-events:none;"></i>
+                                <input type="text" name="q" id="headerSearchInput" placeholder="Find mentors & learners..." autocomplete="off">
+                                
+                                <div id="headerSearchSuggestions">
+                                </div>
+                            </form>
+                        </div>
                         <script>
                             document.addEventListener('DOMContentLoaded', function() {
                                 const searchInput = document.getElementById('headerSearchInput');
@@ -123,7 +169,9 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                         const query = this.value.trim();
                                         
                                         if (query.length < 2) {
-                                            suggestionsBox.style.display = 'none';
+                                            suggestionsBox.style.opacity = '0';
+                                            suggestionsBox.style.transform = 'translateY(-10px)';
+                                            setTimeout(() => { if (searchInput.value.trim().length < 2) suggestionsBox.style.display = 'none'; }, 300);
                                             return;
                                         }
 
@@ -132,30 +180,43 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                                                 .then(res => res.json())
                                                 .then(data => {
                                                     if (data.length > 0) {
-                                                        let html = '';
+                                                        let html = '<div style="padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-light);">Top Matches</div>';
                                                         data.forEach(user => {
+                                                            let initial = user.name.charAt(0).toUpperCase();
                                                             html += `
-                                                                <a href="../pages/user_profile.php?id=${user.id}" style="display: block; padding: 8px 10px; text-decoration: none; border-bottom: 1px solid var(--border-color); color: var(--text-primary);">
-                                                                    <div style="font-weight: 500; font-size: 0.9rem;">${user.name} <span class="badge" style="font-size:0.6rem; background:var(--bg-secondary); color:var(--text-secondary);">${user.badge}</span></div>
-                                                                    <div style="font-size: 0.75rem; color: var(--text-muted);">${user.location}</div>
+                                                                <a href="../pages/user_profile.php?id=${user.id}" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; text-decoration: none; border-bottom: 1px solid var(--border-light); transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+                                                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 56, 108, 0.06); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; border: 1px solid rgba(0, 56, 108, 0.1); flex-shrink: 0;">${initial}</div>
+                                                                    <div style="flex: 1; min-width: 0;">
+                                                                        <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.name}</div>
+                                                                        <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                                                                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.location || 'Anywhere'}</span>
+                                                                            <span class="badge" style="font-size:0.65rem; background:rgba(243, 185, 34, 0.15); color:var(--secondary-dark); padding: 2px 6px;">${user.badge}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </a>
                                                             `;
                                                         });
                                                         suggestionsBox.innerHTML = html;
-                                                        if (window.lucide) lucide.createIcons();
-                                                        suggestionsBox.style.display = 'block';
                                                     } else {
-                                                        suggestionsBox.innerHTML = '<div style="padding: 8px 10px; font-size: 0.85rem; color: var(--text-muted);">No users found</div>';
-                                                        suggestionsBox.style.display = 'block';
+                                                        suggestionsBox.innerHTML = '<div style="padding: 24px 16px; text-align: center; color: var(--text-muted);"><i data-lucide="search-x" style="width: 32px; height: 32px; opacity: 0.5; margin-bottom: 12px;"></i><br><span style="font-size:0.95rem; font-weight:500;">No users found</span><br><span style="font-size:0.8rem;">Try a different name or location</span></div>';
                                                     }
+                                                    
+                                                    if (window.lucide) lucide.createIcons();
+                                                    suggestionsBox.style.display = 'block';
+                                                    // Trigger reflow
+                                                    void suggestionsBox.offsetWidth;
+                                                    suggestionsBox.style.opacity = '1';
+                                                    suggestionsBox.style.transform = 'translateY(0)';
                                                 })
                                                 .catch(err => console.error(err));
-                                        }, 300);
+                                        }, 250);
                                     });
 
                                     document.addEventListener('click', function(e) {
                                         if (!document.getElementById('headerSearchForm').contains(e.target)) {
-                                            suggestionsBox.style.display = 'none';
+                                            suggestionsBox.style.opacity = '0';
+                                            suggestionsBox.style.transform = 'translateY(-10px)';
+                                            setTimeout(() => { suggestionsBox.style.display = 'none'; }, 300);
                                         }
                                     });
                                 }
@@ -166,6 +227,11 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             <?php endif; ?>
 
             <div class="nav-user" style="display:flex; align-items:center;">
+                <!-- Theme Toggle -->
+                <button id="themeToggleBtn" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 5px; margin-right: 15px; color: var(--text-secondary); transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; outline: none;" title="Toggle Dark Mode">
+                    <i data-lucide="moon" class="lucide-sm" id="themeIcon"></i>
+                </button>
+
                 <?php if ($user_id > 0 && !$is_admin): ?>
                 <!-- Messages Icon -->
                 <a href="../pages/messages.php" class="notif-bell-wrapper" style="position: relative; margin-right: 15px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 5px;">

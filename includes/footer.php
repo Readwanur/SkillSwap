@@ -28,5 +28,7 @@
 </script>
 <script src="<?php echo dirname($_SERVER['SCRIPT_NAME']); ?>/../assets/js/city-autocomplete.js"></script>
 <script src="<?php echo dirname($_SERVER['SCRIPT_NAME']); ?>/../assets/js/table-pagination.js"></script>
+<canvas id="bg-canvas"></canvas>
+<script src="<?php echo dirname($_SERVER['SCRIPT_NAME']); ?>/../assets/js/bg-animation.js"></script>
 </body>
 </html>

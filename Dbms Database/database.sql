@@ -332,7 +332,8 @@ INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, sche
 (1, 3, 6, 'completed', '2026-05-10 14:00:00', 60, 20.00, 5, 'David is a great Math tutor!'),
 (3, 4, 5, 'scheduled', '2026-05-12 09:00:00', 60, 25.00, NULL, NULL),
 (2, 1, 8, 'completed', '2026-05-09 18:00:00', 30, 10.00, 5, 'Bob is a fantastic art teacher, very creative.'),
-(4, 2, 7, 'completed', '2026-05-11 10:00:00', 45, 15.00, 4, 'Charlie made music lessons so fun!');
+(4, 2, 7, 'completed', '2026-05-11 10:00:00', 45, 15.00, 4, 'Charlie made music lessons so fun!'),
+(1, 2, 4, 'under-review', '2026-05-13 10:00:00', 60, 15.00, NULL, 'I have taught this session successfully.');
 
 INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES
 (1, 1, 3, 'credit_transfer', 20.00, 20.00),

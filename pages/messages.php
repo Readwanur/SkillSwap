@@ -26,6 +26,8 @@ if ($start_with_user_id > 0 && $start_with_user_id !== $user_id) {
         ");
         if ($check_conv && $check_conv->num_rows > 0) {
             $active_conversation_id = intval($check_conv->fetch_assoc()['conversation_id']);
+            // Ensure the conversation is unhidden for this user when explicitly started
+            $conn->query("UPDATE conversation_members SET is_hidden = 0 WHERE conversation_id = $active_conversation_id AND user_id = $user_id");
         } else {
             // Create new conversation
             $conn->begin_transaction();
@@ -97,18 +99,32 @@ include __DIR__ . '/../includes/header.php';
     padding: 16px;
     border-bottom: 1px solid var(--border-light);
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     gap: 12px;
+    animation: fadeInItem 0.5s ease backwards;
+}
+
+.chat-item:nth-child(1) { animation-delay: 0.05s; }
+.chat-item:nth-child(2) { animation-delay: 0.1s; }
+.chat-item:nth-child(3) { animation-delay: 0.15s; }
+.chat-item:nth-child(4) { animation-delay: 0.2s; }
+.chat-item:nth-child(5) { animation-delay: 0.25s; }
+.chat-item:nth-child(n+6) { animation-delay: 0.3s; }
+
+@keyframes fadeInItem {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 .chat-item:hover {
     background: var(--bg-hover);
+    padding-left: 20px;
 }
 
 .chat-item.active {
     background: var(--surface-container-low);
     border-left: 4px solid var(--primary);
-    padding-left: 12px;
+    padding-left: 20px;
 }
 
 .chat-item-details {
@@ -216,7 +232,7 @@ include __DIR__ . '/../includes/header.php';
     display: flex;
     flex-direction: column;
     gap: 16px;
-    background: #fbfbfe;
+    background: var(--surface-container-low);
 }
 
 .message-group {
@@ -224,16 +240,24 @@ include __DIR__ . '/../includes/header.php';
     flex-direction: column;
     gap: 4px;
     max-width: 75%;
+    animation: messagePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+}
+
+@keyframes messagePop {
+    from { opacity: 0; transform: translateY(15px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .message-group.sent {
     align-self: flex-end;
     align-items: flex-end;
+    transform-origin: bottom right;
 }
 
 .message-group.received {
     align-self: flex-start;
     align-items: flex-start;
+    transform-origin: bottom left;
 }
 
 .message-bubble {
@@ -243,6 +267,12 @@ include __DIR__ . '/../includes/header.php';
     line-height: 1.4;
     word-break: break-word;
     box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-bubble:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 
 .message-bubble.sent {
@@ -434,6 +464,7 @@ let activeConversationId = <?php echo $active_conversation_id; ?>;
 let activeRecipientId = 0;
 let pollingInterval = null;
 let lastMessageIdSeen = 0;
+let lastConversationsJSON = '';
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initial fetch of conversations list
@@ -456,7 +487,12 @@ async function fetchConversations() {
         const data = await response.json();
         
         if (data.status === 'success') {
-            renderConversationsList(data.conversations);
+            const currentJSON = JSON.stringify(data.conversations);
+            // Only re-render if the conversations data has changed to prevent animation loop
+            if (currentJSON !== lastConversationsJSON) {
+                lastConversationsJSON = currentJSON;
+                renderConversationsList(data.conversations);
+            }
         }
     } catch (error) {
         console.error('Error fetching conversations:', error);
@@ -486,11 +522,10 @@ function renderConversationsList(conversations) {
             lastMsg = 'You: ' + lastMsg;
         }
 
-        // Format time
         let timeStr = '';
         if (conv.last_message_time) {
             const date = new Date(conv.last_message_time.replace(/-/g, '/'));
-            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
         html += `
@@ -499,7 +534,10 @@ function renderConversationsList(conversations) {
                 <div class="chat-item-details">
                     <div class="chat-item-header">
                         <span class="chat-item-name">${conv.other_user_name}</span>
-                        <span class="chat-item-time">${timeStr}</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="chat-item-time">${timeStr}</span>
+                            <button onclick="hideInbox(${conv.conversation_id}, event)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem; padding:0 2px; line-height:1; transition:color 0.2s ease;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'" title="Hide conversation">&times;</button>
+                        </div>
                     </div>
                     <div class="flex justify-between items-center" style="gap:5px;">
                         <span class="chat-item-preview">${lastMsg}</span>
@@ -549,8 +587,11 @@ async function loadMessages(conversationId) {
                 const name = activeItem.querySelector('.chat-item-name').textContent;
                 document.getElementById('headerName').textContent = name;
                 document.getElementById('headerAvatar').textContent = name.substring(0, 1).toUpperCase();
+            } else if (data.partner_name) {
+                // If not in list yet, use the name returned by the API
+                document.getElementById('headerName').textContent = data.partner_name;
+                document.getElementById('headerAvatar').textContent = data.partner_name.substring(0, 1).toUpperCase();
             } else {
-                // If not in list yet, wait or do lazy fetch
                 document.getElementById('headerName').textContent = 'Partner';
                 document.getElementById('headerAvatar').textContent = 'P';
             }
@@ -585,7 +626,7 @@ function renderMessages(messages) {
         const bubbleClass = isSent ? 'sent' : 'received';
         
         const date = new Date(msg.sent_at.replace(/-/g, '/'));
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         html += `
             <div class="message-group ${groupClass}" data-id="${msg.message_id}">
@@ -665,6 +706,31 @@ function scrollToBottom() {
 function backToInbox() {
     document.getElementById('chatContainer').classList.remove('thread-active');
     activeConversationId = 0;
+}
+
+async function hideInbox(conversationId, event) {
+    event.stopPropagation();
+    if (!confirm('Are you sure you want to hide this conversation? The history will be preserved if you chat again.')) return;
+    
+    try {
+        const response = await fetch('../api/messages.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'hide_inbox',
+                conversation_id: conversationId
+            })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            if (activeConversationId === conversationId) {
+                backToInbox();
+            }
+            fetchConversations();
+        }
+    } catch (error) {
+        console.error('Error hiding inbox:', error);
+    }
 }
 </script>
 

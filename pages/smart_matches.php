@@ -8,6 +8,29 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 $page_title = 'Smart Matches';
+$success = '';
+$error = '';
+
+// Handle session booking
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'book_session') {
+    $provider_id = intval($_POST['provider_id'] ?? 0);
+    $skill_id = intval($_POST['skill_id'] ?? 0);
+    $scheduled_time = $_POST['scheduled_time'] ?? '';
+    $duration = intval($_POST['duration'] ?? 60);
+
+    if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
+        $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
+        $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);
+        $stmt->execute();
+        $stmt->close();
+        $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
+        if ($result['status'] === 'success') {
+            $success = $result['message'];
+        } else {
+            $error = $result['message'];
+        }
+    }
+}
 
 // ============================================================
 // FEATURE 2: TIMEZONE-AWARE PERFECT MATCH ENGINE
@@ -98,6 +121,13 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <?php if ($success): ?>
+            <div class="alert alert-success mt-2"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-danger mt-2"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+
         <?php if ($my_avail_count == 0): ?>
             <div class="alert alert-warning mt-2">
                 <i data-lucide="alert-triangle" class="lucide-sm"></i> You haven't set your availability schedule yet. <a href="../pages/profile.php">Add your availability</a> to see timezone-aware matching with shared free hours.
@@ -166,7 +196,7 @@ include __DIR__ . '/../includes/header.php';
                                 <!-- Actions -->
                                 <div class="mt-2 flex gap-1">
                                     <a href="messages.php?start_with_user_id=<?php echo $m['user_b_id']; ?>" class="btn btn-sm btn-secondary"><i data-lucide="message-square" class="lucide-sm"></i> Message</a>
-                                    <a href="skill_detail.php?id=<?php echo $m['user_a_requests_skill_id']; ?>" class="btn btn-sm btn-primary"><i data-lucide="calendar" class="lucide-sm"></i> Book Session</a>
+                                    <button onclick="openBooking(<?php echo $m['user_b_id']; ?>, '<?php echo htmlspecialchars(addslashes($m['user_b_name'])); ?>', <?php echo $m['user_a_requests_skill_id']; ?>)" class="btn btn-sm btn-primary"><i data-lucide="calendar" class="lucide-sm"></i> Book Session</button>
                                 </div>
                             </div>
                         </div>
@@ -187,5 +217,103 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Booking Modal -->
+<div class="modal-overlay" id="bookingModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Book a Session</h3>
+            <button class="modal-close" onclick="closeBooking()">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="book_session">
+            <input type="hidden" name="provider_id" id="modal_provider_id">
+            <input type="hidden" name="skill_id" id="modal_skill_id">
+            <p style="color:var(--text-secondary); margin-bottom:8px;">Provider: <strong
+                    id="modal_provider_name"></strong></p>
+            <div id="surge-info" style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;"></div>
+            <div class="form-group">
+                <label for="scheduled_time">Preferred Date & Time</label>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="duration">Duration (minutes)</label>
+                <select name="duration" id="duration" class="form-control" onchange="updateSurgeCost()">
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>60 minutes</option>
+                    <option value="90">90 minutes</option>
+                    <option value="120">120 minutes</option>
+                </select>
+            </div>
+            <div id="cost-display" style="text-align:center; margin-bottom:12px; font-size:0.9rem; color:var(--text-secondary);">Estimated cost: <strong id="cost-value">10.00 TC</strong></div>
+            <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    var currentSurgeMultiplier = 1.0;
+
+    // Set min datetime to the user's local "now"
+    function setMinDateTime() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var d = String(now.getDate()).padStart(2, '0');
+        var h = String(now.getHours()).padStart(2, '0');
+        var min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+    }
+
+    function updateSurgeCost() {
+        var duration = parseInt(document.getElementById('duration').value);
+        var baseCost = (duration / 60) * 10;
+        var surgedCost = (baseCost * currentSurgeMultiplier).toFixed(2);
+        var costEl = document.getElementById('cost-value');
+        if (currentSurgeMultiplier > 1) {
+            costEl.innerHTML = '<span style="text-decoration:line-through;color:var(--text-muted);">' + baseCost.toFixed(2) + ' TC</span> → <span style="color:var(--danger);">' + surgedCost + ' TC</span>';
+        } else {
+            costEl.textContent = baseCost.toFixed(2) + ' TC';
+        }
+    }
+
+    function openBooking(providerId, providerName, skillId) {
+        document.getElementById('modal_provider_id').value = providerId;
+        document.getElementById('modal_skill_id').value = skillId;
+        document.getElementById('modal_provider_name').textContent = providerName;
+        setMinDateTime();
+        
+        // Fetch surge pricing for this provider
+        fetch('../api/surge_pricing.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                currentSurgeMultiplier = data.surge_multiplier || 1.0;
+                var infoEl = document.getElementById('surge-info');
+                if (data.surge_multiplier > 1) {
+                    var level = data.demand_level;
+                    var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
+                    var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
+                    infoEl.style.display = 'block';
+                    infoEl.style.background = bgColor;
+                    infoEl.style.border = '1px solid ' + borderColor;
+                    infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
+                } else {
+                    infoEl.style.display = 'none';
+                }
+                updateSurgeCost();
+            })
+            .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+            
+        document.getElementById('bookingModal').classList.add('active');
+    }
+
+    function closeBooking() {
+        document.getElementById('bookingModal').classList.remove('active');
+    }
+
+    document.getElementById('bookingModal').addEventListener('click', function (e) {
+        if (e.target === this) closeBooking();
+    });
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

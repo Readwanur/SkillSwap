@@ -60,12 +60,39 @@ $my_tasks = $conn->query("
     ORDER BY assigned_at DESC
 ");
 
+// Pagination setup for Available Tasks
+$page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+if ($page < 1) $page = 1;
+$limit = 9; // Display 9 tasks per page
+$offset = ($page - 1) * $limit;
+
+$count_query = "SELECT COUNT(*) as total FROM community_task WHERE status = 'pending' AND (user_id IS NULL OR user_id != $user_id)";
+$total_records = $conn->query($count_query)->fetch_assoc()['total'];
+$total_pages = ceil($total_records / $limit);
+if ($total_pages < 1) $total_pages = 1;
+if ($page > $total_pages) $page = $total_pages;
+$offset = ($page - 1) * $limit;
+
 // Available tasks (unassigned)
 $available_tasks = $conn->query("
     SELECT * FROM community_task
     WHERE status = 'pending' AND (user_id IS NULL OR user_id != $user_id)
     ORDER BY credit_reward DESC
+    LIMIT $limit OFFSET $offset
 ");
+
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'rank');
+$order = trim($_GET['order'] ?? 'asc');
+
+$allowed_sorts = [
+    'rank' => 'task_rank',
+    'name' => 'name',
+    'rewards' => 'total_rewards'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 'task_rank';
+$order_sql = (strtolower($order) === 'desc') ? 'DESC' : 'ASC';
 
 // --- COMPLEX QUERY: CQ-12 ---
 // Community Task Leaderboard (CTE + Window Function DENSE_RANK)
@@ -82,7 +109,7 @@ $task_leaderboard = $conn->query("
         WHERE ct.status = 'completed'
         GROUP BY ct.user_id
     )
-    SELECT * FROM task_ranks WHERE task_rank <= 5
+    SELECT * FROM task_ranks WHERE task_rank <= 5 ORDER BY $sort_col $order_sql
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -173,33 +200,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 <?php endif; ?>
 
-                <!-- Available Tasks -->
-                <h2 class="section-title mt-3">Available Tasks</h2>
-                <?php if ($available_tasks->num_rows > 0): ?>
-                    <?php while ($t = $available_tasks->fetch_assoc()): ?>
-                        <div class="task-card">
-                            <div class="task-header">
-                                <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
-                                <span class="badge badge-orange">+<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
-                            </div>
-                            <p><?php echo htmlspecialchars($t['description']); ?></p>
-                            <div class="task-meta">
-                                <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
-                            </div>
-                            <form method="POST" class="mt-2">
-                                <input type="hidden" name="action" value="accept_task">
-                                <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                                <button type="submit" class="btn btn-sm btn-primary">Accept Task</button>
-                            </form>
-                        </div>
-                    <?php endwhile; ?>
-                <?php else: ?>
-                    <div class="card">
-                        <div class="empty-state">
-                            <p>No community tasks available at the moment.</p>
-                        </div>
-                    </div>
-                <?php endif; ?>
+
             </div>
 
             <!-- Right: Task Leaderboard -->
@@ -216,9 +217,24 @@ include __DIR__ . '/../includes/header.php';
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Rank</th>
-                                    <th>Contributor</th>
-                                    <th style="text-align: right;">Rewards</th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Rank</span>
+                                            <?php echo renderTableSort('rank', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Contributor</span>
+                                            <?php echo renderTableSort('name', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th style="text-align: right;">
+                                        <span class="th-content" style="justify-content: flex-end;">
+                                            <span>Rewards</span>
+                                            <?php echo renderTableSort('rewards', $sort, $order); ?>
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -248,6 +264,62 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
         </div>
+
+        <!-- Available Tasks -->
+        <h2 class="section-title mt-4">Available Tasks</h2>
+        <?php if ($available_tasks->num_rows > 0): ?>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+                <?php while ($t = $available_tasks->fetch_assoc()): ?>
+                    <div class="task-card">
+                        <div class="task-header">
+                            <h4><?php echo htmlspecialchars($t['task_type']); ?> Task</h4>
+                            <span class="badge badge-orange">+<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
+                        </div>
+                        <p><?php echo htmlspecialchars($t['description']); ?></p>
+                        <div class="task-meta">
+                            <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
+                        </div>
+                        <form method="POST" class="mt-2">
+                            <input type="hidden" name="action" value="accept_task">
+                            <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
+                            <button type="submit" class="btn btn-sm btn-primary" style="width: 100%;">Accept Task</button>
+                        </form>
+                    </div>
+                <?php endwhile; ?>
+            </div>
+            
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 0; margin-top: 20px; border-top: 1px solid var(--border-light);">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        Showing <strong><?php echo $offset + 1; ?></strong> to <strong><?php echo min($offset + $limit, $total_records); ?></strong> of <strong><?php echo $total_records; ?></strong> tasks
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <?php if ($page > 1): ?>
+                            <a href="?sort=<?php echo urlencode($sort); ?>&order=<?php echo urlencode($order); ?>&page=<?php echo $page - 1; ?>" class="btn btn-sm btn-secondary" style="padding: 6px 12px;">&larr; Prev</a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <?php if ($i == 1 || $i == $total_pages || ($i >= $page - 2 && $i <= $page + 2)): ?>
+                                <a href="?sort=<?php echo urlencode($sort); ?>&order=<?php echo urlencode($order); ?>&page=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $page ? 'btn-primary' : 'btn-secondary'; ?>" style="padding: 6px 12px;"><?php echo $i; ?></a>
+                            <?php elseif ($i == 2 || $i == $total_pages - 1): ?>
+                                <span style="padding: 6px; color: var(--text-muted);">...</span>
+                            <?php endif; ?>
+                        <?php endfor; ?>
+
+                        <?php if ($page < $total_pages): ?>
+                            <a href="?sort=<?php echo urlencode($sort); ?>&order=<?php echo urlencode($order); ?>&page=<?php echo $page + 1; ?>" class="btn btn-sm btn-secondary" style="padding: 6px 12px;">Next &rarr;</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        <?php else: ?>
+            <div class="card">
+                <div class="empty-state">
+                    <p>No community tasks available at the moment.</p>
+                </div>
+            </div>
+        <?php endif; ?>
 
     </div>
 </div>

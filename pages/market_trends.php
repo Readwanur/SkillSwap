@@ -13,6 +13,27 @@ $page_title = 'Market Trends & Insights';
 // FEATURE 1: MARKET TRENDS & SKILL DEMAND ANALYTICS
 // ============================================================
 
+// Sorting parameters for Scarcity
+$sort_scarcity = trim($_GET['sort_scarcity'] ?? 'ratio');
+$order_scarcity = trim($_GET['order_scarcity'] ?? 'desc');
+$allowed_scarcity = ['skill' => 's.skill_name', 'category' => 's.catagory', 'demand' => 'demand_count', 'supply' => 'supply_count', 'ratio' => 'scarcity_ratio'];
+$col_scarcity = $allowed_scarcity[$sort_scarcity] ?? 'scarcity_ratio';
+$ord_scarcity = (strtolower($order_scarcity) === 'asc') ? 'ASC' : 'DESC';
+
+// Sorting parameters for Trending
+$sort_trending = trim($_GET['sort_trending'] ?? 'growth');
+$order_trending = trim($_GET['order_trending'] ?? 'desc');
+$allowed_trending = ['skill' => 'skill_name', 'month' => 'month', 'sessions' => 'session_count', 'prev' => 'prev_month_count', 'growth' => 'growth_pct'];
+$col_trending = $allowed_trending[$sort_trending] ?? 'growth_pct';
+$ord_trending = (strtolower($order_trending) === 'asc') ? 'ASC' : 'DESC';
+
+// Sorting parameters for Heatmap
+$sort_heatmap = trim($_GET['sort_heatmap'] ?? 'sessions');
+$order_heatmap = trim($_GET['order_heatmap'] ?? 'desc');
+$allowed_heatmap = ['category' => 'category', 'skills' => 'skill_count', 'providers' => 'total_providers', 'learners' => 'total_learners', 'sessions' => 'total_sessions', 'rating' => 'avg_rating'];
+$col_heatmap = $allowed_heatmap[$sort_heatmap] ?? 'total_sessions';
+$ord_heatmap = (strtolower($order_heatmap) === 'asc') ? 'ASC' : 'DESC';
+
 // --- CQ: Scarcity Ratio (Demand / Supply per skill) ---
 // Uses LEFT JOIN on derived tables (aggregate subqueries) to compute
 // demand_count, supply_count, and scarcity_ratio per skill.
@@ -49,7 +70,7 @@ $scarcity = $conn->query("
         GROUP BY skill_id
     ) sess ON s.skill_id = sess.skill_id
     WHERE COALESCE(d.demand_count, 0) > 0 OR COALESCE(o.supply_count, 0) > 0
-    ORDER BY scarcity_ratio DESC
+    ORDER BY $col_scarcity $ord_scarcity
 ");
 
 // --- CQ: Trending Skills (Month-over-Month growth via LAG window function) ---
@@ -80,7 +101,7 @@ $trending = $conn->query("
             ELSE ROUND((session_count - prev_month_count) * 100.0 / prev_month_count, 1)
         END AS growth_pct
     FROM with_lag
-    ORDER BY month DESC, growth_pct DESC
+    ORDER BY $col_trending $ord_trending
     LIMIT 20
 ");
 
@@ -107,7 +128,7 @@ $category_heat = $conn->query("
     ) usr_cnt ON s.skill_id = usr_cnt.skill_id
     WHERE s.catagory IS NOT NULL
     GROUP BY s.catagory
-    ORDER BY total_sessions DESC
+    ORDER BY $col_heatmap $ord_heatmap
 ");
 
 // --- CQ: Platform-wide summary stats ---
@@ -128,7 +149,6 @@ include __DIR__ . '/../includes/header.php';
         <div class="flex justify-between items-center" style="flex-wrap:wrap; gap:12px;">
             <div>
                 <h1 class="page-title" style="margin-bottom:4px;"><i data-lucide="bar-chart" class="lucide-sm"></i> Market Trends & Insights</h1>
-                <p style="color:var(--text-muted); font-size:0.85rem;">Real-time skill demand analytics powered by complex SQL aggregations</p>
             </div>
             <div class="flex gap-1">
                 <a href="../pages/smart_matches.php" class="btn btn-sm btn-secondary"><i data-lucide="link" class="lucide-sm"></i> Smart Matches</a>
@@ -165,18 +185,42 @@ include __DIR__ . '/../includes/header.php';
             <div class="card">
                 <div class="card-header">
                     <h3>Skill Demand vs Supply</h3>
-                    <span class="badge badge-info" style="font-size:0.7rem;">Scarcity Ratio = Demand / Supply</span>
                 </div>
                 <?php if ($scarcity && $scarcity->num_rows > 0): ?>
                     <div class="table-wrapper">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Skill</th>
-                                    <th>Category</th>
-                                    <th>Demand</th>
-                                    <th>Supply</th>
-                                    <th>Ratio</th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Skill</span>
+                                            <?php echo renderTableSort('skill', $sort_scarcity, $order_scarcity, 'sort_scarcity', 'order_scarcity'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Category</span>
+                                            <?php echo renderTableSort('category', $sort_scarcity, $order_scarcity, 'sort_scarcity', 'order_scarcity'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Demand</span>
+                                            <?php echo renderTableSort('demand', $sort_scarcity, $order_scarcity, 'sort_scarcity', 'order_scarcity'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Supply</span>
+                                            <?php echo renderTableSort('supply', $sort_scarcity, $order_scarcity, 'sort_scarcity', 'order_scarcity'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Ratio</span>
+                                            <?php echo renderTableSort('ratio', $sort_scarcity, $order_scarcity, 'sort_scarcity', 'order_scarcity'); ?>
+                                        </span>
+                                    </th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -212,18 +256,42 @@ include __DIR__ . '/../includes/header.php';
             <div class="card">
                 <div class="card-header">
                     <h3><i data-lucide="trending-up" class="lucide-sm"></i> Trending Skills</h3>
-                    <span class="badge badge-success" style="font-size:0.7rem;">MoM Growth via LAG()</span>
                 </div>
                 <?php if ($trending && $trending->num_rows > 0): ?>
                     <div class="table-wrapper">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Skill</th>
-                                    <th>Month</th>
-                                    <th>Sessions</th>
-                                    <th>Prev</th>
-                                    <th>Growth</th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Skill</span>
+                                            <?php echo renderTableSort('skill', $sort_trending, $order_trending, 'sort_trending', 'order_trending'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Month</span>
+                                            <?php echo renderTableSort('month', $sort_trending, $order_trending, 'sort_trending', 'order_trending'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Sessions</span>
+                                            <?php echo renderTableSort('sessions', $sort_trending, $order_trending, 'sort_trending', 'order_trending'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Prev</span>
+                                            <?php echo renderTableSort('prev', $sort_trending, $order_trending, 'sort_trending', 'order_trending'); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Growth</span>
+                                            <?php echo renderTableSort('growth', $sort_trending, $order_trending, 'sort_trending', 'order_trending'); ?>
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -258,19 +326,48 @@ include __DIR__ . '/../includes/header.php';
         <div class="card mt-3">
             <div class="card-header">
                 <h3><i data-lucide="flame" class="lucide-sm"></i> Category Heatmap</h3>
-                <span class="badge badge-warning" style="font-size:0.7rem;">Nested Subqueries + GROUP BY</span>
             </div>
             <?php if ($category_heat && $category_heat->num_rows > 0): ?>
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Skills</th>
-                                <th>Providers</th>
-                                <th>Learners</th>
-                                <th>Completed Sessions</th>
-                                <th>Avg Rating</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Category</span>
+                                        <?php echo renderTableSort('category', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Skills</span>
+                                        <?php echo renderTableSort('skills', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Providers</span>
+                                        <?php echo renderTableSort('providers', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Learners</span>
+                                        <?php echo renderTableSort('learners', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Completed Sessions</span>
+                                        <?php echo renderTableSort('sessions', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Avg Rating</span>
+                                        <?php echo renderTableSort('rating', $sort_heatmap, $order_heatmap, 'sort_heatmap', 'order_heatmap'); ?>
+                                    </span>
+                                </th>
                                 <th>Activity</th>
                             </tr>
                         </thead>

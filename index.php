@@ -22,32 +22,29 @@ header("Pragma: no-cache");
     <style>
         html {
             scroll-behavior: smooth;
-        }
-        /* Modern Design System Tokens */
+        }        /* Modern Design System Tokens */
         :root {
             --primary: #00386c;
             --primary-dark: #002548;
             --primary-glow: rgba(0, 56, 108, 0.05);
             --secondary: #f3b922;
-            --secondary-dark: #cca41b;
-            --success: #1a7a42;
-            --danger: #ba1a1a;
-            --info: #2f5f9c;
+            --secondary-dark: #b88a14;
             --bg-primary: #ffffff;
-            --bg-secondary: #f7f9fc;
+            --bg-secondary: #f4f7f9;
             --bg-card: #ffffff;
-            --text-primary: #191c20;
-            --text-secondary: #43474e;
-            --text-muted: #737781;
-            --border-color: #dbe2f9;
-            --border-light: #f0f4ff;
-            --radius-sm: 8px;
-            --radius-md: 16px;
-            --radius-lg: 24px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --shadow-sm: 0 2px 8px rgba(0, 56, 108, 0.05);
-            --shadow-md: 0 8px 24px rgba(0, 56, 108, 0.08);
-            --shadow-lg: 0 16px 40px rgba(0, 56, 108, 0.12);
+            --text-primary: #121826;
+            --text-secondary: #4a5568;
+            --text-muted: #8492a6;
+            --border-light: #e2e8f0;
+            --border-color: #cbd5e1;
+            --success: #10b981;
+            --info: #3b82f6;
+            --radius-sm: 12px;
+            --radius-md: 20px;
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.03);
+            --shadow-md: 0 12px 30px rgba(0,0,0,0.05);
+            --shadow-lg: 0 20px 40px rgba(0,56,108,0.1);
+            --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         /* Reset & Base Styles */
@@ -60,10 +57,21 @@ header("Pragma: no-cache");
         body {
             font-family: 'Inter', sans-serif;
             color: var(--text-primary);
-            background: var(--bg-primary);
+            background: transparent;
             line-height: 1.6;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: var(--bg-primary);
+            pointer-events: none;
         }
 
         h1, h2, h3, h4 {
@@ -746,7 +754,7 @@ header("Pragma: no-cache");
                 <div class="hero-text" data-aos="fade-right" data-aos-duration="1000">
                     <h1>Time as <span>Currency.</span></h1>
                     <p>
-                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not Taka. Exchange your knowledge, build your reputation, and invest in your growth.
+                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not in Taka. Exchange your knowledge, build your reputation, and invest in your growth.
                     </p>
                     <div class="hero-actions">
                         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']): ?>
@@ -958,6 +966,207 @@ header("Pragma: no-cache");
         // Initialize Lucide Icons
         document.addEventListener("DOMContentLoaded", function() {
             lucide.createIcons();
+        });
+    </script>
+    <canvas id="bg-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let nodes = [];
+        let particles = [];
+        let flowParticles = [];
+        const maxDistance = 180;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        
+        function getBezierPoint(t, p0, p1, p2, p3) {
+            const u = 1 - t;
+            const tt = t * t;
+            const uu = u * u;
+            let x = (uu * u) * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + (tt * t) * p3.x;
+            let y = (uu * u) * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + (tt * t) * p3.y;
+            return {x, y};
+        }
+
+        class Node {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.radius = Math.random() * 2 + 1.5;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 56, 108, 0.4)';
+                ctx.fill();
+            }
+        }
+        
+        class Particle {
+            constructor(source, target) {
+                this.source = source;
+                this.target = target;
+                this.progress = 0;
+                this.speed = Math.random() * 0.004 + 0.002;
+            }
+            update() {
+                this.progress += this.speed;
+                return this.progress >= 1;
+            }
+            draw() {
+                const x = this.source.x + (this.target.x - this.source.x) * this.progress;
+                const y = this.source.y + (this.target.y - this.source.y) * this.progress;
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(243, 185, 34, 0.9)'; // Theme yellow
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = 'rgba(243, 185, 34, 0.6)';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class FlowParticle {
+            constructor(curveIndex) {
+                this.curveIndex = curveIndex;
+                this.progress = Math.random();
+                this.speed = Math.random() * 0.0015 + 0.0005;
+                this.size = Math.random() * 2.5 + 1.5;
+                this.opacity = Math.random() * 0.5 + 0.4;
+            }
+            update() {
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    this.progress = 0;
+                    this.curveIndex = Math.random() > 0.5 ? 0 : 1;
+                }
+            }
+            draw(flowOffset) {
+                let p0, p1, p2, p3;
+                if (this.curveIndex === 0) {
+                    p0 = {x: -100, y: height * 0.2 + Math.sin(flowOffset) * 50};
+                    p1 = {x: width * 0.3, y: height * 0.1 + Math.cos(flowOffset) * 50};
+                    p2 = {x: width * 0.6, y: height * 0.8 + Math.sin(flowOffset) * 50};
+                    p3 = {x: width + 100, y: height * 0.4};
+                } else {
+                    p0 = {x: -100, y: height * 0.8 + Math.cos(flowOffset) * 50};
+                    p1 = {x: width * 0.4, y: height * 0.9 + Math.sin(flowOffset) * 50};
+                    p2 = {x: width * 0.7, y: height * 0.2 + Math.cos(flowOffset) * 50};
+                    p3 = {x: width + 100, y: height * 0.6};
+                }
+                const pos = getBezierPoint(this.progress, p0, p1, p2, p3);
+                
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(243, 185, 34, ${this.opacity})`; // Theme yellow
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(243, 185, 34, 0.5)';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function init() {
+            nodes = [];
+            particles = [];
+            flowParticles = [];
+            const nodeCount = Math.floor((width * height) / 15000); 
+            for (let i = 0; i < nodeCount; i++) {
+                nodes.push(new Node());
+            }
+            for (let i = 0; i < 12; i++) {
+                flowParticles.push(new FlowParticle(Math.random() > 0.5 ? 0 : 1));
+            }
+        }
+        init();
+        
+        let flowOffset = 0;
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            flowOffset += 0.001;
+            
+            ctx.beginPath();
+            ctx.moveTo(-100, height * 0.2 + Math.sin(flowOffset) * 50);
+            ctx.bezierCurveTo(
+                width * 0.3, height * 0.1 + Math.cos(flowOffset) * 50, 
+                width * 0.6, height * 0.8 + Math.sin(flowOffset) * 50, 
+                width + 100, height * 0.4
+            );
+            ctx.strokeStyle = 'rgba(0, 56, 108, 0.03)';
+            ctx.lineWidth = 120;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-100, height * 0.8 + Math.cos(flowOffset) * 50);
+            ctx.bezierCurveTo(
+                width * 0.4, height * 0.9 + Math.sin(flowOffset) * 50, 
+                width * 0.7, height * 0.2 + Math.cos(flowOffset) * 50, 
+                width + 100, height * 0.6
+            );
+            ctx.strokeStyle = 'rgba(0, 56, 108, 0.025)';
+            ctx.lineWidth = 180;
+            ctx.stroke();
+
+            flowParticles.forEach(fp => {
+                fp.update();
+                fp.draw(flowOffset);
+            });
+
+            for (let i = 0; i < nodes.length; i++) {
+                nodes[i].update();
+                nodes[i].draw();
+                
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const dx = nodes[i].x - nodes[j].x;
+                    const dy = nodes[i].y - nodes[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < maxDistance) {
+                        ctx.beginPath();
+                        ctx.moveTo(nodes[i].x, nodes[i].y);
+                        ctx.lineTo(nodes[j].x, nodes[j].y);
+                        const alpha = 1 - (dist / maxDistance);
+                        ctx.strokeStyle = `rgba(0, 56, 108, ${alpha * 0.15})`;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        
+                        if (Math.random() < 0.0005) {
+                            particles.push(new Particle(nodes[i], nodes[j]));
+                        }
+                    }
+                }
+            }
+            
+            particles = particles.filter(p => {
+                const reached = p.update();
+                p.draw();
+                return !reached;
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        window.addEventListener('resize', () => {
+            resize();
+            init();
         });
     </script>
 </body>

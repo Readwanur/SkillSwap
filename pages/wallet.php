@@ -19,16 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'request_loan') {
         $amount = floatval($_POST['amount'] ?? 0);
         
-        $stmt = $conn->prepare("CALL sp_request_loan(?, ?, @status, @msg)");
-        $stmt->bind_param("id", $user_id, $amount);
-        $stmt->execute();
-        $stmt->close();
-        
-        $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
-        if ($res['status'] === 'success') {
-            $success_msg = $res['msg'];
+        $check_bal = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
+        if ($check_bal && $check_bal['balance'] > 0) {
+            $error_msg = 'You can only request a loan when your balance is 0.';
         } else {
-            $error_msg = $res['msg'];
+            $stmt = $conn->prepare("CALL sp_request_loan(?, ?, @status, @msg)");
+            $stmt->bind_param("id", $user_id, $amount);
+            $stmt->execute();
+            $stmt->close();
+            
+            $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
+            if ($res['status'] === 'success') {
+                $success_msg = $res['msg'];
+            } else {
+                $error_msg = $res['msg'];
+            }
         }
     } 
     elseif ($action === 'repay_loan') {
@@ -50,16 +55,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $recipient_email = trim($_POST['recipient_email'] ?? '');
         $amount = floatval($_POST['amount'] ?? 0);
         
-        $stmt = $conn->prepare("CALL sp_gift_credits(?, ?, ?, @status, @msg)");
-        $stmt->bind_param("isd", $user_id, $recipient_email, $amount);
-        $stmt->execute();
-        $stmt->close();
-        
-        $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
-        if ($res['status'] === 'success') {
-            $success_msg = $res['msg'];
+        if ($amount > 5) {
+            $error_msg = 'You can only send a maximum of 5 TC as a gift.';
         } else {
-            $error_msg = $res['msg'];
+            $stmt = $conn->prepare("CALL sp_gift_credits(?, ?, ?, @status, @msg)");
+            $stmt->bind_param("isd", $user_id, $recipient_email, $amount);
+            $stmt->execute();
+            $stmt->close();
+            
+            $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
+            if ($res['status'] === 'success') {
+                $success_msg = $res['msg'];
+            } else {
+                $error_msg = $res['msg'];
+            }
         }
     }
 }
@@ -288,7 +297,7 @@ include __DIR__ . '/../includes/header.php';
                 <!-- Tab Content: Request Loan -->
                 <div class="wallet-tab-panel active" id="borrow-tab">
                     <div class="wallet-section-title">Borrow Time Credits</div>
-                    <?php if ($completed_sess >= 2): ?>
+                    <?php if ($completed_sess >= 2 && $balance <= 0): ?>
                         <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px; line-height: 1.4;">
                             You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
                         </p>
@@ -316,8 +325,13 @@ include __DIR__ . '/../includes/header.php';
                                 Borrowing Option Locked
                             </p>
                             <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; max-width: 320px; margin: 0 auto;">
-                                Complete at least 2 exchange sessions to unlock credit borrowing.<br>
-                                <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_sess; ?> / 2</span>
+                                <?php if ($balance > 0): ?>
+                                    You can only request a loan when your balance is 0 TC.<br>
+                                    <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current balance: <?php echo number_format($balance, 2); ?> TC</span>
+                                <?php else: ?>
+                                    Complete at least 2 exchange sessions to unlock credit borrowing.<br>
+                                    <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_sess; ?> / 2</span>
+                                <?php endif; ?>
                             </p>
                         </div>
                     <?php endif; ?>
@@ -328,7 +342,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="wallet-tab-panel" id="gift-tab">
                 <div class="wallet-section-title">Gift Time Credits</div>
                 <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 20px; line-height: 1.4;">
-                    Transfer credits to a collaborator. Maximum <strong>25 TC</strong> per transfer, <strong>50 TC</strong> daily limit. 
+                    Transfer credits to a collaborator. Maximum <strong>5 TC</strong> per transfer, <strong>50 TC</strong> daily limit. 
                     Gifts are restricted to collaborators with mutual session history or established accounts.
                 </p>
                 <form method="POST" action="">
@@ -343,7 +357,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group" style="margin-bottom: 18px;">
                         <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Gift (TC)</label>
                         <input type="number" id="gift_amount" name="amount" class="form-control" 
-                               min="0.5" step="0.5" placeholder="e.g. 5"
+                               min="0.5" max="5" step="0.5" placeholder="e.g. 5"
                                style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
                                required>
                     </div>

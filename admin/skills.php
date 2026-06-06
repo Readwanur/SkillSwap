@@ -246,13 +246,20 @@ include __DIR__ . '/../includes/admin_header.php';
 </div>
 
 <!-- Search & Filter Bar -->
-<div class="card mb-3">
-    <form method="GET" class="admin-filter-bar">
+<div class="card mb-3" style="padding: 16px 24px; position: relative; z-index: 10;">
+    <form method="GET" class="flex flex-wrap gap-2 items-center" id="adminSkillsSearchForm">
         <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort); ?>">
         <input type="hidden" name="order" value="<?php echo htmlspecialchars(strtolower($order)); ?>">
-        <div class="admin-search-box">
-            <input type="text" name="search" class="form-control" placeholder="&#x1F50D; Search skills by name or description..."
+        
+        <div style="position:relative; display:flex; align-items:center;">
+            <i data-lucide="search" style="position:absolute; left:14px; color:var(--text-muted); width:16px; height:16px; z-index:2; pointer-events:none;"></i>
+            <input type="text" name="search" id="adminSkillsSearchInput" placeholder="Search skills by name or description..." autocomplete="off"
                 value="<?php echo htmlspecialchars($search); ?>">
+            <?php if ($search): ?>
+                <a href="skills.php" style="position:absolute; right:12px; color:var(--text-muted); display:flex; align-items:center; z-index:2;"><i data-lucide="x" class="lucide-sm"></i></a>
+            <?php endif; ?>
+            <div id="skillsSearchSuggestions">
+            </div>
         </div>
         <select name="category" class="form-control" style="max-width:180px;">
             <option value="">All Categories</option>
@@ -283,9 +290,9 @@ include __DIR__ . '/../includes/admin_header.php';
             <a href="<?php echo buildTabUrl('Advanced', $search, $cat_filter, $sort, $order); ?>"
                class="filter-tab <?php echo $diff_filter === 'Advanced' ? 'active' : ''; ?>" style="<?php echo $diff_filter === 'Advanced' ? '' : 'color:var(--danger);'; ?>">Advanced</a>
         </div>
-        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        <button type="submit" class="btn btn-primary" style="border-radius: 99px; padding: 10px 24px;">Filter</button>
         <?php if ($search || $cat_filter || $diff_filter || $sort !== 'category' || $order !== 'ASC'): ?>
-            <a href="skills.php" class="btn btn-sm btn-secondary">Clear All</a>
+            <a href="skills.php" class="btn btn-secondary" style="border-radius: 99px; padding: 10px 24px;">Clear All</a>
         <?php endif; ?>
     </form>
 </div>
@@ -381,7 +388,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <!-- Edit Button -->
                                 <button type="button" class="btn btn-sm btn-secondary" title="Edit Skill"
                                     onclick="openEditModal(<?php echo $s['skill_id']; ?>, '<?php echo addslashes(htmlspecialchars($s['skill_name'])); ?>', '<?php echo addslashes(htmlspecialchars($s['catagory'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($s['description'] ?? '')); ?>', '<?php echo $s['difficulty_level']; ?>')">
-                                    &#x270E;
+                                    <i data-lucide="edit-3" class="lucide-sm"></i>
                                 </button>
                                 <!-- Delete -->
                                 <form method="POST" style="display:inline;">
@@ -389,7 +396,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                     <input type="hidden" name="skill_id" value="<?php echo $s['skill_id']; ?>">
                                     <button type="submit" class="btn btn-sm btn-danger" title="Delete Skill"
                                         onclick="return confirm('Delete &quot;<?php echo addslashes(htmlspecialchars($s['skill_name'])); ?>&quot;? This cannot be undone.')">
-                                        &#x1F5D1;
+                                        <i data-lucide="trash-2" class="lucide-sm"></i>
                                     </button>
                                 </form>
                             </div>
@@ -401,7 +408,7 @@ include __DIR__ . '/../includes/admin_header.php';
     </div>
     <?php else: ?>
         <div class="empty-state">
-            <div class="icon">&#x1F50D;</div>
+            <div class="icon" style="color: var(--text-muted);"><i data-lucide="search" style="width: 48px; height: 48px;"></i></div>
             <p>No skills match your filters.</p>
             <a href="skills.php" class="btn btn-sm btn-secondary mt-2">Clear Filters</a>
         </div>
@@ -583,6 +590,89 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay.active').forEach(function(m) {
             m.classList.remove('active');
+        });
+    }
+});
+
+// Search suggestions logic
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('adminSkillsSearchInput');
+    const searchSuggestions = document.getElementById('skillsSearchSuggestions');
+    const searchForm = document.getElementById('adminSkillsSearchForm');
+    let debounceTimer;
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                searchSuggestions.style.display = 'none';
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetch(`../api/search_skills.php?q=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(skills => {
+                        if (skills.length > 0) {
+                            let html = '';
+                            skills.forEach(s => {
+                                let badgeColor = 'badge-success';
+                                if (s.difficulty === 'Intermediate') badgeColor = 'badge-warning';
+                                else if (s.difficulty === 'Advanced') badgeColor = 'badge-danger';
+
+                                html += `
+                                    <div class="suggestion-item" data-id="${s.id}" data-name="${s.name}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                                        <div style="font-weight: 600; color: var(--primary);">${s.name}</div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                                            <span style="font-size: 0.8rem; color: var(--text-muted);">${s.category}</span>
+                                            <span class="badge ${badgeColor}" style="font-size: 0.65rem;">${s.difficulty}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            searchSuggestions.innerHTML = html;
+                            searchSuggestions.style.display = 'block';
+                            setTimeout(() => {
+                                searchSuggestions.style.opacity = '1';
+                                searchSuggestions.style.transform = 'translateY(0)';
+                            }, 10);
+                        } else {
+                            searchSuggestions.innerHTML = '<div class="suggestion-empty" style="padding: 16px; text-align: center; color: var(--text-muted);">No skills found</div>';
+                            searchSuggestions.style.display = 'block';
+                            setTimeout(() => {
+                                searchSuggestions.style.opacity = '1';
+                                searchSuggestions.style.transform = 'translateY(0)';
+                            }, 10);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error fetching skills suggestions:', err);
+                    });
+            }, 300);
+        });
+
+        searchSuggestions.addEventListener('click', function(e) {
+            const item = e.target.closest('.suggestion-item');
+            if (item) {
+                const name = item.getAttribute('data-name');
+                searchInput.value = name;
+                searchSuggestions.style.display = 'none';
+                searchForm.submit();
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+                searchSuggestions.style.opacity = '0';
+                searchSuggestions.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (searchSuggestions.style.opacity === '0') {
+                        searchSuggestions.style.display = 'none';
+                    }
+                }, 300);
+            }
         });
     }
 });

@@ -167,8 +167,7 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="card mb-3" style="border-left:4px solid var(--danger);">
     <div class="card-header">
         <h3><i data-lucide="refresh-cw" class="lucide-sm"></i> Circular Transaction Rings (A→B→C→A)</h3>
-        <span class="badge badge-danger">Triple Self-JOIN · 72-Hour Window</span>
-    </div>
+        </div>
     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
         Detects transaction cycles where User A pays B, B pays C, and C pays A within 72 hours — a classic wash-trading pattern to farm credits or inflate reputation.
     </p>
@@ -224,8 +223,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card" style="border-left:4px solid var(--warning);">
         <div class="card-header">
             <h3><i data-lucide="zap" class="lucide-sm"></i> Velocity Alerts</h3>
-            <span class="badge badge-warning">GROUP BY + HAVING</span>
-        </div>
+            </div>
         <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
             Providers who completed >3 sessions in a single day.
         </p>
@@ -266,8 +264,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card" style="border-left:4px solid var(--info);">
         <div class="card-header">
             <h3><i data-lucide="star" class="lucide-sm"></i> Rating Anomalies</h3>
-            <span class="badge badge-info">AVG + STDDEV + HAVING</span>
-        </div>
+            </div>
         <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
             Providers with 100% 5-star ratings from 3+ sessions — statistically improbable.
         </p>
@@ -306,8 +303,7 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="card mb-3" style="border-left:4px solid #6a1b9a;">
     <div class="card-header">
         <h3><i data-lucide="handshake" class="lucide-sm"></i> Mutual Trading Pairs</h3>
-        <span class="badge" style="background:rgba(106,27,154,0.1); color:#6a1b9a;">LEAST/GREATEST + GROUP BY + HAVING</span>
-    </div>
+        </div>
     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
         Pairs of users who have 4+ completed sessions together — could indicate coordinated credit farming.
     </p>

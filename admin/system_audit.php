@@ -73,45 +73,122 @@ include __DIR__ . '/../includes/admin_header.php';
         </div>
     </div>
     
-    <div style="padding: 15px 20px; background: var(--bg-primary); border-bottom: 1px solid var(--border-light);">
-        <form method="GET" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
-            <div style="flex: 1; min-width: 200px;">
-                <label style="display: block; font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 5px;">Search Details / User</label>
-                <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="e.g. status, user name..." style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.85rem;">
+    <div style="padding: 16px 24px; position: relative; z-index: 10; background: var(--bg-primary); border-bottom: 1px solid var(--border-light);">
+        <form method="GET" class="flex flex-wrap gap-2 items-center" id="adminSearchForm">
+            
+            <div style="position:relative; display:flex; align-items:center;">
+                <i data-lucide="search" style="position:absolute; left:14px; color:var(--text-muted); width:16px; height:16px; z-index:2; pointer-events:none;"></i>
+                <input type="text" name="search" id="adminSearchInput" placeholder="Search details or user name..." autocomplete="off"
+                    value="<?php echo htmlspecialchars($search); ?>">
+                <div id="searchSuggestions">
+                </div>
             </div>
             
-            <div style="width: 150px;">
-                <label style="display: block; font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 5px;">Filter Table</label>
-                <select name="table" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.85rem;">
-                    <option value="">All Tables</option>
-                    <?php while ($t = $tables_result->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($t['table_affected']); ?>" <?php echo $table_filter === $t['table_affected'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($t['table_affected']); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
+            <select name="table" style="padding: 10px 16px; border-radius: 99px; border: 1.5px solid transparent; background: var(--bg-primary); color: var(--text-primary); font-size: 0.88rem; outline: none; cursor: pointer; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <option value="">All Tables</option>
+                <?php while ($t = $tables_result->fetch_assoc()): ?>
+                    <option value="<?php echo htmlspecialchars($t['table_affected']); ?>" <?php echo $table_filter === $t['table_affected'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($t['table_affected']); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
 
-            <div style="width: 150px;">
-                <label style="display: block; font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 5px;">Filter Action</label>
-                <select name="action" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.85rem;">
-                    <option value="">All Actions</option>
-                    <?php while ($a = $actions_result->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($a['action_type']); ?>" <?php echo $action_filter === $a['action_type'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($a['action_type']); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
+            <select name="action" style="padding: 10px 16px; border-radius: 99px; border: 1.5px solid transparent; background: var(--bg-primary); color: var(--text-primary); font-size: 0.88rem; outline: none; cursor: pointer; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <option value="">All Actions</option>
+                <?php while ($a = $actions_result->fetch_assoc()): ?>
+                    <option value="<?php echo htmlspecialchars($a['action_type']); ?>" <?php echo $action_filter === $a['action_type'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($a['action_type']); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
 
-            <div style="display: flex; gap: 10px;">
-                <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Apply Filters</button>
-                <?php if ($search || $table_filter || $action_filter): ?>
-                    <a href="system_audit.php" class="btn btn-secondary" style="padding: 8px 16px; display: flex; align-items: center; justify-content: center;">Clear</a>
-                <?php endif; ?>
-            </div>
+            <button type="submit" class="btn btn-primary" style="border-radius: 99px; padding: 10px 24px;">Search</button>
+            <?php if ($search || $table_filter || $action_filter): ?>
+                <a href="system_audit.php" class="btn btn-secondary" style="border-radius: 99px; padding: 10px 24px;">Clear Filters</a>
+            <?php endif; ?>
         </form>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('adminSearchInput');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const searchForm = document.getElementById('adminSearchForm');
+    let debounceTimer;
+
+    // Handle typing in search input
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            searchSuggestions.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`../api/admin_search_users.php?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(users => {
+                    if (users.length > 0) {
+                        let html = '';
+                        users.forEach(u => {
+                            html += `
+                                <div class="suggestion-item" data-id="${u.id}" data-name="${u.name}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                                    <div style="font-weight: 600; color: var(--primary);">${u.name}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                                        <span style="font-size: 0.8rem; color: var(--text-muted);">${u.email}</span>
+                                        <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}" style="font-size: 0.65rem;">${u.status}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        searchSuggestions.innerHTML = html;
+                        searchSuggestions.style.display = 'block';
+                        setTimeout(() => {
+                            searchSuggestions.style.opacity = '1';
+                            searchSuggestions.style.transform = 'translateY(0)';
+                        }, 10);
+                    } else {
+                        searchSuggestions.innerHTML = '<div class="suggestion-empty" style="padding: 16px; text-align: center; color: var(--text-muted);">No users found</div>';
+                        searchSuggestions.style.display = 'block';
+                        setTimeout(() => {
+                            searchSuggestions.style.opacity = '1';
+                            searchSuggestions.style.transform = 'translateY(0)';
+                        }, 10);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching user suggestions:', err);
+                });
+        }, 300);
+    });
+
+    // Handle clicking a suggestion
+    searchSuggestions.addEventListener('click', function(e) {
+        const item = e.target.closest('.suggestion-item');
+        if (item) {
+            const name = item.getAttribute('data-name');
+            searchInput.value = name;
+            searchSuggestions.style.display = 'none';
+            searchForm.submit(); // Auto-submit when clicking a suggestion
+        }
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+            searchSuggestions.style.opacity = '0';
+            searchSuggestions.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                if (searchSuggestions.style.opacity === '0') {
+                    searchSuggestions.style.display = 'none';
+                }
+            }, 300);
+        }
+    });
+});
+</script>
 
     <?php if ($logs_result && $logs_result->num_rows > 0): ?>
     <div class="table-wrapper">
