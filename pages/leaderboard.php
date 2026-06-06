@@ -36,6 +36,23 @@ if ($filter_category !== 'all' && !empty($filter_category)) {
     $cat_filter = "AND s.catagory = '$safe_cat'";
 }
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'rank');
+$order = trim($_GET['order'] ?? 'asc');
+
+$allowed_sorts = [
+    'rank' => 'category_rank',
+    'name' => 'name',
+    'sessions' => 'session_count',
+    'rating' => 'avg_rating',
+    'hours' => 'hours_taught',
+    'reliability' => 'reliability',
+    'score' => 'composite_score'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? 'category_rank';
+$order_sql = (strtolower($order) === 'desc') ? 'DESC' : 'ASC';
+
 // --- CQ: Category-Based Leaderboard (CTE + DENSE_RANK + Composite Score) ---
 // Composite score: 40% sessions + 30% rating*6 + 20% reliability*4 + 10% hours
 // Uses DENSE_RANK() OVER (PARTITION BY category) for per-category ranking
@@ -77,7 +94,7 @@ $leaderboard = $conn->query("
         END AS badge_tier
     FROM provider_scores
     WHERE 1=1
-    ORDER BY category ASC, category_rank ASC
+    ORDER BY category ASC, $sort_col $order_sql
 ");
 
 // Organize by category
@@ -180,13 +197,48 @@ include __DIR__ . '/../includes/header.php';
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Rank</th>
-                                    <th>Provider</th>
-                                    <th>Sessions</th>
-                                    <th>Avg Rating</th>
-                                    <th>Hours Taught</th>
-                                    <th>Reliability</th>
-                                    <th>Composite Score</th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Rank</span>
+                                            <?php echo renderTableSort('rank', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Provider</span>
+                                            <?php echo renderTableSort('name', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Sessions</span>
+                                            <?php echo renderTableSort('sessions', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Avg Rating</span>
+                                            <?php echo renderTableSort('rating', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Hours Taught</span>
+                                            <?php echo renderTableSort('hours', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Reliability</span>
+                                            <?php echo renderTableSort('reliability', $sort, $order); ?>
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <span class="th-content">
+                                            <span>Composite Score</span>
+                                            <?php echo renderTableSort('score', $sort, $order); ?>
+                                        </span>
+                                    </th>
                                     <th>Badge</th>
                                 </tr>
                             </thead>
@@ -239,17 +291,6 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         <?php endif; ?>
-
-        <!-- Scoring Formula Info -->
-        <div class="card mt-2" style="background:var(--surface-container-low); border:1px dashed var(--border-color);">
-            <h4 style="margin-bottom:8px; font-size:0.9rem;"><i data-lucide="pen-tool" class="lucide-sm"></i> Composite Score Formula</h4>
-            <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.7; font-family:monospace;">
-                Score = (Sessions × 0.4) + (AvgRating × 6 × 0.3) + (Reliability × 4 × 0.2) + (HoursTaught × 0.1)
-            </p>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
-                Rankings are calculated using <code>DENSE_RANK() OVER (PARTITION BY category ORDER BY composite_score DESC)</code>
-            </p>
-        </div>
     </div>
 </div>
 

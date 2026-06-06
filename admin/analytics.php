@@ -569,8 +569,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Market Gaps (Demand with No Providers)</h3>
-            <span class="badge badge-warning">NOT EXISTS</span>
-        </div>
+            </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -664,8 +663,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Community Task Contributors</h3>
-            <span class="badge badge-orange">DENSE_RANK</span>
-        </div>
+            </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -738,8 +736,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="bar-chart" class="lucide-sm"></i> OLAP Data Warehouse Analytics</h2>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced reporting engine executing cross-dimensional aggregations over Fact & Dimension views.</p>
         </div>
-        <span class="badge badge-success" style="font-size: 0.75rem;">Star-Schema Architecture</span>
-    </div>
+        </div>
     
     <div style="padding: 20px;">
         <div class="grid-2 mb-3">
@@ -891,8 +888,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <h2 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="brain" class="lucide-sm"></i> Business Intelligence Analytics</h2>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
         </div>
-        <span class="badge badge-info" style="font-size: 0.75rem;">Window Functions + CTEs</span>
-    </div>
+        </div>
 
     <div style="padding: 20px;">
 
@@ -900,8 +896,7 @@ include __DIR__ . '/../includes/admin_header.php';
         <div class="card mb-3" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
             <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
                 <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="bar-chart" class="lucide-sm"></i> Demand-to-Supply Ratio (Market Economics)</h4>
-                <span class="badge badge-warning" style="font-size: 0.7rem;">Correlated Subqueries</span>
-            </div>
+                </div>
             <div class="table-wrapper">
                 <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                     <thead>
@@ -957,8 +952,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
                 <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
                     <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="medal" class="lucide-sm"></i> Skill Popularity Percentiles</h4>
-                    <span class="badge badge-success" style="font-size: 0.7rem;">NTILE(4) OVER()</span>
-                </div>
+                    </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>
@@ -1008,8 +1002,7 @@ include __DIR__ . '/../includes/admin_header.php';
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
                 <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
                     <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="trending-up" class="lucide-sm"></i> Month-over-Month Session Growth</h4>
-                    <span class="badge badge-info" style="font-size: 0.7rem;">LAG() OVER()</span>
-                </div>
+                    </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>

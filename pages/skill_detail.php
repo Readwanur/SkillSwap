@@ -96,7 +96,7 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Providers -->
         <h2 class="section-title">Available Providers</h2>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-12px; margin-bottom:12px;"><i data-lucide="lightbulb" class="lucide-sm"></i> Dynamic pricing based on provider demand (surge multiplier calculated via SQL subqueries)</p>
+        <!-- Surge badge logic removed here -->
 
         <?php if ($providers && $providers->num_rows > 0): ?>
             <?php while ($providers && $p = $providers->fetch_assoc()): ?>

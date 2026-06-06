@@ -106,8 +106,21 @@ $requested = $conn->query("SELECT s.skill_id, s.skill_name FROM user_skills_requ
 // All skills for dropdowns
 $all_skills = $conn->query("SELECT skill_id, skill_name FROM skills ORDER BY skill_name");
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'day');
+$order = trim($_GET['order'] ?? 'asc');
+
+$allowed_sorts = [
+    'day' => "FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')",
+    'start' => 'start_time',
+    'end' => 'end_time'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? $allowed_sorts['day'];
+$order_sql = (strtolower($order) === 'desc') ? 'DESC' : 'ASC';
+
 // Availability
-$availability = $conn->query("SELECT * FROM user_availability WHERE user_id = $user_id ORDER BY FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')");
+$availability = $conn->query("SELECT * FROM user_availability WHERE user_id = $user_id ORDER BY $sort_col $order_sql");
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -274,9 +287,24 @@ include __DIR__ . '/../includes/header.php';
                     <table>
                         <thead>
                             <tr>
-                                <th>Day</th>
-                                <th>Start</th>
-                                <th>End</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Day</span>
+                                        <?php echo renderTableSort('day', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Start</span>
+                                        <?php echo renderTableSort('start', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>End</span>
+                                        <?php echo renderTableSort('end', $sort, $order); ?>
+                                    </span>
+                                </th>
                                 <th>Action</th>
                             </tr>
                         </thead>

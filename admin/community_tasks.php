@@ -370,15 +370,15 @@ function buildTabUrl($status, $sort, $order) {
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="action" value="reject_task">
                                         <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Reject Task"
-                                            onclick="return confirm('Reject this submission? The task will be returned to the pending pool.')">&#x274C;</button>
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Reject Submission"
+                                            onclick="return confirm('Reject this submission? The task will be returned to the pending pool.')"><i data-lucide="x" class="lucide-sm"></i></button>
                                     </form>
                                 <?php else: ?>
                                 
                                     <!-- Edit -->
                                     <button type="button" class="btn btn-sm btn-secondary" title="Edit Task"
                                         onclick="openEditTask(<?php echo $t['task_id']; ?>, '<?php echo addslashes(htmlspecialchars($t['task_type'])); ?>', '<?php echo addslashes(htmlspecialchars($t['description'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($t['location'] ?? '')); ?>', <?php echo $t['credit_reward']; ?>, '<?php echo $t['status']; ?>')">
-                                        &#x270E;
+                                        <i data-lucide="edit-3" class="lucide-sm"></i>
                                     </button>
 
                                     <?php if ($t['status'] === 'in-progress' || $t['status'] === 'completed'): ?>
@@ -386,8 +386,8 @@ function buildTabUrl($status, $sort, $order) {
                                         <form method="POST" style="display:inline;">
                                             <input type="hidden" name="action" value="reset_task">
                                             <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-secondary" title="Reset to Pending"
-                                                onclick="return confirm('Reset this task to pending and unassign it?')">&#x21BA;</button>
+                                            <button type="submit" class="btn btn-sm btn-warning" title="Reset Task"
+                                                onclick="return confirm('Reset this task to pending and unassign it?')"><i data-lucide="refresh-cw" class="lucide-sm"></i></button>
                                         </form>
                                     <?php endif; ?>
 
@@ -398,7 +398,7 @@ function buildTabUrl($status, $sort, $order) {
                                         <input type="hidden" name="action" value="cancel_task">
                                         <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Cancel Task"
-                                            onclick="return confirm('Cancel this task?')">&#x274C;</button>
+                                            onclick="return confirm('Cancel this task?')"><i data-lucide="x" class="lucide-sm"></i></button>
                                     </form>
                                 <?php endif; ?>
 
@@ -406,8 +406,8 @@ function buildTabUrl($status, $sort, $order) {
                                 <form method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="delete_task">
                                     <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
-                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete Permanently"
-                                        onclick="return confirm('Permanently delete this task?')">&#x1F5D1;</button>
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete Task"
+                                        onclick="return confirm('Permanently delete this task?')"><i data-lucide="trash-2" class="lucide-sm"></i></button>
                                 </form>
                                 <?php endif; ?>
                             </div>
@@ -419,8 +419,8 @@ function buildTabUrl($status, $sort, $order) {
     </div>
     <?php else: ?>
         <div class="empty-state">
-            <div class="icon">&#x1F4AD;</div>
-            <p>No <?php echo $status_filter ?: ''; ?> tasks found.</p>
+            <div class="icon" style="color: var(--text-muted);"><i data-lucide="message-square" style="width: 48px; height: 48px;"></i></div>
+            <p>No community tasks match your filters.</p>
             <?php if ($status_filter): ?>
                 <a href="community_tasks.php" class="btn btn-sm btn-secondary mt-2">View All</a>
             <?php else: ?>

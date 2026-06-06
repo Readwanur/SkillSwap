@@ -65,7 +65,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 15px;">
         <div>
             <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0;"><i data-lucide="scale" class="lucide-sm"></i> Formal Disputes Center</h2>
-            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Review complaints filed by platform users and execute ACID-compliant resolutions.</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Review complaints filed by platform users and resolve them fairly.</p>
         </div>
     </div>
 
@@ -151,4 +151,4 @@ include __DIR__ . '/../includes/admin_header.php';
     </div>
 </div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/admin_footer.php'; ?>

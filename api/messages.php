@@ -45,6 +45,23 @@ if ($method === 'GET') {
         $mark_stmt->execute();
         $mark_stmt->close();
         
+        // Get partner name
+        $partner_stmt = $conn->prepare("
+            SELECT u.name 
+            FROM conversation_members cm
+            JOIN users u ON cm.user_id = u.user_id
+            WHERE cm.conversation_id = ? AND cm.user_id != ?
+            LIMIT 1
+        ");
+        $partner_stmt->bind_param("ii", $conversation_id, $user_id);
+        $partner_stmt->execute();
+        $partner_res = $partner_stmt->get_result();
+        $partner_name = 'Partner';
+        if ($partner_res->num_rows > 0) {
+            $partner_name = $partner_res->fetch_assoc()['name'];
+        }
+        $partner_stmt->close();
+        
         // Get messages
         $msg_stmt = $conn->prepare("
             SELECT message_id, sender_id, message_text, is_read, sent_at 
@@ -72,6 +89,7 @@ if ($method === 'GET') {
         echo json_encode([
             'status' => 'success',
             'conversation_id' => $conversation_id,
+            'partner_name' => htmlspecialchars($partner_name),
             'messages' => $messages
         ]);
         exit;
@@ -92,15 +110,14 @@ if ($method === 'GET') {
                    AND m2.is_read = 0 
                    AND m2.sender_id != ?) AS unread_count
             FROM conversations c
-            INNER JOIN conversation_members cm1 ON c.conversation_id = cm1.conversation_id AND cm1.user_id = ?
+            INNER JOIN conversation_members cm1 ON c.conversation_id = cm1.conversation_id AND cm1.user_id = ? AND cm1.is_hidden = 0
             INNER JOIN conversation_members cm2 ON c.conversation_id = cm2.conversation_id AND cm2.user_id != ?
             INNER JOIN users u ON cm2.user_id = u.user_id
-            LEFT JOIN messages m ON m.message_id = (
-                SELECT message_id FROM messages 
-                WHERE conversation_id = c.conversation_id 
-                ORDER BY sent_at DESC, message_id DESC 
-                LIMIT 1
-            )
+            LEFT JOIN (
+                SELECT conversation_id, MAX(message_id) AS max_id 
+                FROM messages GROUP BY conversation_id
+            ) m_max ON m_max.conversation_id = c.conversation_id
+            LEFT JOIN messages m ON m.message_id = m_max.max_id
             ORDER BY COALESCE(m.sent_at, c.created_at) DESC
         ";
         
@@ -140,6 +157,23 @@ if ($method === 'GET') {
     }
     
     $action = $input['action'] ?? 'send';
+    
+    if ($action === 'hide_inbox') {
+        $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : 0;
+        if ($conversation_id > 0) {
+            $stmt = $conn->prepare("UPDATE conversation_members SET is_hidden = 1 WHERE conversation_id = ? AND user_id = ?");
+            $stmt->bind_param("ii", $conversation_id, $user_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            echo json_encode(['status' => 'success', 'message' => 'Inbox hidden']);
+            exit;
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid conversation ID']);
+            exit;
+        }
+    }
     
     if ($action === 'mark_read') {
         $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : 0;
@@ -272,6 +306,12 @@ if ($method === 'GET') {
         $sent_at = date('Y-m-d H:i:s');
         
         $msg_stmt->close();
+        
+        // Unhide conversation for all members since there is a new message
+        $unhide_stmt = $conn->prepare("UPDATE conversation_members SET is_hidden = 0 WHERE conversation_id = ?");
+        $unhide_stmt->bind_param("i", $conversation_id);
+        $unhide_stmt->execute();
+        $unhide_stmt->close();
         
         echo json_encode([
             'status' => 'success',

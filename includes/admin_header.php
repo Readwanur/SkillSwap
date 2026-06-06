@@ -20,7 +20,6 @@ $page_titles = [
     'community_tasks' => 'Community Tasks',
     'analytics' => 'Analytics',
     'system_audit' => 'System Audit Logs',
-    'transaction_simulator' => 'ACID Transaction Simulator',
     'stress_test' => 'Stress Test & Index Profiler',
     'formal_disputes' => 'Formal Disputes',
     'fraud_detection' => 'Fraud Detection',
@@ -36,6 +35,13 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
     <meta name="description" content="SkillSwap Admin Panel">
     <title>SkillSwap Admin — <?php echo $breadcrumb_title; ?></title>
     <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
+    <script>
+        // Check local storage for theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
 </head>
 
 <body>
@@ -60,7 +66,7 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
     <nav class="navbar">
         <div class="container" style="max-width: 100%; padding: 0 30px;">
             <a href="../admin/dashboard.php" class="navbar-brand">
-                <img src="../assets/skillswap.png" alt="SkillSwap Logo"><span
+                <img src="../assets/loading.png" alt="SkillSwap Logo"><span
                     style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">ADMIN</span>
             </a>
 
@@ -70,8 +76,12 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </span>
             </div>
 
-            <div class="nav-user">
-                <span class="admin-clock" id="admin-clock"></span>
+            <div class="nav-user" style="display:flex; align-items:center;">
+                <!-- Theme Toggle -->
+                <button id="themeToggleBtnAdmin" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 5px; margin-right: 15px; color: var(--text-secondary); transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; outline: none;" title="Toggle Dark Mode">
+                    <i data-lucide="moon" class="lucide-sm" id="themeIconAdmin"></i>
+                </button>
+                <span class="admin-clock" id="admin-clock" style="margin-right: 15px;"></span>
                 <a href="../pages/logout.php" class="btn-logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</a>
             </div>
         </div>
@@ -114,10 +124,6 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                         class="<?php echo $current_page === 'system_audit' ? 'active' : ''; ?>">
                         <span class="sidebar-icon"><i data-lucide="shield" class="lucide-sm"></i></span> Audit Logs</a>
                 </li>
-                <li><a href="../admin/transaction_simulator.php"
-                        class="<?php echo $current_page === 'transaction_simulator' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon"><i data-lucide="zap" class="lucide-sm"></i></span> ACID Simulator</a>
-                </li>
                 <li><a href="../admin/stress_test.php"
                         class="<?php echo $current_page === 'stress_test' ? 'active' : ''; ?>">
                         <span class="sidebar-icon"><i data-lucide="rocket" class="lucide-sm"></i></span> Stress Test</a>
@@ -132,12 +138,6 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </li>
             </ul>
 
-            <div class="sidebar-section-label" style="margin-top: 20px;">QUICK LINKS</div>
-            <ul class="sidebar-menu">
-                <li><a href="../index.php" target="_blank" style="font-size:0.82rem;">
-                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span> View Site</a>
-                </li>
-            </ul>
         </aside>
         <main class="admin-content">
 
@@ -149,6 +149,34 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
             </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const themeBtnAdmin = document.getElementById('themeToggleBtnAdmin');
+    const themeIconAdmin = document.getElementById('themeIconAdmin');
+    
+    const currentThemeAdmin = document.documentElement.getAttribute('data-theme') || 'light';
+    if (currentThemeAdmin === 'dark' && themeIconAdmin) {
+        themeIconAdmin.setAttribute('data-lucide', 'sun');
+    }
+
+    if (themeBtnAdmin) {
+        themeBtnAdmin.addEventListener('click', function() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                themeBtnAdmin.innerHTML = '<i data-lucide="moon" class="lucide-sm" id="themeIconAdmin"></i>';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                themeBtnAdmin.innerHTML = '<i data-lucide="sun" class="lucide-sm" id="themeIconAdmin"></i>';
+            }
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+    }
+});
+
 // Live clock in navbar
 function updateClock() {
     const now = new Date();

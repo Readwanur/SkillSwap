@@ -188,62 +188,108 @@ include __DIR__ . '/../includes/admin_header.php';
 <?php endif; ?>
 
 <!-- Search Bar -->
-<div class="card mb-3">
-    <form method="GET" class="admin-filter-bar">
+<div class="card mb-3" style="padding: 16px 24px; position: relative; z-index: 10;">
+    <form method="GET" class="flex flex-wrap gap-2 items-center" id="adminSearchForm">
         <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort); ?>">
         <input type="hidden" name="order" value="<?php echo htmlspecialchars(strtolower($order)); ?>">
-        <div class="admin-search-box">
-            <input type="text" name="search" class="form-control" placeholder="&#x1F50D; Search by name, email, or location..."
-                value="<?php echo htmlspecialchars($search); ?>" style="min-width:280px;">
+        
+        <div style="position:relative; display:flex; align-items:center;">
+            <i data-lucide="search" style="position:absolute; left:14px; color:var(--text-muted); width:16px; height:16px; z-index:2; pointer-events:none;"></i>
+            <input type="text" name="search" id="adminSearchInput" placeholder="Search by name, email, or location..." autocomplete="off"
+                value="<?php echo htmlspecialchars($search); ?>">
+            <div id="searchSuggestions">
+            </div>
         </div>
-
-        <button type="submit" class="btn btn-sm btn-primary">Search</button>
+        <button type="submit" class="btn btn-primary" style="border-radius: 99px; padding: 10px 24px;">Search</button>
         <?php if ($search || $sort !== 'joined' || $order !== 'DESC'): ?>
-            <a href="users.php" class="btn btn-sm btn-secondary">Clear</a>
+            <a href="users.php" class="btn btn-secondary" style="border-radius: 99px; padding: 10px 24px;">Clear Filters</a>
         <?php endif; ?>
+    </form>
 </div>
 
-<!-- Alert: Inactive Users (CQ-11) -->
-<?php if ($inactive_users && $inactive_users->num_rows > 0): ?>
-    <div class="card mb-3" style="border: 1px solid var(--warning); background: rgba(115,92,0,0.02);">
-        <div class="card-header" style="border-bottom: 1px solid rgba(115,92,0,0.15); margin-bottom: 15px;">
-            <h3 style="color: var(--warning); margin:0;"><i data-lucide="alert-triangle" class="lucide-sm"></i> Inactive Users Alert (30+ Days No Session)</h3>
-            <span class="badge badge-warning" style="background: rgba(115,92,0,0.15); color: var(--warning);"><?php echo $inactive_users->num_rows; ?> User(s)</span>
-        </div>
-        <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
-            Active accounts that have not participated in any session (as requester or provider) within the past 30 days.
-        </p>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>User ID</th>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Last Active At</th>
-                        <th>Inactivity Period</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($iu = $inactive_users->fetch_assoc()): ?>
-                        <tr>
-                            <td>#<?php echo $iu['user_id']; ?></td>
-                            <td>
-                                <strong><a href="../pages/user_profile.php?id=<?php echo $iu['user_id']; ?>" style="color: var(--primary); text-decoration:none;"><?php echo htmlspecialchars($iu['name']); ?></a></strong>
-                            </td>
-                            <td><?php echo htmlspecialchars($iu['email']); ?></td>
-                            <td style="color:var(--text-muted);"><?php echo date('M d, Y', strtotime($iu['last_active_at'])); ?></td>
-                            <td style="color:var(--danger); font-weight:600;"><?php echo $iu['days_inactive']; ?> days inactive</td>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-<?php endif; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('adminSearchInput');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const searchForm = document.getElementById('adminSearchForm');
+    let debounceTimer;
+
+    // Handle typing in search input
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            searchSuggestions.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`../api/admin_search_users.php?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(users => {
+                    if (users.length > 0) {
+                        let html = '';
+                        users.forEach(u => {
+                            html += `
+                                <div class="suggestion-item" data-id="${u.id}" data-name="${u.name}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                                    <div style="font-weight: 600; color: var(--primary);">${u.name}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                                        <span style="font-size: 0.8rem; color: var(--text-muted);">${u.email}</span>
+                                        <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}" style="font-size: 0.65rem;">${u.status}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        searchSuggestions.innerHTML = html;
+                        searchSuggestions.style.display = 'block';
+                        setTimeout(() => {
+                            searchSuggestions.style.opacity = '1';
+                            searchSuggestions.style.transform = 'translateY(0)';
+                        }, 10);
+                    } else {
+                        searchSuggestions.innerHTML = '<div class="suggestion-empty" style="padding: 16px; text-align: center; color: var(--text-muted);">No users found</div>';
+                        searchSuggestions.style.display = 'block';
+                        setTimeout(() => {
+                            searchSuggestions.style.opacity = '1';
+                            searchSuggestions.style.transform = 'translateY(0)';
+                        }, 10);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching user suggestions:', err);
+                });
+        }, 300);
+    });
+
+    // Handle clicking a suggestion
+    searchSuggestions.addEventListener('click', function(e) {
+        const item = e.target.closest('.suggestion-item');
+        if (item) {
+            const name = item.getAttribute('data-name');
+            searchInput.value = name;
+            searchSuggestions.style.display = 'none';
+            searchForm.submit(); // Auto-submit when clicking a suggestion
+        }
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+            searchSuggestions.style.opacity = '0';
+            searchSuggestions.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                if (searchSuggestions.style.opacity === '0') {
+                    searchSuggestions.style.display = 'none';
+                }
+            }, 300);
+        }
+    });
+});
+</script>
 
 <!-- Users Table -->
-<div class="card">
+<div class="card" style="margin-bottom: 30px;">
     <div class="card-header">
         <h3>Showing <?php echo $users->num_rows; ?> user(s)</h3>
     </div>
@@ -340,7 +386,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                         <input type="hidden" name="action" value="suspend_user">
                                         <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-warning" title="Suspend User"
-                                            onclick="return confirm('Suspend User #<?php echo $u['user_id']; ?>? They will not be able to log in.')">&#x26D4; Suspend</button>
+                                            onclick="return confirm('Suspend User #<?php echo $u['user_id']; ?>? They will not be able to log in.')"><i data-lucide="ban" class="lucide-sm"></i> Suspend</button>
                                     </form>
                                 <?php else: ?>
                                     <form method="POST" style="display:inline;">
@@ -355,7 +401,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                     <input type="hidden" name="action" value="delete_user">
                                     <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                     <button type="submit" class="btn btn-sm btn-danger" title="Hard Delete"
-                                        onclick="return confirm('Permanently delete User #<?php echo $u['user_id']; ?>? (Will fail if they have transaction history)')">&#x1F5D1;</button>
+                                        onclick="return confirm('Permanently delete User #<?php echo $u['user_id']; ?>? (Will fail if they have transaction history)')"><i data-lucide="trash-2" class="lucide-sm"></i></button>
                                 </form>
                             </div>
                         </td>
@@ -366,11 +412,50 @@ include __DIR__ . '/../includes/admin_header.php';
     </div>
     <?php else: ?>
         <div class="empty-state">
-            <div class="icon">&#x1F50D;</div>
+            <div class="icon" style="color: var(--text-muted);"><i data-lucide="search" style="width: 48px; height: 48px;"></i></div>
             <p>No users match your search.</p>
             <a href="users.php" class="btn btn-sm btn-secondary mt-2">Clear Search</a>
         </div>
     <?php endif; ?>
 </div>
+
+<!-- Alert: Inactive Users (CQ-11) -->
+<?php if ($inactive_users && $inactive_users->num_rows > 0): ?>
+    <div class="card mb-3" style="border: 1px solid var(--warning); background: rgba(115,92,0,0.02);">
+        <div class="card-header" style="border-bottom: 1px solid rgba(115,92,0,0.15); margin-bottom: 15px;">
+            <h3 style="color: var(--warning); margin:0;"><i data-lucide="alert-triangle" class="lucide-sm"></i> Inactive Users Alert (30+ Days No Session)</h3>
+            <span class="badge badge-warning" style="background: rgba(115,92,0,0.15); color: var(--warning);"><?php echo $inactive_users->num_rows; ?> User(s)</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
+            Active accounts that have not participated in any session (as requester or provider) within the past 30 days.
+        </p>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Last Active At</th>
+                        <th>Inactivity Period</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($iu = $inactive_users->fetch_assoc()): ?>
+                        <tr>
+                            <td>#<?php echo $iu['user_id']; ?></td>
+                            <td>
+                                <strong><a href="../pages/user_profile.php?id=<?php echo $iu['user_id']; ?>" style="color: var(--primary); text-decoration:none;"><?php echo htmlspecialchars($iu['name']); ?></a></strong>
+                            </td>
+                            <td><?php echo htmlspecialchars($iu['email']); ?></td>
+                            <td style="color:var(--text-muted);"><?php echo date('M d, Y', strtotime($iu['last_active_at'])); ?></td>
+                            <td style="color:var(--danger); font-weight:600;"><?php echo $iu['days_inactive']; ?> days inactive</td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<?php endif; ?>
 
 <?php include __DIR__ . '/../includes/admin_footer.php'; ?>
