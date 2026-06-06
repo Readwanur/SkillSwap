@@ -202,9 +202,7 @@ if ($my_badges) {
     while ($b = $my_badges->fetch_assoc()) { $badge_list[] = $b; }
 }
 
-include __DIR__ . '/../includes/header.php';
-?>
-<link rel="stylesheet" href="../assets/css/style.css">
+include __DIR__ . '/../includes/header.php'; ?>
 <div class="page-wrapper">
     <div class="container">
         <h1 class="page-title">Dashboard</h1>

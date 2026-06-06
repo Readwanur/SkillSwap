@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Create your SkillSwap account and start exchanging skills.">
     <title>SkillSwap — Register</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=<?=time()?>">
     <style>
         .auth-wrapper {
             background: transparent !important;
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-wrapper">
         <div class="auth-card" style="max-width: 480px;">
             <div class="auth-logo">
-                <a href="../index.php?v=<?=time()?>"><img src="../assets/skillswap.png" alt="SkillSwap Logo" class="auth-logo-img"></a>
+                <a href="../index.php?v=<?=time()?>"><img src="../assets/loading.png" alt="SkillSwap Logo" class="auth-logo-img"></a>
                 <p>Create Your Account</p>
             </div>
 

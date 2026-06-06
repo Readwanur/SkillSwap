@@ -56,7 +56,7 @@ if (!$skill) {
 
 // Fetch providers (users who offer this skill, excluding current user)
 $providers = $conn->query("
-    SELECT u.user_id, u.name, u.location, u.bio,
+    SELECT u.user_id, u.name, u.location, u.bio, IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS has_photo,
            r.current_score, r.completed_sessions, r.mentor_level
     FROM user_skills_offered uso
     JOIN users u ON uso.user_id = u.user_id
@@ -102,10 +102,14 @@ include __DIR__ . '/../includes/header.php';
             <?php while ($providers && $p = $providers->fetch_assoc()): ?>
                 <div class="card mb-2">
                     <div class="flex gap-2">
-                        <div class="avatar avatar-lg"><?php echo strtoupper(substr($p['name'], 0, 1)); ?></div>
+                        <?php if (!empty($p['has_photo'])): ?>
+                            <img src="../api/user_photo.php?user_id=<?php echo $p['user_id']; ?>" class="avatar-img avatar-lg" alt="<?php echo htmlspecialchars($p['name']); ?>" style="object-fit:cover;">
+                        <?php else: ?>
+                            <div class="avatar avatar-lg"><?php echo strtoupper(substr($p['name'], 0, 1)); ?></div>
+                        <?php endif; ?>
                         <div style="flex:1;">
                             <h3 style="margin-bottom: 4px;">
-                                <a href="javascript:void(0)" onclick="openMentorInfo('<?php echo htmlspecialchars(addslashes($p['name'])); ?>', '<?php echo htmlspecialchars(addslashes($p['location'] ?? '')); ?>', '<?php echo htmlspecialchars(addslashes($p['bio'] ?? '')); ?>', '<?php echo $p['current_score'] ?? '5.00'; ?>', <?php echo $p['completed_sessions'] ?? 0; ?>, '<?php echo htmlspecialchars(addslashes($p['mentor_level'] ?? 'Novice')); ?>')" style="color: var(--primary); text-decoration: none;">
+                                <a href="user_profile.php?id=<?php echo $p['user_id']; ?>" style="color: var(--primary); text-decoration: none;">
                                     <?php echo htmlspecialchars($p['name']); ?>
                                 </a>
                             </h3>

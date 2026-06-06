@@ -20,8 +20,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $bio = trim($_POST['bio'] ?? '');
 
         if (!empty($name)) {
-            $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ? WHERE user_id = ?");
-            $stmt->bind_param("sssi", $name, $location, $bio, $user_id);
+            $img_data = null;
+            $file_mime = null;
+            if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
+                $file_tmp = $_FILES['profile_photo']['tmp_name'];
+                $file_mime = mime_content_type($file_tmp);
+                if (strpos($file_mime, 'image/') === 0) {
+                    $img_data = file_get_contents($file_tmp);
+                }
+            }
+
+            if ($img_data) {
+                $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ?, profile_photo = ?, profile_photo_mime = ? WHERE user_id = ?");
+                $stmt->bind_param("sssssi", $name, $location, $bio, $img_data, $file_mime, $user_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ? WHERE user_id = ?");
+                $stmt->bind_param("sssi", $name, $location, $bio, $user_id);
+            }
+
             if ($stmt->execute()) {
                 $_SESSION['user_name'] = $name;
                 $success = 'Profile updated successfully.';
@@ -96,7 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Fetch user data
-$user = $conn->query("SELECT * FROM users WHERE user_id = $user_id")->fetch_assoc();
+$res = $conn->query("SELECT user_id, name, email, location, bio, created_at, last_active_at, IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) AS profile_photo FROM users WHERE user_id = $user_id");
+if (!$res) { die("SQL Error: " . $conn->error); }
+$user = $res->fetch_assoc();
 $rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
 
 // Fetch skills offered & requested
@@ -140,8 +158,27 @@ include __DIR__ . '/../includes/header.php';
             <!-- Profile Info -->
             <div class="card">
                 <h3 class="section-title">Personal Information</h3>
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="update_profile">
+                    
+                    <div class="profile-photo-upload-container">
+                        <div>
+                            <?php if (!empty($user['profile_photo'])): ?>
+                                <img src="../api/user_photo.php?user_id=<?php echo $user_id; ?>&v=<?php echo time(); ?>" class="avatar-img avatar-lg" alt="Profile Photo">
+                            <?php else: ?>
+                                <div class="avatar avatar-lg" style="margin: 0;"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-weight:600; margin-bottom:8px;">Profile Picture</label>
+                            <div class="upload-btn-wrapper">
+                                <button type="button" class="btn btn-sm btn-secondary"><i data-lucide="upload" class="lucide-sm"></i> Choose Image</button>
+                                <input type="file" name="profile_photo" accept="image/jpeg, image/png, image/webp" />
+                            </div>
+                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Recommended: Square image, max 2MB. Updates when you click Save Changes.</p>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="name">Full Name</label>
                         <input type="text" id="name" name="name" class="form-control"

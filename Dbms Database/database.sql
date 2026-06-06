@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     location VARCHAR(100),
     bio TEXT,
-    profile_photo VARCHAR(255),
+    profile_photo MEDIUMBLOB,
+    profile_photo_mime VARCHAR(50),
     reliability_score DECIMAL(5, 2) DEFAULT 5.00,
     status ENUM('active', 'suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1289,15 +1290,15 @@ BEGIN
         ) INTO v_both_established;
 
         -- === Validation inside transaction ===
-        IF v_giftable_balance < p_amount THEN
+        IF v_loan_debt > 0 THEN
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = 'Gifting blocked. You cannot gift time credits while you have an active loan debt.';
+        ELSEIF v_giftable_balance < p_amount THEN
             -- [Flaw 1] Insufficient giftable balance (accounts for loan reservation)
             ROLLBACK;
             SET p_status = 'error';
-            IF v_loan_debt > 0 THEN
-                SET p_message = CONCAT('Insufficient giftable balance. You have ', v_from_balance, ' TC but ', v_loan_debt, ' TC is reserved for loan repayment. Available: ', v_giftable_balance, ' TC.');
-            ELSE
-                SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
-            END IF;
+            SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
         ELSEIF (v_daily_gifted + p_amount) > 50 THEN
             -- [Flaw 5] Daily cap exceeded
             ROLLBACK;
@@ -1507,7 +1508,7 @@ CREATE TABLE IF NOT EXISTS disputes (
 );
 
 CREATE OR REPLACE VIEW vw_public_users AS
-SELECT user_id, name, location, bio, reliability_score, status, created_at, last_active_at
+SELECT user_id, name, location, bio, profile_photo, reliability_score, status, created_at, last_active_at
 FROM users;
 
 CREATE OR REPLACE VIEW vw_smart_matches AS
@@ -1532,7 +1533,7 @@ JOIN user_skills_offered my_off ON their_req.skill_id = my_off.skill_id AND my_o
 JOIN users u ON their_off.user_id = u.user_id
 JOIN skills s1 ON my_req.skill_id = s1.skill_id
 JOIN skills s2 ON their_req.skill_id = s2.skill_id
-WHERE u.status = 'active';
+WHERE u.status = 'active' AND my_req.user_id != their_off.user_id;
 
 DROP PROCEDURE IF EXISTS sp_resolve_dispute;
 DELIMITER //

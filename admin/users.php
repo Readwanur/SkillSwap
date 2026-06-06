@@ -233,10 +233,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         users.forEach(u => {
                             html += `
                                 <div class="suggestion-item" data-id="${u.id}" data-name="${u.name}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: background 0.2s ease;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
-                                    <div style="font-weight: 600; color: var(--primary);">${u.name}</div>
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                                        <span style="font-size: 0.8rem; color: var(--text-muted);">${u.email}</span>
-                                        <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}" style="font-size: 0.65rem;">${u.status}</span>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        ${u.has_photo == 1 
+                                            ? `<img src="../api/user_photo.php?user_id=${u.id}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">`
+                                            : `<div class="avatar" style="width:32px; height:32px; font-size:0.8rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold;">${u.name.charAt(0).toUpperCase()}</div>`
+                                        }
+                                        <div style="flex:1;">
+                                            <div style="font-weight: 600; color: var(--primary);">${u.name}</div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                                                <span style="font-size: 0.8rem; color: var(--text-muted);">${u.email}</span>
+                                                <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}" style="font-size: 0.65rem;">${u.status}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -352,8 +360,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td><?php echo $u['user_id']; ?></td>
                         <td>
                             <div class="flex items-center gap-1">
-                                <div class="avatar" style="width:32px; height:32px; font-size:0.8rem;">
-                                    <?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                                <?php if (!empty($u['profile_photo'])): ?>
+                                    <img src="../api/user_photo.php?user_id=<?php echo $u['user_id']; ?>" class="avatar" style="width:32px; height:32px; object-fit:cover; border-radius:50%;" alt="User">
+                                <?php else: ?>
+                                    <div class="avatar" style="width:32px; height:32px; font-size:0.8rem;">
+                                        <?php echo strtoupper(substr($u['name'], 0, 1)); ?></div>
+                                <?php endif; ?>
                                 <strong><?php echo htmlspecialchars($u['name']); ?></strong>
                             </div>
                         </td>

@@ -18,7 +18,7 @@ $escaped = $conn->real_escape_string($query);
 
 // Fetch matching users
 $result = $conn->query("
-    SELECT user_id, name, email, location, status
+    SELECT user_id, name, email, location, status, IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) AS has_photo
     FROM users
     WHERE name LIKE '%$escaped%' OR email LIKE '%$escaped%' OR location LIKE '%$escaped%'
     ORDER BY name ASC
@@ -33,7 +33,8 @@ if ($result) {
             'name' => htmlspecialchars($row['name']),
             'email' => htmlspecialchars($row['email']),
             'location' => htmlspecialchars($row['location'] ?? 'N/A'),
-            'status' => htmlspecialchars($row['status'])
+            'status' => htmlspecialchars($row['status']),
+            'has_photo' => $row['has_photo']
         ];
     }
 }

@@ -725,7 +725,7 @@ header("Pragma: no-cache");
     <nav class="navbar">
         <div class="container">
             <a href="index.php" class="logo">
-                <img src="assets/skillswap.png" alt="SkillSwap Logo">
+                <img src="assets/loading.png" alt="SkillSwap Logo">
             </a>
             
             <ul class="nav-links">

@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 
 $user = $conn->query("
-    SELECT u.name, u.location, u.bio, u.created_at, u.last_active_at, r.current_score, r.completed_sessions, r.mentor_level
+    SELECT u.name, u.location, u.bio, IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS profile_photo, u.created_at, u.last_active_at, r.current_score, r.completed_sessions, r.mentor_level
     FROM vw_public_users u
     LEFT JOIN reputation r ON u.user_id = r.user_id
     WHERE u.user_id = $profile_id
@@ -86,6 +86,10 @@ if ($user_badges) {
     while ($b = $user_badges->fetch_assoc()) { $profile_badges[] = $b; }
 }
 
+// Fetch availability
+$availability = $conn->query("SELECT day_of_week, start_time, end_time FROM user_availability WHERE user_id = $profile_id ORDER BY FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), start_time ASC");
+
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -102,7 +106,11 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="card mt-2 mb-3">
             <div class="flex gap-2 items-center">
-                <div class="avatar avatar-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                <?php if (!empty($user['profile_photo'])): ?>
+                    <img src="../api/user_photo.php?user_id=<?php echo $profile_id; ?>" class="avatar-img avatar-lg" alt="Profile Photo" onclick="openLightbox(this.src)">
+                <?php else: ?>
+                    <div class="avatar avatar-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                <?php endif; ?>
                 <div style="flex:1;">
                     <h1 style="margin:0; font-size:1.8rem;"><?php echo htmlspecialchars($user['name']); ?></h1>
                     <p style="color:var(--text-secondary); margin-bottom: 8px;"><?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
@@ -183,6 +191,23 @@ include __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Availability -->
+        <div class="card mt-3">
+            <h3 class="section-title">Availability</h3>
+            <?php if ($availability && $availability->num_rows > 0): ?>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    <?php while ($a = $availability->fetch_assoc()): ?>
+                        <span class="badge badge-info" style="font-size:0.85rem; padding: 6px 10px;">
+                            <i data-lucide="clock" class="lucide-sm"></i> <?php echo $a['day_of_week']; ?>: 
+                            <?php echo date('h:i A', strtotime($a['start_time'])); ?> - <?php echo date('h:i A', strtotime($a['end_time'])); ?>
+                        </span>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <p style="color:var(--text-muted); font-size:0.9rem;">This user hasn't set any specific availability times.</p>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 
@@ -245,6 +270,27 @@ include __DIR__ . '/../includes/header.php';
     document.getElementById('bookingModal').addEventListener('click', function (e) {
         if (e.target === this) closeBooking();
     });
+
+    // Lightbox Logic
+    function openLightbox(src) {
+        document.getElementById('lightbox_img').src = src;
+        document.getElementById('imageLightbox').classList.add('active');
+    }
+
+    function closeLightbox() {
+        document.getElementById('imageLightbox').classList.remove('active');
+        setTimeout(() => document.getElementById('lightbox_img').src = '', 400); // Clear after animation
+    }
+
+    document.getElementById('imageLightbox').addEventListener('click', function(e) {
+        if (e.target === this) closeLightbox();
+    });
 </script>
+
+<!-- Image Lightbox Modal -->
+<div class="image-lightbox" id="imageLightbox">
+    <button class="image-lightbox-close" onclick="closeLightbox()">&times;</button>
+    <img src="" id="lightbox_img" alt="Enlarged Profile Photo">
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
