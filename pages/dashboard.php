@@ -60,7 +60,8 @@ $sort_col = $allowed_sorts[$sort] ?? 'timestamp';
 $order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
 
 // Sort URL generator
-function getSortUrl($col, $dir) {
+function getSortUrl($col, $dir)
+{
     $query = [
         'sort' => $col,
         'order' => $dir
@@ -69,7 +70,8 @@ function getSortUrl($col, $dir) {
 }
 
 // Sort Buttons generator (single toggle button beside column header)
-function renderSortButtons($col, $current_sort, $current_order) {
+function renderSortButtons($col, $current_sort, $current_order)
+{
     if ($current_sort === $col) {
         if (strtolower($current_order) === 'asc') {
             $url = getSortUrl($col, 'desc');
@@ -199,7 +201,9 @@ $my_badges = $conn->query("
 ");
 $badge_list = [];
 if ($my_badges) {
-    while ($b = $my_badges->fetch_assoc()) { $badge_list[] = $b; }
+    while ($b = $my_badges->fetch_assoc()) {
+        $badge_list[] = $b;
+    }
 }
 
 include __DIR__ . '/../includes/header.php'; ?>
@@ -295,7 +299,8 @@ include __DIR__ . '/../includes/header.php'; ?>
                         <?php endwhile; ?>
                     </div>
                 <?php else: ?>
-                    <div class="empty-state" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="empty-state"
+                        style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
                         <div class="icon">&#128197;</div>
                         <p>No upcoming sessions. <a href="../pages/skills.php">Browse skills</a> to book one!</p>
                     </div>
@@ -311,13 +316,19 @@ include __DIR__ . '/../includes/header.php'; ?>
                     <span style="font-size:0.75rem; color:var(--text-muted);">Collaborative Filtering via CTEs</span>
                 </div>
                 <?php if ($recommendations && $recommendations->num_rows > 0): ?>
-                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">Users who learned the same skills as you also learned:</p>
+                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">Users who learned the same
+                        skills as you also learned:</p>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                         <?php while ($rec = $recommendations->fetch_assoc()): ?>
-                            <a href="skill_detail.php?id=<?php echo $rec['skill_id']; ?>" style="display:block; text-decoration:none; padding:10px 12px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); transition:var(--transition);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-light)'">
-                                <strong style="color:var(--primary); font-size:0.88rem;"><?php echo htmlspecialchars($rec['skill_name']); ?></strong>
+                            <a href="skill_detail.php?id=<?php echo $rec['skill_id']; ?>"
+                                style="display:block; text-decoration:none; padding:10px 12px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); transition:var(--transition);"
+                                onmouseover="this.style.borderColor='var(--primary)'"
+                                onmouseout="this.style.borderColor='var(--border-light)'">
+                                <strong
+                                    style="color:var(--primary); font-size:0.88rem;"><?php echo htmlspecialchars($rec['skill_name']); ?></strong>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                                    <span class="badge badge-orange" style="font-size:0.65rem;"><?php echo htmlspecialchars($rec['catagory']); ?></span>
+                                    <span class="badge badge-orange"
+                                        style="font-size:0.65rem;"><?php echo htmlspecialchars($rec['catagory']); ?></span>
                                     <span style="font-size:0.75rem; color:var(--text-muted);">
                                         <?php echo $rec['avg_rating'] ? '<i data-lucide="star" class="lucide-sm"></i> ' . $rec['avg_rating'] : ''; ?>
                                         · <?php echo $rec['learn_count']; ?> similar
@@ -342,22 +353,37 @@ include __DIR__ . '/../includes/header.php'; ?>
                 <?php if (!empty($badge_list)): ?>
                     <div style="display:flex; flex-wrap:wrap; gap:10px;">
                         <?php foreach ($badge_list as $badge):
-                            $icon = '<i data-lucide="medal" class="lucide-sm"></i>'; $color = 'var(--info)';
-                            if ($badge['rank_pos'] == 1) { $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>'; $color = 'var(--warning)'; }
-                            elseif ($badge['rank_pos'] == 2) { $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>'; $color = 'var(--info)'; }
-                            elseif ($badge['rank_pos'] == 3) { $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>'; $color = 'var(--primary)'; }
-                        ?>
-                            <div style="text-align:center; padding:12px 16px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); min-width:100px;">
+                            $icon = '<i data-lucide="medal" class="lucide-sm"></i>';
+                            $color = 'var(--info)';
+                            if ($badge['rank_pos'] == 1) {
+                                $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>';
+                                $color = 'var(--warning)';
+                            } elseif ($badge['rank_pos'] == 2) {
+                                $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>';
+                                $color = 'var(--info)';
+                            } elseif ($badge['rank_pos'] == 3) {
+                                $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>';
+                                $color = 'var(--primary)';
+                            }
+                            ?>
+                            <div
+                                style="text-align:center; padding:12px 16px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); min-width:100px;">
                                 <span style="font-size:1.6rem;"><?php echo $icon; ?></span>
-                                <div style="font-weight:700; color:<?php echo $color; ?>; font-size:0.9rem;">#<?php echo $badge['rank_pos']; ?></div>
-                                <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;"><?php echo htmlspecialchars($badge['category']); ?></div>
+                                <div style="font-weight:700; color:<?php echo $color; ?>; font-size:0.9rem;">
+                                    #<?php echo $badge['rank_pos']; ?></div>
+                                <div
+                                    style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">
+                                    <?php echo htmlspecialchars($badge['category']); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 <?php else: ?>
                     <div class="empty-state" style="padding:20px;">
                         <p>Complete teaching sessions to earn category badges!</p>
-                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 3 in any skill category earns <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i><i data-lucide="medal" style="color: silver;" class="lucide-sm"></i><i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i></p>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 3 in any skill category
+                            earns <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i><i data-lucide="medal"
+                                style="color: silver;" class="lucide-sm"></i><i data-lucide="medal" style="color: #cd7f32;"
+                                class="lucide-sm"></i></p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -397,7 +423,8 @@ include __DIR__ . '/../includes/header.php'; ?>
                         <tbody>
                             <?php while ($txn = $recent_txn->fetch_assoc()): ?>
                                 <tr>
-                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($txn['transaction_category']); ?></span>
+                                    <td><span
+                                            class="badge badge-orange"><?php echo htmlspecialchars($txn['transaction_category']); ?></span>
                                     </td>
                                     <td><?php echo htmlspecialchars($txn['sender_name'] ?? 'System'); ?></td>
                                     <td><?php echo htmlspecialchars($txn['receiver_name']); ?></td>
@@ -413,56 +440,73 @@ include __DIR__ . '/../includes/header.php'; ?>
                     <p>No transactions yet.</p>
                 </div>
             <?php endif; ?>
-        <!-- CQ-7: Activity Timeline (UNION ALL query) -->
-        <div class="card mt-3" id="timeline">
-            <div class="card-header">
-                <h3>Activity Timeline</h3>
-            </div>
-            <?php if (count($activities) > 0): ?>
-                <?php foreach ($activities as $event):
-                    $icon = '<i data-lucide="pin" class="lucide-sm"></i>';
-                    $badge = 'badge-info';
-                    if ($event['event_type'] === 'session_booked') { $icon = '<i data-lucide="calendar" class="lucide-sm"></i>'; $badge = 'badge-warning'; }
-                    elseif ($event['event_type'] === 'session_taught') { $icon = '<i data-lucide="graduation-cap" class="lucide-sm"></i>'; $badge = 'badge-success'; }
-                    elseif ($event['event_type'] === 'task_completed') { $icon = '<i data-lucide="check-circle" class="lucide-sm"></i>'; $badge = 'badge-primary'; }
-                    elseif ($event['event_type'] === 'credit_received') { $icon = '<i data-lucide="coins" class="lucide-sm"></i>'; $badge = 'badge-orange'; }
-                ?>
-                    <div class="session-card">
-                        <div class="avatar"><?php echo $icon; ?></div>
-                        <div class="session-info">
-                            <h4><?php echo htmlspecialchars($event['description']); ?></h4>
-                            <p><?php echo $event['event_time'] ? date('M d, Y h:i A', strtotime($event['event_time'])) : 'N/A'; ?></p>
+            <!-- CQ-7: Activity Timeline (UNION ALL query) -->
+            <div class="card mt-3" id="timeline">
+                <div class="card-header">
+                    <h3>Activity Timeline</h3>
+                </div>
+                <?php if (count($activities) > 0): ?>
+                    <?php foreach ($activities as $event):
+                        $icon = '<i data-lucide="pin" class="lucide-sm"></i>';
+                        $badge = 'badge-info';
+                        if ($event['event_type'] === 'session_booked') {
+                            $icon = '<i data-lucide="calendar" class="lucide-sm"></i>';
+                            $badge = 'badge-warning';
+                        } elseif ($event['event_type'] === 'session_taught') {
+                            $icon = '<i data-lucide="graduation-cap" class="lucide-sm"></i>';
+                            $badge = 'badge-success';
+                        } elseif ($event['event_type'] === 'task_completed') {
+                            $icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
+                            $badge = 'badge-primary';
+                        } elseif ($event['event_type'] === 'credit_received') {
+                            $icon = '<i data-lucide="coins" class="lucide-sm"></i>';
+                            $badge = 'badge-orange';
+                        }
+                        ?>
+                        <div class="session-card">
+                            <div class="avatar"><?php echo $icon; ?></div>
+                            <div class="session-info">
+                                <h4><?php echo htmlspecialchars($event['description']); ?></h4>
+                                <p><?php echo $event['event_time'] ? date('M d, Y h:i A', strtotime($event['event_time'])) : 'N/A'; ?>
+                                </p>
+                            </div>
+                            <span
+                                class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
                         </div>
-                        <span class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
+                    <?php endforeach; ?>
+
+                    <!-- Pagination -->
+                    <div class="flex justify-between items-center mt-3"
+                        style="border-top: 1px solid var(--border-light); padding-top: 16px;">
+                        <div>
+                            <?php if ($activity_page > 1): ?>
+                                <a href="dashboard.php?activity_page=<?php echo $activity_page - 1; ?>#timeline"
+                                    class="btn btn-sm btn-secondary" style="border-radius: 99px;">&larr; Previous</a>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-secondary" disabled
+                                    style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">&larr; Previous</button>
+                            <?php endif; ?>
+                        </div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); font-weight:500;">Page
+                            <?php echo $activity_page; ?></div>
+                        <div>
+                            <?php if ($has_next_activity): ?>
+                                <a href="dashboard.php?activity_page=<?php echo $activity_page + 1; ?>#timeline"
+                                    class="btn btn-sm btn-secondary" style="border-radius: 99px;">Next &rarr;</a>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-secondary" disabled
+                                    style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">Next &rarr;</button>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                <?php endforeach; ?>
-                
-                <!-- Pagination -->
-                <div class="flex justify-between items-center mt-3" style="border-top: 1px solid var(--border-light); padding-top: 16px;">
-                    <div>
-                        <?php if ($activity_page > 1): ?>
-                            <a href="dashboard.php?activity_page=<?php echo $activity_page - 1; ?>#timeline" class="btn btn-sm btn-secondary" style="border-radius: 99px;">&larr; Previous</a>
-                        <?php else: ?>
-                            <button class="btn btn-sm btn-secondary" disabled style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">&larr; Previous</button>
-                        <?php endif; ?>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <p>No activity yet. Start learning or teaching!</p>
                     </div>
-                    <div style="font-size:0.85rem; color:var(--text-muted); font-weight:500;">Page <?php echo $activity_page; ?></div>
-                    <div>
-                        <?php if ($has_next_activity): ?>
-                            <a href="dashboard.php?activity_page=<?php echo $activity_page + 1; ?>#timeline" class="btn btn-sm btn-secondary" style="border-radius: 99px;">Next &rarr;</a>
-                        <?php else: ?>
-                            <button class="btn btn-sm btn-secondary" disabled style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">Next &rarr;</button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <p>No activity yet. Start learning or teaching!</p>
-                </div>
-            <?php endif; ?>
+                <?php endif; ?>
+            </div>
+
         </div>
-
     </div>
-</div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+    <?php include __DIR__ . '/../includes/footer.php'; ?>

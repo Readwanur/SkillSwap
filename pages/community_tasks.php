@@ -11,8 +11,15 @@ $page_title = 'Community Tasks';
 $success = '';
 $error = '';
 
+// Penalize reliability score by -0.5 for users who failed to complete tasks within 24 hours
+$conn->query("
+    UPDATE users u
+    JOIN community_task ct ON u.user_id = ct.user_id
+    SET u.reliability_score = GREATEST(u.reliability_score - 0.50, 0)
+    WHERE ct.status = 'in-progress' AND ct.assigned_at < NOW() - INTERVAL 1 DAY
+");
 // Auto-expire tasks assigned more than 24 hours ago
-$conn->query("UPDATE community_task SET status = 'pending', user_id = NULL WHERE status = 'in-progress' AND assigned_at < NOW() - INTERVAL 1 DAY");
+$conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, assigned_at = NULL WHERE status = 'in-progress' AND assigned_at < NOW() - INTERVAL 1 DAY");
 
 // Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -20,10 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'accept_task') {
         $task_id = intval($_POST['task_id'] ?? 0);
         if ($task_id > 0) {
-            $stmt = $conn->prepare("UPDATE community_task SET user_id = ?, status = 'in-progress' WHERE task_id = ? AND status = 'pending'");
+            $stmt = $conn->prepare("UPDATE community_task SET user_id = ?, status = 'in-progress', assigned_at = NOW() WHERE task_id = ? AND status = 'pending'");
             $stmt->bind_param("ii", $user_id, $task_id);
             if ($stmt->execute() && $stmt->affected_rows > 0) {
                 $success = 'Task accepted! Complete it to earn time credits.';
+            } else {
+                $error = 'This task is no longer available or has already been accepted by another user.';
+            }
+            $stmt->close();
+        }
+    }
+
+    if ($_POST['action'] === 'abandon_task') {
+        $task_id = intval($_POST['task_id'] ?? 0);
+        if ($task_id > 0) {
+            $stmt = $conn->prepare("UPDATE community_task SET status = 'pending', user_id = NULL, assigned_at = NULL WHERE task_id = ? AND user_id = ? AND status = 'in-progress'");
+            $stmt->bind_param("ii", $task_id, $user_id);
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $success = 'Task returned to the available pool.';
+            } else {
+                $error = 'Failed to return task. It may not be in-progress.';
             }
             $stmt->close();
         }
@@ -56,7 +79,7 @@ $balance = $wallet ? $wallet['balance'] : 0.00;
 // My tasks
 $my_tasks = $conn->query("
     SELECT * FROM community_task
-    WHERE user_id = $user_id
+    WHERE user_id = $user_id AND status != 'completed'
     ORDER BY assigned_at DESC
 ");
 
@@ -170,8 +193,8 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                             <p><?php echo htmlspecialchars($t['description']); ?></p>
                             <div class="task-meta">
-                                <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
-                                <span>&#128176; +<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
+                                <span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="map-pin" class="lucide-sm"></i> <?php echo htmlspecialchars($t['location']); ?></span>
+                                <span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="coins" class="lucide-sm"></i> +<?php echo number_format($t['credit_reward'], 2); ?> TC</span>
                             </div>
                             <div class="task-meta mt-1" style="font-size: 0.75rem;">
                                 <span>Assigned: <?php echo date('M d, Y', strtotime($t['assigned_at'])); ?></span>
@@ -180,10 +203,18 @@ include __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </div>
                             <?php if ($t['status'] === 'in-progress'): ?>
-                                <div class="alert alert-info mt-2" style="font-size:0.8rem; padding:8px;">
-                                    &#x23F0; You have 24 hours to complete this task from the time of assignment, or it will be automatically returned to the pool.
+                                <div class="alert alert-info mt-2" style="font-size:0.8rem; padding:8px; display: flex; align-items: flex-start; gap: 6px;">
+                                    <i data-lucide="clock" class="lucide-sm" style="flex-shrink: 0; margin-top: 2px;"></i> 
+                                    <div>You have 24 hours to complete this task from the time of assignment, or it will be automatically returned to the pool.</div>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-success mt-2" onclick="openSubmitModal(<?php echo $t['task_id']; ?>)">Submit for Review</button>
+                                <div style="display:flex; gap: 8px;">
+                                    <button type="button" class="btn btn-sm btn-success mt-2" onclick="openSubmitModal(<?php echo $t['task_id']; ?>)">Submit for Review</button>
+                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to return this task?');">
+                                        <input type="hidden" name="action" value="abandon_task">
+                                        <input type="hidden" name="task_id" value="<?php echo $t['task_id']; ?>">
+                                        <button type="submit" class="btn btn-sm btn-danger mt-2" style="background: transparent; color: var(--danger); border: 1px solid var(--danger);">Return Task</button>
+                                    </form>
+                                </div>
                             <?php elseif ($t['status'] === 'under-review' && !empty($t['submission_note'])): ?>
                                 <div style="margin-top:10px; background:var(--bg-hover); padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; border-left:3px solid var(--primary);">
                                     <strong>Your Submission:</strong><br>
@@ -277,7 +308,7 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <p><?php echo htmlspecialchars($t['description']); ?></p>
                         <div class="task-meta">
-                            <span>&#128205; <?php echo htmlspecialchars($t['location']); ?></span>
+                            <span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="map-pin" class="lucide-sm"></i> <?php echo htmlspecialchars($t['location']); ?></span>
                         </div>
                         <form method="POST" class="mt-2">
                             <input type="hidden" name="action" value="accept_task">

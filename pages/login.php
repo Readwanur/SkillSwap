@@ -345,6 +345,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             init();
         });
     </script>
+
+    <!-- Global CSRF Auto-Injection -->
+    <script>
+    window.csrfToken = "<?php echo $_SESSION['csrf_token'] ?? ''; ?>";
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form[method="POST"], form[method="post"]');
+        forms.forEach(form => {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = window.csrfToken;
+                form.appendChild(input);
+            }
+        });
+    });
+    </script>
 </body>
 
 </html>

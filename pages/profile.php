@@ -93,11 +93,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $start = $_POST['start_time'] ?? '';
         $end = $_POST['end_time'] ?? '';
         if ($day && $start && $end) {
-            $stmt = $conn->prepare("INSERT INTO user_availability (user_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("isss", $user_id, $day, $start, $end);
-            $stmt->execute();
-            $stmt->close();
-            $success = 'Availability added.';
+            if (strtotime($start) >= strtotime($end)) {
+                $error = 'End time must be after start time.';
+            } else {
+                // Check if an overlapping slot already exists
+                $check_stmt = $conn->prepare("SELECT availability_id FROM user_availability WHERE user_id = ? AND day_of_week = ? AND start_time < ? AND end_time > ?");
+                $check_stmt->bind_param("isss", $user_id, $day, $end, $start);
+                $check_stmt->execute();
+                $result = $check_stmt->get_result();
+                
+                if ($result->num_rows > 0) {
+                    $error = 'This time slot overlaps with an existing availability.';
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO user_availability (user_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("isss", $user_id, $day, $start, $end);
+                    $stmt->execute();
+                    $stmt->close();
+                    $success = 'Availability added.';
+                }
+                $check_stmt->close();
+            }
         }
     }
 
@@ -113,7 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Fetch user data
 $res = $conn->query("SELECT user_id, name, email, location, bio, created_at, last_active_at, IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) AS profile_photo FROM users WHERE user_id = $user_id");
-if (!$res) { die("SQL Error: " . $conn->error); }
+if (!$res) {
+    die("SQL Error: " . $conn->error);
+}
 $user = $res->fetch_assoc();
 $rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
 
@@ -160,22 +177,26 @@ include __DIR__ . '/../includes/header.php';
                 <h3 class="section-title">Personal Information</h3>
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="update_profile">
-                    
+
                     <div class="profile-photo-upload-container">
                         <div>
                             <?php if (!empty($user['profile_photo'])): ?>
-                                <img src="../api/user_photo.php?user_id=<?php echo $user_id; ?>&v=<?php echo time(); ?>" class="avatar-img avatar-lg" alt="Profile Photo">
+                                <img src="../api/user_photo.php?user_id=<?php echo $user_id; ?>&v=<?php echo time(); ?>"
+                                    class="avatar-img avatar-lg" alt="Profile Photo">
                             <?php else: ?>
-                                <div class="avatar avatar-lg" style="margin: 0;"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                                <div class="avatar avatar-lg" style="margin: 0;">
+                                    <?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
                             <?php endif; ?>
                         </div>
                         <div style="flex:1;">
                             <label style="display:block; font-weight:600; margin-bottom:8px;">Profile Picture</label>
                             <div class="upload-btn-wrapper">
-                                <button type="button" class="btn btn-sm btn-secondary"><i data-lucide="upload" class="lucide-sm"></i> Choose Image</button>
+                                <button type="button" class="btn btn-sm btn-secondary"><i data-lucide="upload"
+                                        class="lucide-sm"></i> Choose Image</button>
                                 <input type="file" name="profile_photo" accept="image/jpeg, image/png, image/webp" />
                             </div>
-                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Recommended: Square image, max 2MB. Updates when you click Save Changes.</p>
+                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Recommended: Square
+                                image, max 2MB. Updates when you click Save Changes.</p>
                         </div>
                     </div>
 
@@ -238,9 +259,11 @@ include __DIR__ . '/../includes/header.php';
                 <div class="card">
                     <h3 class="section-title">Member Since</h3>
                     <p style="color: var(--text-secondary);">
-                        <?php echo date('F j, Y', strtotime($user['created_at'])); ?></p>
+                        <?php echo date('F j, Y', strtotime($user['created_at'])); ?>
+                    </p>
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Last active:
-                        <?php echo date('M j, Y g:i A', strtotime($user['last_active_at'])); ?></p>
+                        <?php echo date('M j, Y g:i A', strtotime($user['last_active_at'])); ?>
+                    </p>
                 </div>
             </div>
         </div>

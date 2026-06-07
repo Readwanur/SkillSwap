@@ -45,9 +45,9 @@ if ($method === 'GET') {
         $mark_stmt->execute();
         $mark_stmt->close();
         
-        // Get partner name
+        // Get partner details
         $partner_stmt = $conn->prepare("
-            SELECT u.name 
+            SELECT u.user_id, u.name, u.last_active_at, IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS has_photo 
             FROM conversation_members cm
             JOIN users u ON cm.user_id = u.user_id
             WHERE cm.conversation_id = ? AND cm.user_id != ?
@@ -57,14 +57,25 @@ if ($method === 'GET') {
         $partner_stmt->execute();
         $partner_res = $partner_stmt->get_result();
         $partner_name = 'Partner';
+        $partner_id = 0;
+        $partner_has_photo = 0;
+        $is_online = false;
+        $last_active = null;
         if ($partner_res->num_rows > 0) {
-            $partner_name = $partner_res->fetch_assoc()['name'];
+            $row = $partner_res->fetch_assoc();
+            $partner_name = $row['name'];
+            $partner_id = intval($row['user_id']);
+            $partner_has_photo = intval($row['has_photo']);
+            $last_active = $row['last_active_at'];
+            if ($last_active && strtotime($last_active) >= strtotime('-2 minutes')) {
+                $is_online = true;
+            }
         }
         $partner_stmt->close();
         
         // Get messages
         $msg_stmt = $conn->prepare("
-            SELECT message_id, sender_id, message_text, is_read, sent_at 
+            SELECT message_id, sender_id, message_text, message_type, media_url, is_read, sent_at 
             FROM messages 
             WHERE conversation_id = ? 
             ORDER BY sent_at ASC, message_id ASC 
@@ -80,6 +91,8 @@ if ($method === 'GET') {
                 'message_id' => intval($row['message_id']),
                 'sender_id' => intval($row['sender_id']),
                 'message_text' => htmlspecialchars($row['message_text']),
+                'message_type' => $row['message_type'] ?? 'text',
+                'media_url' => $row['media_url'],
                 'is_read' => (bool)$row['is_read'],
                 'sent_at' => $row['sent_at']
             ];
@@ -90,6 +103,10 @@ if ($method === 'GET') {
             'status' => 'success',
             'conversation_id' => $conversation_id,
             'partner_name' => htmlspecialchars($partner_name),
+            'partner_id' => $partner_id,
+            'partner_has_photo' => $partner_has_photo,
+            'is_online' => $is_online,
+            'last_active' => $last_active,
             'messages' => $messages
         ]);
         exit;
@@ -101,6 +118,7 @@ if ($method === 'GET') {
                 c.conversation_id,
                 u.user_id AS other_user_id,
                 u.name AS other_user_name,
+                u.last_active_at,
                 IF(u.profile_photo IS NOT NULL AND LENGTH(u.profile_photo) > 0, 1, 0) AS has_photo,
                 m.message_text AS last_message_text,
                 m.sent_at AS last_message_time,
@@ -128,11 +146,16 @@ if ($method === 'GET') {
         
         $conversations = [];
         while ($row = $res->fetch_assoc()) {
+            $is_online = false;
+            if ($row['last_active_at'] && strtotime($row['last_active_at']) >= strtotime('-2 minutes')) {
+                $is_online = true;
+            }
             $conversations[] = [
                 'conversation_id' => intval($row['conversation_id']),
                 'other_user_id' => intval($row['other_user_id']),
                 'other_user_name' => htmlspecialchars($row['other_user_name']),
                 'has_photo' => intval($row['has_photo']),
+                'is_online' => $is_online,
                 'last_message_text' => $row['last_message_text'] ? htmlspecialchars($row['last_message_text']) : null,
                 'last_message_time' => $row['last_message_time'],
                 'last_message_sender_id' => $row['last_message_sender_id'] ? intval($row['last_message_sender_id']) : null,
@@ -197,11 +220,37 @@ if ($method === 'GET') {
     }
     
     // Default action: send message
-    $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : 0;
-    $recipient_id = isset($input['recipient_id']) ? intval($input['recipient_id']) : 0;
-    $message_text = trim($input['message_text'] ?? '');
+    $conversation_id = isset($input['conversation_id']) ? intval($input['conversation_id']) : (isset($_POST['conversation_id']) ? intval($_POST['conversation_id']) : 0);
+    $recipient_id = isset($input['recipient_id']) ? intval($input['recipient_id']) : (isset($_POST['recipient_id']) ? intval($_POST['recipient_id']) : 0);
+    $message_text = trim($input['message_text'] ?? ($_POST['message_text'] ?? ''));
     
-    if ($message_text === '') {
+    $message_type = 'text';
+    $media_url = null;
+    
+    if (isset($_FILES['audio_file']) && $_FILES['audio_file']['error'] === UPLOAD_ERR_OK) {
+        $message_type = 'audio';
+        $message_text = 'Voice message';
+        
+        $tmp_name = $_FILES['audio_file']['tmp_name'];
+        $ext = pathinfo($_FILES['audio_file']['name'], PATHINFO_EXTENSION);
+        if (empty($ext)) $ext = 'webm';
+        $new_name = 'audio_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+        $upload_dir = __DIR__ . '/../uploads/voice_messages/';
+        
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+        
+        if (move_uploaded_file($tmp_name, $upload_dir . $new_name)) {
+            $media_url = '/uploads/voice_messages/' . $new_name;
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to save audio file']);
+            exit;
+        }
+    }
+    
+    if ($message_text === '' && $message_type === 'text') {
         http_response_code(400);
         echo json_encode(['error' => 'Message text cannot be empty']);
         exit;
@@ -297,10 +346,10 @@ if ($method === 'GET') {
     
     // Insert new message
     $msg_stmt = $conn->prepare("
-        INSERT INTO messages (conversation_id, sender_id, message_text) 
-        VALUES (?, ?, ?)
+        INSERT INTO messages (conversation_id, sender_id, message_text, message_type, media_url) 
+        VALUES (?, ?, ?, ?, ?)
     ");
-    $msg_stmt->bind_param("iis", $conversation_id, $user_id, $message_text);
+    $msg_stmt->bind_param("iisss", $conversation_id, $user_id, $message_text, $message_type, $media_url);
     if ($msg_stmt->execute()) {
         $message_id = $conn->insert_id;
         $sent_at = date('Y-m-d H:i:s');
@@ -320,6 +369,8 @@ if ($method === 'GET') {
                 'conversation_id' => $conversation_id,
                 'sender_id' => $user_id,
                 'message_text' => htmlspecialchars($message_text),
+                'message_type' => $message_type,
+                'media_url' => $media_url,
                 'sent_at' => $sent_at,
                 'is_read' => false
             ]

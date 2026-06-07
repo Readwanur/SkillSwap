@@ -84,14 +84,9 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                     if (isDark) {
                         document.documentElement.removeAttribute('data-theme');
                         localStorage.setItem('theme', 'light');
-                        themeBtn.innerHTML = '<i data-lucide="moon" class="lucide-sm" id="themeIcon"></i>';
                     } else {
                         document.documentElement.setAttribute('data-theme', 'dark');
                         localStorage.setItem('theme', 'dark');
-                        themeBtn.innerHTML = '<i data-lucide="sun" class="lucide-sm" id="themeIcon"></i>';
-                    }
-                    if (window.lucide) {
-                        lucide.createIcons();
                     }
                 });
             }
@@ -231,14 +226,18 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
 
             <div class="nav-user" style="display:flex; align-items:center;">
                 <!-- Theme Toggle -->
-                <button id="themeToggleBtn" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 5px; margin-right: 15px; color: var(--text-secondary); transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; outline: none;" title="Toggle Dark Mode">
-                    <i data-lucide="moon" class="lucide-sm" id="themeIcon"></i>
-                </button>
+                <div id="themeToggleBtn" class="theme-toggle-pill" role="button" tabindex="0" title="Toggle Dark Mode">
+                    <div class="theme-toggle-thumb"></div>
+                    <div class="theme-toggle-icons">
+                        <i data-lucide="moon" class="moon-icon"></i>
+                        <i data-lucide="sun" class="sun-icon"></i>
+                    </div>
+                </div>
 
                 <?php if ($user_id > 0 && !$is_admin): ?>
                 <!-- Messages Icon -->
-                <a href="../pages/messages.php" class="notif-bell-wrapper" style="position: relative; margin-right: 15px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 5px;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#043A72" xmlns="http://www.w3.org/2000/svg">
+                <a href="../pages/messages.php" class="notif-bell-wrapper" style="position: relative; margin-right: 15px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 5px; color: var(--primary); transition: var(--transition);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2C6.48 2 2 6.13 2 11.23C2 14.12 3.53 16.69 5.86 18.31V22L9.36 19.98C10.2 20.25 11.08 20.41 12 20.41C17.52 20.41 22 16.29 22 11.23C22 6.13 17.52 2 12 2ZM13.06 14.28L10.74 11.75L6.2 14.28L11.16 8.75L13.56 11.21L17.96 8.75L13.06 14.28Z"/>
                     </svg>
                     <?php if ($unread_msg_count > 0): ?>
@@ -274,7 +273,14 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
                     <?php endif; ?>
                 </div>
 
-                <a href="../pages/logout.php" class="btn-logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</a>
+                <div class="glass-button-wrap">
+                    <a href="../pages/logout.php" class="glass-button">
+                        <span class="glass-button-text">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout
+                        </span>
+                    </a>
+                    <div class="glass-button-shadow"></div>
+                </div>
             </div>
         </div>
     </nav>
@@ -375,7 +381,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             fetch('../api/notifications.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'mark_read', notif_id: notifId })
+                body: JSON.stringify({ action: 'mark_read', notif_id: notifId, csrf_token: window.csrfToken })
             })
             .then(res => res.json())
             .then(data => {
@@ -394,7 +400,7 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             fetch('../api/notifications.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'mark_all_read' })
+                body: JSON.stringify({ action: 'mark_all_read', csrf_token: window.csrfToken })
             })
             .then(res => res.json())
             .then(data => {
@@ -416,3 +422,20 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
     });
     </script>
     <?php endif; ?>
+
+    <!-- Global CSRF Auto-Injection -->
+    <script>
+    window.csrfToken = "<?php echo $_SESSION['csrf_token'] ?? ''; ?>";
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form[method="POST"], form[method="post"]');
+        forms.forEach(form => {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = window.csrfToken;
+                form.appendChild(input);
+            }
+        });
+    });
+    </script>

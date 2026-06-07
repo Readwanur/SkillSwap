@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    location VARCHAR(100),
+    location VARCHAR(100) NOT NULL,
     bio TEXT,
     profile_photo MEDIUMBLOB,
     profile_photo_mime VARCHAR(50),
@@ -548,6 +548,11 @@ BEGIN
             VALUES (NEW.provider_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
+        ELSEIF NEW.status = 'refunded' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, 'Admin has resolved a dispute and your credits have been refunded.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'Admin has resolved a dispute. The session was refunded to the requester.', 'session_update');
         END IF;
     END IF;
 END //
@@ -1224,6 +1229,8 @@ BEGIN
     DECLARE v_loan_debt DECIMAL(15, 2);
     DECLARE v_giftable_balance DECIMAL(15, 2);
     DECLARE v_daily_gifted DECIMAL(15, 2);
+    DECLARE v_completed_activities INT;
+    DECLARE v_has_gifted_before BOOLEAN;
     
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -1250,8 +1257,32 @@ BEGIN
         SET p_status = 'error';
         SET p_message = 'Maximum gift amount per transaction is 25 TC.';
     ELSE
-        -- === [Flaw 3] Start transaction and lock wallet row ===
-        START TRANSACTION;
+        -- Check if user has completed at least one community task or session
+        SELECT (
+            (SELECT COUNT(*) FROM community_task WHERE user_id = p_from_user_id AND status = 'completed')
+            +
+            (SELECT COUNT(*) FROM exchange_sessions WHERE (requester_id = p_from_user_id OR provider_id = p_from_user_id) AND status = 'completed')
+        ) INTO v_completed_activities;
+
+        IF v_completed_activities < 3 THEN
+            SET p_status = 'error';
+            SET p_message = 'You must complete at least 3 community tasks or skill exchange sessions to unlock gifting.';
+        ELSE
+            -- Check if sender has already gifted this recipient before
+            SELECT EXISTS (
+                SELECT 1 FROM transactions 
+                WHERE from_user_id = p_from_user_id 
+                  AND to_user_id = v_to_user_id 
+                  AND type = 'gift'
+                  AND timestamp >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+            ) INTO v_has_gifted_before;
+
+            IF v_has_gifted_before THEN
+                SET p_status = 'error';
+                SET p_message = 'You have already sent a gift to this user recently. You must wait 2 weeks before gifting them again.';
+            ELSE
+                -- === [Flaw 3] Start transaction and lock wallet row ===
+                START TRANSACTION;
 
         -- Lock the sender's wallet row to prevent race conditions
         SELECT balance INTO v_from_balance 
@@ -1299,11 +1330,11 @@ BEGIN
             ROLLBACK;
             SET p_status = 'error';
             SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
-        ELSEIF (v_daily_gifted + p_amount) > 50 THEN
+        ELSEIF (v_daily_gifted + p_amount) > 10 THEN
             -- [Flaw 5] Daily cap exceeded
             ROLLBACK;
             SET p_status = 'error';
-            SET p_message = CONCAT('Daily gift limit exceeded. You have already gifted ', v_daily_gifted, ' TC today. Daily limit is 50 TC.');
+            SET p_message = CONCAT('Daily gift limit exceeded. You have already gifted ', v_daily_gifted, ' TC today. Daily limit is 10 TC.');
         ELSEIF NOT v_has_mutual_session AND NOT v_both_established THEN
             ROLLBACK;
             SET p_status = 'error';
@@ -1322,6 +1353,8 @@ BEGIN
             COMMIT;
             SET p_status = 'success';
             SET p_message = CONCAT('Successfully gifted ', p_amount, ' TC to ', p_to_user_email);
+        END IF;
+        END IF;
         END IF;
     END IF;
 END //
@@ -1482,7 +1515,9 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
     conversation_id INT NOT NULL,
     sender_id INT NOT NULL,
-    message_text TEXT NOT NULL,
+    message_text TEXT,
+    message_type ENUM('text', 'audio') DEFAULT 'text',
+    media_url VARCHAR(255),
     is_read BOOLEAN DEFAULT FALSE,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
