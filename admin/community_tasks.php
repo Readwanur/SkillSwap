@@ -40,6 +40,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt->execute();
                 $stmt->close();
                 
+                // 4. Send Notification
+                $msg = "Your submission for Task #$tid was approved! $reward TC has been added to your wallet.";
+                $stmt_notif = $conn->prepare("INSERT INTO notifications (user_id, message, type) VALUES (?, ?, 'system')");
+                $stmt_notif->bind_param("is", $uid, $msg);
+                $stmt_notif->execute();
+                $stmt_notif->close();
+                
                 $conn->commit();
                 $success = "Task #$tid approved! $reward TC awarded to the user.";
             } catch (Exception $e) {
@@ -51,8 +58,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'reject_task') {
         $tid = intval($_POST['task_id'] ?? 0);
-        $conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, submission_note = NULL, assigned_at = CURRENT_TIMESTAMP WHERE task_id = $tid");
-        $success = "Task #$tid rejected and returned to the pending pool.";
+        $task = $conn->query("SELECT user_id FROM community_task WHERE task_id = $tid AND status = 'under-review'")->fetch_assoc();
+        if ($task && $task['user_id']) {
+            $uid = $task['user_id'];
+            $conn->query("UPDATE community_task SET status = 'pending', user_id = NULL, submission_note = NULL, assigned_at = CURRENT_TIMESTAMP WHERE task_id = $tid");
+            
+            $msg = "Your submission for Task #$tid was rejected by an admin. The task has been returned to the pending pool.";
+            $stmt_notif = $conn->prepare("INSERT INTO notifications (user_id, message, type) VALUES (?, ?, 'system')");
+            $stmt_notif->bind_param("is", $uid, $msg);
+            $stmt_notif->execute();
+            $stmt_notif->close();
+            
+            $success = "Task #$tid rejected and returned to the pending pool.";
+        } else {
+            $error = "Task not found or already processed.";
+        }
     }
 
     if ($_POST['action'] === 'add_task') {
@@ -201,7 +221,10 @@ include __DIR__ . '/../includes/admin_header.php';
 ?>
 
 <div class="page-header">
-    <h1 class="page-title" style="margin:0;"><i data-lucide="clipboard-list" class="lucide-sm"></i> Community Tasks</h1>
+    <div style="display:flex; align-items:center; gap: 15px;">
+        <h1 class="page-title" style="margin:0;"><i data-lucide="clipboard-list" class="lucide-sm"></i> Community Tasks</h1>
+        <span class="badge badge-info" style="font-size:0.85rem; padding:6px 16px;"><?php echo $count_all; ?> Total Tasks</span>
+    </div>
     <button class="btn btn-primary" onclick="document.getElementById('add-task-modal').classList.add('active')">+ Create New Task</button>
 </div>
 
@@ -244,6 +267,22 @@ function buildTabUrl($status, $sort, $order) {
         <span class="stat-label">Completed</span>
     </div>
 </div>
+
+<!-- Alert: Tasks Under Review -->
+<?php if ($count_review > 0 && $status_filter !== 'under-review'): ?>
+    <div class="card mb-3" style="border: 1px solid var(--primary); background: rgba(0, 56, 108, 0.02);">
+        <div class="card-header" style="border-bottom: 1px solid rgba(0, 56, 108, 0.15); margin-bottom: 15px;">
+            <h3 style="color: var(--primary); margin:0;"><i data-lucide="bell" class="lucide-sm"></i> Pending Approval Alert</h3>
+            <span class="badge badge-primary" style="background: rgba(0, 56, 108, 0.15); color: var(--primary);"><?php echo $count_review; ?> Task(s)</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
+            There are tasks submitted by users waiting for your review and approval.
+        </p>
+        <div style="margin-bottom: 15px;">
+            <a href="?status=under-review" class="btn btn-sm btn-primary">Review Tasks Now</a>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- Filter + Table -->
 <div class="card">
@@ -463,7 +502,7 @@ function buildTabUrl($status, $sort, $order) {
             </div>
             <div class="form-group">
                 <label>Location</label>
-                <input type="text" name="location" class="form-control" placeholder="e.g. Community Center, Main Library...">
+                <input type="text" name="location" class="form-control city-autocomplete" placeholder="City, Country">
             </div>
             <div class="flex gap-1" style="justify-content:flex-end;">
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('add-task-modal').classList.remove('active')">Cancel</button>
@@ -506,7 +545,7 @@ function buildTabUrl($status, $sort, $order) {
             <div class="grid-2">
                 <div class="form-group">
                     <label>Location</label>
-                    <input type="text" name="location" id="edit-task-location" class="form-control">
+                    <input type="text" name="location" id="edit-task-location" class="form-control city-autocomplete" placeholder="City, Country">
                 </div>
                 <div class="form-group">
                     <label>Credit Reward (TC)</label>
@@ -567,5 +606,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+
+<script src="../assets/js/city-autocomplete.js"></script>
 
 <?php include __DIR__ . '/../includes/admin_footer.php'; ?>

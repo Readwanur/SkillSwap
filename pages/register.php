@@ -12,8 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $location = trim($_POST['location'] ?? '');
     $bio = trim($_POST['bio'] ?? '');
 
-    if (empty($name) || empty($email) || empty($password)) {
-        $error = 'Name, email, and password are required.';
+    if (empty($name) || empty($email) || empty($password) || empty($location)) {
+        $error = 'Name, email, password, and location are required.';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } elseif (strlen($password) < 4) {
@@ -144,9 +144,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label for="location">Location</label>
+                    <label for="location">Location *</label>
                     <input type="text" id="location" name="location" class="form-control city-autocomplete" placeholder="City, Country"
-                        value="<?php echo htmlspecialchars($_POST['location'] ?? ''); ?>">
+                        required value="<?php echo htmlspecialchars($_POST['location'] ?? ''); ?>">
                 </div>
 
                 <div class="form-group">
@@ -285,6 +285,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         animate();
     </script>
     <script src="../assets/js/city-autocomplete.js"></script>
+
+    <!-- Global CSRF Auto-Injection -->
+    <script>
+    window.csrfToken = "<?php echo $_SESSION['csrf_token'] ?? ''; ?>";
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form[method="POST"], form[method="post"]');
+        forms.forEach(form => {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = window.csrfToken;
+                form.appendChild(input);
+            }
+        });
+    });
+    </script>
 </body>
 
 </html>
