@@ -32,7 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             if ($img_data) {
                 $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ?, profile_photo = ?, profile_photo_mime = ? WHERE user_id = ?");
-                $stmt->bind_param("sssssi", $name, $location, $bio, $img_data, $file_mime, $user_id);
+                $null = NULL;
+                $stmt->bind_param("sssbsi", $name, $location, $bio, $null, $file_mime, $user_id);
+                $stmt->send_long_data(3, $img_data);
             } else {
                 $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ? WHERE user_id = ?");
                 $stmt->bind_param("sssi", $name, $location, $bio, $user_id);
@@ -42,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $_SESSION['user_name'] = $name;
                 $success = 'Profile updated successfully.';
             } else {
-                $error = 'Failed to update profile.';
+                $error = 'Failed to update profile. Error: ' . $stmt->error;
             }
             $stmt->close();
         }
