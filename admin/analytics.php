@@ -171,11 +171,11 @@ $categories_engagement = $conn->query("
         CASE
             WHEN (SELECT COUNT(*) FROM exchange_sessions es3
                   JOIN skills sk3 ON es3.skill_id = sk3.skill_id
-                  WHERE sk3.catagory = s.catagory AND es3.status = 'completed') >= 10 THEN 'Hot 🔥'
+                  WHERE sk3.catagory = s.catagory AND es3.status = 'completed') >= 10 THEN 'Hot <i data-lucide=\"flame\" class=\"lucide-sm\"></i>'
             WHEN (SELECT COUNT(*) FROM exchange_sessions es3
                   JOIN skills sk3 ON es3.skill_id = sk3.skill_id
-                  WHERE sk3.catagory = s.catagory AND es3.status = 'completed') >= 5 THEN 'Growing 📈'
-            ELSE 'New 🌱'
+                  WHERE sk3.catagory = s.catagory AND es3.status = 'completed') >= 5 THEN 'Growing <i data-lucide=\"trending-up\" class=\"lucide-sm\"></i>'
+            ELSE 'New <i data-lucide=\"leaf\" class=\"lucide-sm\"></i>'
         END AS category_status
     FROM skills s
     WHERE s.catagory IS NOT NULL
@@ -240,9 +240,9 @@ $reliability_stats = $conn->query("
             END, 1
         ) AS cancellation_rate_pct,
         CASE
-            WHEN r.cancelled_sessions = 0 THEN 'Reliable ✅'
-            WHEN r.cancelled_sessions <= 2 THEN 'Good ⚠️'
-            ELSE 'At Risk ❌'
+            WHEN r.cancelled_sessions = 0 THEN 'Reliable <i data-lucide=\"check-circle\" class=\"lucide-sm\"></i>'
+            WHEN r.cancelled_sessions <= 2 THEN 'Good <i data-lucide=\"alert-triangle\" class=\"lucide-sm\"></i>'
+            ELSE 'At Risk <i data-lucide=\"x-circle\" class=\"lucide-sm\"></i>'
         END AS reliability_status
     FROM users u
     JOIN reputation r ON u.user_id = r.user_id
@@ -283,11 +283,11 @@ $demand_supply = $conn->query("
             ELSE ROUND(COALESCE(d.demand_count, 0) * 1.0 / o.supply_count, 2)
         END AS demand_supply_ratio,
         CASE
-            WHEN COALESCE(o.supply_count, 0) = 0 THEN 'Critical Gap ⛔'
-            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 3 THEN 'High Demand 🔥'
-            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 1.5 THEN 'Growing 📈'
-            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count >= 0.8 THEN 'Balanced ⚖️'
-            ELSE 'Over-Supplied 📦'
+            WHEN COALESCE(o.supply_count, 0) = 0 THEN 'Critical Gap <i data-lucide=\"minus-circle\" class=\"lucide-sm\"></i>'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 3 THEN 'High Demand <i data-lucide=\"flame\" class=\"lucide-sm\"></i>'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count > 1.5 THEN 'Growing <i data-lucide=\"trending-up\" class=\"lucide-sm\"></i>'
+            WHEN COALESCE(d.demand_count, 0) * 1.0 / o.supply_count >= 0.8 THEN 'Balanced <i data-lucide=\"scale\" class=\"lucide-sm\"></i>'
+            ELSE 'Over-Supplied <i data-lucide=\"package\" class=\"lucide-sm\"></i>'
         END AS market_status
     FROM skills s
     LEFT JOIN (
@@ -416,7 +416,7 @@ include __DIR__ . '/../includes/admin_header.php';
                             <td><strong>#<?php echo $p['teaching_rank']; ?></strong></td>
                             <td><strong><?php echo htmlspecialchars($p['name']); ?></strong></td>
                             <td><?php echo $p['hours_taught']; ?>h <small style="color:var(--text-muted);">(<?php echo $p['session_count']; ?> sessions)</small></td>
-                            <td>⭐ <?php echo $p['avg_rating'] ?? 'N/A'; ?></td>
+                            <td><i data-lucide="star" class="lucide-sm"></i> <?php echo $p['avg_rating'] ?? 'N/A'; ?></td>
                             <td><span class="badge badge-info">#<?php echo $p['rating_rank']; ?></span></td>
                         </tr>
                     <?php endwhile; ?>
@@ -475,14 +475,14 @@ include __DIR__ . '/../includes/admin_header.php';
                 <tbody>
                     <?php while ($cat = $categories_engagement->fetch_assoc()): 
                         $badge_class = 'badge-orange';
-                        if ($cat['category_status'] === 'Hot 🔥') $badge_class = 'badge-danger';
-                        elseif ($cat['category_status'] === 'Growing 📈') $badge_class = 'badge-info';
+                        if ($cat['category_status'] === 'Hot <i data-lucide="flame" class="lucide-sm"></i>') $badge_class = 'badge-danger';
+                        elseif ($cat['category_status'] === 'Growing <i data-lucide="trending-up" class="lucide-sm"></i>') $badge_class = 'badge-info';
                         ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($cat['catagory']); ?></strong></td>
                             <td><?php echo $cat['skill_count']; ?></td>
                             <td><?php echo $cat['completed_sessions']; ?></td>
-                            <td>⭐ <?php echo $cat['avg_category_rating'] ?? 'N/A'; ?></td>
+                            <td><i data-lucide="star" class="lucide-sm"></i> <?php echo $cat['avg_category_rating'] ?? 'N/A'; ?></td>
                             <td><span class="badge <?php echo $badge_class; ?>"><?php echo $cat['category_status']; ?></span></td>
                         </tr>
                     <?php endwhile; ?>
@@ -511,8 +511,8 @@ include __DIR__ . '/../includes/admin_header.php';
                 <tbody>
                     <?php while ($r = $reliability_stats->fetch_assoc()): 
                         $rel_badge = 'badge-success';
-                        if ($r['reliability_status'] === 'At Risk ❌') $rel_badge = 'badge-danger';
-                        elseif ($r['reliability_status'] === 'Good ⚠️') $rel_badge = 'badge-warning';
+                        if ($r['reliability_status'] === 'At Risk <i data-lucide="x-circle" class="lucide-sm"></i>') $rel_badge = 'badge-danger';
+                        elseif ($r['reliability_status'] === 'Good <i data-lucide="alert-triangle" class="lucide-sm"></i>') $rel_badge = 'badge-warning';
                         ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($r['name']); ?></strong></td>
@@ -569,8 +569,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Market Gaps (Demand with No Providers)</h3>
-            <span class="badge badge-warning">NOT EXISTS</span>
-        </div>
+            </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -664,8 +663,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Community Task Contributors</h3>
-            <span class="badge badge-orange">DENSE_RANK</span>
-        </div>
+            </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -735,11 +733,10 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="card mb-3" style="border: 2px solid var(--primary);">
     <div class="card-header" style="background: var(--primary-glow); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
         <div>
-            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">📊 OLAP Data Warehouse Analytics</h2>
+            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="bar-chart" class="lucide-sm"></i> OLAP Data Warehouse Analytics</h2>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced reporting engine executing cross-dimensional aggregations over Fact & Dimension views.</p>
         </div>
-        <span class="badge badge-success" style="font-size: 0.75rem;">Star-Schema Architecture</span>
-    </div>
+        </div>
     
     <div style="padding: 20px;">
         <div class="grid-2 mb-3">
@@ -853,12 +850,12 @@ include __DIR__ . '/../includes/admin_header.php';
                                 if ($is_grand_total) {
                                     $row_bg = 'var(--primary-glow)';
                                     $font_weight = 'bold';
-                                    $cat_display = '✨ GRAND TOTAL';
+                                    $cat_display = '<i data-lucide="sparkles" class="lucide-sm"></i> GRAND TOTAL';
                                     $diff_display = 'All Difficulties';
                                 } elseif ($is_category_total) {
                                     $row_bg = 'var(--bg-hover)';
                                     $font_weight = '600';
-                                    $cat_display = '📁 ' . $cat_display;
+                                    $cat_display = '<i data-lucide="folder" class="lucide-sm"></i> ' . $cat_display;
                                     $diff_display = 'Subtotal';
                                 }
                             ?>
@@ -888,20 +885,18 @@ include __DIR__ . '/../includes/admin_header.php';
 <div class="card mb-3" style="border: 2px solid var(--info);">
     <div class="card-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(14, 165, 233, 0.08)); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
         <div>
-            <h2 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">🧠 Business Intelligence Analytics</h2>
+            <h2 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="brain" class="lucide-sm"></i> Business Intelligence Analytics</h2>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
         </div>
-        <span class="badge badge-info" style="font-size: 0.75rem;">Window Functions + CTEs</span>
-    </div>
+        </div>
 
     <div style="padding: 20px;">
 
         <!-- Demand-to-Supply Ratio -->
         <div class="card mb-3" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
             <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">📊 Demand-to-Supply Ratio (Market Economics)</h4>
-                <span class="badge badge-warning" style="font-size: 0.7rem;">Correlated Subqueries</span>
-            </div>
+                <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="bar-chart" class="lucide-sm"></i> Demand-to-Supply Ratio (Market Economics)</h4>
+                </div>
             <div class="table-wrapper">
                 <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                     <thead>
@@ -956,9 +951,8 @@ include __DIR__ . '/../includes/admin_header.php';
             <!-- Skill Popularity Percentiles (NTILE) -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
                 <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">🏅 Skill Popularity Percentiles</h4>
-                    <span class="badge badge-success" style="font-size: 0.7rem;">NTILE(4) OVER()</span>
-                </div>
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="medal" class="lucide-sm"></i> Skill Popularity Percentiles</h4>
+                    </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>
@@ -974,7 +968,7 @@ include __DIR__ . '/../includes/admin_header.php';
                             <?php if ($skill_percentiles && $skill_percentiles->num_rows > 0): ?>
                                 <?php while ($sp = $skill_percentiles->fetch_assoc()):
                                     $q = (int)$sp['popularity_quartile'];
-                                    $quartile_labels = [1 => 'Top 25% 🥇', 2 => 'Top 50% 🥈', 3 => 'Top 75% 🥉', 4 => 'Bottom 25%'];
+                                    $quartile_labels = [1 => 'Top 25% <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>', 2 => 'Top 50% <i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>', 3 => 'Top 75% <i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>', 4 => 'Bottom 25%'];
                                     $quartile_badges = [1 => 'badge-success', 2 => 'badge-info', 3 => 'badge-warning', 4 => 'badge-danger'];
                                     $pct = round((1 - (float)$sp['pct_rank']) * 100, 0);
                                 ?>
@@ -985,7 +979,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                         </td>
                                         <td style="text-align: center; font-weight: 600;"><?php echo $sp['total_sessions']; ?></td>
                                         <td style="text-align: center; color: var(--text-muted);"><?php echo $sp['total_hours']; ?>h</td>
-                                        <td style="text-align: center;">⭐ <?php echo $sp['avg_rating']; ?></td>
+                                        <td style="text-align: center;"><i data-lucide="star" class="lucide-sm"></i> <?php echo $sp['avg_rating']; ?></td>
                                         <td style="text-align: center;">
                                             <span class="badge <?php echo $quartile_badges[$q] ?? 'badge-info'; ?>">
                                                 <?php echo $quartile_labels[$q] ?? 'Q'.$q; ?>
@@ -1007,9 +1001,8 @@ include __DIR__ . '/../includes/admin_header.php';
             <!-- Month-over-Month Growth -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
                 <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);">📈 Month-over-Month Session Growth</h4>
-                    <span class="badge badge-info" style="font-size: 0.7rem;">LAG() OVER()</span>
-                </div>
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="trending-up" class="lucide-sm"></i> Month-over-Month Session Growth</h4>
+                    </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>

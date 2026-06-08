@@ -19,16 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'request_loan') {
         $amount = floatval($_POST['amount'] ?? 0);
         
-        $stmt = $conn->prepare("CALL sp_request_loan(?, ?, @status, @msg)");
-        $stmt->bind_param("id", $user_id, $amount);
-        $stmt->execute();
-        $stmt->close();
-        
-        $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
-        if ($res['status'] === 'success') {
-            $success_msg = $res['msg'];
+        $check_bal = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
+        if ($check_bal && $check_bal['balance'] > 0) {
+            $error_msg = 'You can only request a loan when your balance is 0.';
         } else {
-            $error_msg = $res['msg'];
+            $stmt = $conn->prepare("CALL sp_request_loan(?, ?, @status, @msg)");
+            $stmt->bind_param("id", $user_id, $amount);
+            $stmt->execute();
+            $stmt->close();
+            
+            $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
+            if ($res['status'] === 'success') {
+                $success_msg = $res['msg'];
+            } else {
+                $error_msg = $res['msg'];
+            }
         }
     } 
     elseif ($action === 'repay_loan') {
@@ -50,16 +55,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $recipient_email = trim($_POST['recipient_email'] ?? '');
         $amount = floatval($_POST['amount'] ?? 0);
         
-        $stmt = $conn->prepare("CALL sp_gift_credits(?, ?, ?, @status, @msg)");
-        $stmt->bind_param("isd", $user_id, $recipient_email, $amount);
-        $stmt->execute();
-        $stmt->close();
-        
-        $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
-        if ($res['status'] === 'success') {
-            $success_msg = $res['msg'];
+        if ($amount > 5) {
+            $error_msg = 'You can only send a maximum of 5 TC as a gift.';
         } else {
-            $error_msg = $res['msg'];
+            $stmt = $conn->prepare("CALL sp_gift_credits(?, ?, ?, @status, @msg)");
+            $stmt->bind_param("isd", $user_id, $recipient_email, $amount);
+            $stmt->execute();
+            $stmt->close();
+            
+            $res = $conn->query("SELECT @status AS status, @msg AS msg")->fetch_assoc();
+            if ($res['status'] === 'success') {
+                $success_msg = $res['msg'];
+            } else {
+                $error_msg = $res['msg'];
+            }
         }
     }
 }
@@ -76,9 +85,18 @@ $user_reliability = $conn->query("SELECT reliability_score FROM users WHERE user
 $user_reliability = $user_reliability !== null ? floatval($user_reliability) : 5.00;
 $max_borrow_limit = $user_reliability * 5.00;
 
-// Fetch completed sessions from reputation to check loan eligibility (needs >= 2)
-$completed_sess = $conn->query("SELECT completed_sessions FROM reputation WHERE user_id = $user_id")->fetch_assoc()['completed_sessions'];
-$completed_sess = $completed_sess ? intval($completed_sess) : 0;
+// Fetch completed sessions to check loan eligibility (needs >= 2)
+$completed_sess = $conn->query("SELECT COUNT(*) AS cnt FROM exchange_sessions WHERE (requester_id = $user_id OR provider_id = $user_id) AND status = 'completed'")->fetch_assoc()['cnt'];
+$completed_sess = intval($completed_sess);
+
+// Check eligibility for gifting (at least 1 completed task or session)
+$completed_activities = $conn->query("
+    SELECT (
+        (SELECT COUNT(*) FROM community_task WHERE user_id = $user_id AND status = 'completed')
+        +
+        (SELECT COUNT(*) FROM exchange_sessions WHERE (requester_id = $user_id OR provider_id = $user_id) AND status = 'completed')
+    ) AS total
+")->fetch_assoc()['total'];
 
 // Aggregate: Total earned and spent (excluding loan liabilities)
 $earned = $conn->query("SELECT COALESCE(SUM(final_amount), 0) AS total FROM transactions WHERE to_user_id = $user_id AND type NOT IN ('loan_disbursement', 'loan_repayment')")->fetch_assoc()['total'];
@@ -222,15 +240,15 @@ include __DIR__ . '/../includes/header.php';
             <div class="wallet-tab-nav">
                 <?php if ($active_loan): ?>
                     <button class="wallet-tab-btn active" data-tab="loan-tab">
-                        <span class="tab-icon">📋</span> Active Loan
+                        <span class="tab-icon"><i data-lucide="clipboard" class="lucide-sm"></i></span> Active Loan
                     </button>
                 <?php else: ?>
                     <button class="wallet-tab-btn active" data-tab="borrow-tab">
-                        <span class="tab-icon">🏦</span> Borrow Credits
+                        <span class="tab-icon"><i data-lucide="landmark" class="lucide-sm"></i></span> Borrow Credits
                     </button>
                 <?php endif; ?>
                 <button class="wallet-tab-btn" data-tab="gift-tab">
-                    <span class="tab-icon">🎁</span> Gift Credits
+                    <span class="tab-icon"><i data-lucide="gift" class="lucide-sm"></i></span> Gift Credits
                 </button>
             </div>
 
@@ -240,7 +258,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="wallet-section-title">Active Loan Details</div>
                     <div class="card" style="border: 1px solid <?php echo $active_loan['status'] === 'defaulted' ? 'var(--danger)' : 'var(--border-light)'; ?>; background: <?php echo $active_loan['status'] === 'defaulted' ? 'rgba(186, 26, 26, 0.02)' : 'var(--bg-secondary)'; ?>; margin: 0; box-shadow: none;">
                         <div class="card-header" style="padding-top: 0; padding-left: 0; padding-right: 0;">
-                            <h3 style="font-size: 1.1rem;"><?php echo $active_loan['status'] === 'defaulted' ? '⚠️ Overdue Loan Notification' : 'Outstanding Balance'; ?></h3>
+                            <h3 style="font-size: 1.1rem;"><?php echo $active_loan['status'] === 'defaulted' ? '<i data-lucide="alert-triangle" class="lucide-sm"></i> Overdue Loan Notification' : 'Outstanding Balance'; ?></h3>
                             <span class="badge <?php echo $active_loan['status'] === 'defaulted' ? 'badge-danger' : 'badge-warning'; ?>">
                                 <?php echo $active_loan['status'] === 'defaulted' ? 'DEFAULTED' : 'UNPAID'; ?>
                             </span>
@@ -248,7 +266,7 @@ include __DIR__ . '/../includes/header.php';
                         
                         <?php if ($active_loan['status'] === 'defaulted'): ?>
                             <p style="color: var(--danger); font-size: 0.85rem; margin-top: 10px; font-weight: 500; line-height: 1.4;">
-                                ⚠️ This loan is overdue and has been marked as defaulted. Your reliability score has been penalized. Session booking is blocked until repayment.
+                                <i data-lucide="alert-triangle" class="lucide-sm"></i> This loan is overdue and has been marked as defaulted. Your reliability score has been penalized. Session booking is blocked until repayment.
                             </p>
                         <?php endif; ?>
                         
@@ -288,12 +306,12 @@ include __DIR__ . '/../includes/header.php';
                 <!-- Tab Content: Request Loan -->
                 <div class="wallet-tab-panel active" id="borrow-tab">
                     <div class="wallet-section-title">Borrow Time Credits</div>
-                    <?php if ($completed_sess >= 2): ?>
+                    <?php if ($completed_sess >= 2 && $balance <= 0): ?>
                         <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px; line-height: 1.4;">
                             You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
                         </p>
                         <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; line-height: 1.4;">
-                            📌 A <strong>5% interest rate</strong> applies. Repayment is due within <strong>30 days</strong>. Overdue loans are automatically marked as defaulted and result in a reliability penalty.
+                            <i data-lucide="pin" class="lucide-sm"></i> A <strong>5% interest rate</strong> applies. Repayment is due within <strong>30 days</strong>. Overdue loans are automatically marked as defaulted and result in a reliability penalty.
                         </p>
                         <form method="POST" action="">
                             <input type="hidden" name="action" value="request_loan">
@@ -311,13 +329,18 @@ include __DIR__ . '/../includes/header.php';
                         </form>
                     <?php else: ?>
                         <div class="locked-state" style="background: rgba(115, 119, 129, 0.03); border: 1px dashed var(--border-light); padding: 24px; border-radius: var(--radius-md); text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 12px;">🔒</div>
+                            <div style="font-size: 2rem; margin-bottom: 12px;"><i data-lucide="lock" class="lucide-sm"></i></div>
                             <p style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 6px;">
                                 Borrowing Option Locked
                             </p>
                             <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; max-width: 320px; margin: 0 auto;">
-                                Complete at least 2 exchange sessions to unlock credit borrowing.<br>
-                                <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_sess; ?> / 2</span>
+                                <?php if ($balance > 0): ?>
+                                    You can only request a loan when your balance is 0 TC.<br>
+                                    <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current balance: <?php echo number_format($balance, 2); ?> TC</span>
+                                <?php else: ?>
+                                    Complete at least 2 exchange sessions to unlock credit borrowing.<br>
+                                    <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_sess; ?> / 2</span>
+                                <?php endif; ?>
                             </p>
                         </div>
                     <?php endif; ?>
@@ -327,30 +350,43 @@ include __DIR__ . '/../includes/header.php';
             <!-- Tab Content: Gift Credits -->
             <div class="wallet-tab-panel" id="gift-tab">
                 <div class="wallet-section-title">Gift Time Credits</div>
-                <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 20px; line-height: 1.4;">
-                    Transfer credits to a collaborator. Maximum <strong>25 TC</strong> per transfer, <strong>50 TC</strong> daily limit. 
-                    Gifts are restricted to collaborators with mutual session history or established accounts.
-                </p>
-                <form method="POST" action="">
-                    <input type="hidden" name="action" value="gift_credits">
-                    <div class="form-group" style="margin-bottom: 14px;">
-                        <label for="recipient_email" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Recipient Email</label>
-                        <input type="email" id="recipient_email" name="recipient_email" class="form-control" 
-                               placeholder="collaborator@example.com" 
-                               style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
-                               required>
+                <?php if ($completed_activities >= 3): ?>
+                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 20px; line-height: 1.4;">
+                        Transfer credits to a collaborator. Maximum <strong>5 TC</strong> per transfer, <strong>10 TC</strong> daily limit. 
+                        Gifts are restricted to collaborators with mutual session history or established accounts, and you can only gift a specific user once every 2 weeks.
+                    </p>
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="gift_credits">
+                        <div class="form-group" style="margin-bottom: 14px;">
+                            <label for="recipient_email" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Recipient Email</label>
+                            <input type="email" id="recipient_email" name="recipient_email" class="form-control" 
+                                   placeholder="collaborator@example.com" 
+                                   style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
+                                   required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 18px;">
+                            <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Gift (TC)</label>
+                            <input type="number" id="gift_amount" name="amount" class="form-control" 
+                                   min="0.5" max="5" step="0.5" placeholder="e.g. 5"
+                                   style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
+                                   required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary" style="width:100%; padding: 12px; border-radius:var(--radius-md); border: 1px solid var(--border-color); font-weight:600; cursor:pointer; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">
+                            Send Gift
+                        </button>
+                    </form>
+                <?php else: ?>
+                    <div class="locked-state" style="background: rgba(115, 119, 129, 0.03); border: 1px dashed var(--border-light); padding: 24px; border-radius: var(--radius-md); text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 12px;"><i data-lucide="lock" class="lucide-sm"></i></div>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 6px;">
+                            Gifting Option Locked
+                        </p>
+                        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; max-width: 320px; margin: 0 auto;">
+                            Complete at least 3 community tasks or sessions to unlock gifting.<br>
+                            <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current completed: <?php echo $completed_activities; ?> / 3</span>
+                        </p>
                     </div>
-                    <div class="form-group" style="margin-bottom: 18px;">
-                        <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Gift (TC)</label>
-                        <input type="number" id="gift_amount" name="amount" class="form-control" 
-                               min="0.5" step="0.5" placeholder="e.g. 5"
-                               style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
-                               required>
-                    </div>
-                    <button type="submit" class="btn btn-secondary" style="width:100%; padding: 12px; border-radius:var(--radius-md); border: 1px solid var(--border-color); font-weight:600; cursor:pointer; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">
-                        Send Gift
-                    </button>
-                </form>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -434,7 +470,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="empty-state">
-                        <div class="icon">&#128176;</div>
+                        <div class="icon" style="margin-bottom: 12px;"><i data-lucide="wallet" style="width: 48px; height: 48px; color: var(--border-color); display: inline-block;"></i></div>
                         <p>No transactions yet. Complete a session to earn Time Credits!</p>
                     </div>
                 <?php endif; ?>

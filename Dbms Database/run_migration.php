@@ -211,9 +211,13 @@ $q_proc = "CREATE PROCEDURE sp_book_session(
 BEGIN
     DECLARE v_balance DECIMAL(15,2);
     DECLARE v_credit_cost DECIMAL(10,2);
+    DECLARE v_base_cost DECIMAL(10,2);
     DECLARE v_otp VARCHAR(10);
     DECLARE v_has_defaulted_loan BOOLEAN;
     DECLARE v_has_conflict BOOLEAN;
+    DECLARE v_surge_multiplier DECIMAL(4,2) DEFAULT 1.00;
+    DECLARE v_prov_sessions INT DEFAULT 0;
+    DECLARE v_platform_avg DECIMAL(10,2) DEFAULT 0;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -222,7 +226,35 @@ BEGIN
         SET p_message = 'Booking failed due to a database error.';
     END;
 
-    SET v_credit_cost = (p_duration / 60.0) * 10;
+    -- FEATURE 6: Dynamic Surge Pricing ---
+    -- Calculate provider's 7-day booking count via subquery
+    SELECT COUNT(*) INTO v_prov_sessions
+    FROM exchange_sessions
+    WHERE provider_id = p_provider_id
+      AND scheduled_time > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      AND status IN ('scheduled', 'completed');
+
+    -- Calculate platform-wide average bookings per provider (derived table)
+    SELECT COALESCE(AVG(cnt), 0) INTO v_platform_avg
+    FROM (
+        SELECT COUNT(*) AS cnt
+        FROM exchange_sessions
+        WHERE scheduled_time > DATE_SUB(NOW(), INTERVAL 7 DAY)
+          AND status IN ('scheduled', 'completed')
+        GROUP BY provider_id
+    ) t;
+
+    -- Assign surge tier using CASE expression
+    SET v_surge_multiplier = CASE
+        WHEN v_platform_avg = 0 THEN 1.00
+        WHEN v_prov_sessions > v_platform_avg * 3 THEN 1.50
+        WHEN v_prov_sessions > v_platform_avg * 2 THEN 1.25
+        WHEN v_prov_sessions > v_platform_avg * 1.5 THEN 1.10
+        ELSE 1.00
+    END;
+
+    SET v_base_cost = (p_duration / 60.0) * 10;
+    SET v_credit_cost = ROUND(v_base_cost * v_surge_multiplier, 2);
     SET v_otp = LPAD(FLOOR(RAND() * 10000), 4, '0');
 
     START TRANSACTION;
@@ -261,24 +293,28 @@ BEGIN
     ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
         ROLLBACK;
         SET p_status = 'error';
-        SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC, have ', COALESCE(v_balance, 0), ' TC.');
+        SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC (', v_surge_multiplier, 'x surge), have ', COALESCE(v_balance, 0), ' TC.');
     ELSEIF p_scheduled_time <= NOW() THEN
         ROLLBACK;
         SET p_status = 'error';
         SET p_message = 'Cannot book a session in the past.';
     ELSE
-        -- Deduct escrow
+        -- Deduct escrow (surge-adjusted amount)
         UPDATE wallet SET balance = balance - v_credit_cost WHERE user_id = p_requester_id;
 
-        -- Create session
+        -- Create session with surge multiplier stored in bonus_multiplier
         INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status,
-            scheduled_time, session_duration, time_credit_transfer, completion_otp)
+            scheduled_time, session_duration, time_credit_transfer, bonus_multiplier, completion_otp)
         VALUES (p_requester_id, p_provider_id, p_skill_id, 'scheduled',
-            p_scheduled_time, p_duration, v_credit_cost, v_otp);
+            p_scheduled_time, p_duration, v_credit_cost, v_surge_multiplier, v_otp);
 
         COMMIT;
         SET p_status = 'success';
-        SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow. OTP: ', v_otp);
+        IF v_surge_multiplier > 1 THEN
+            SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow (', v_surge_multiplier, 'x surge). OTP: ', v_otp);
+        ELSE
+            SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow. OTP: ', v_otp);
+        END IF;
     END IF;
 END";
 if ($conn->query($q_proc)) {
@@ -388,7 +424,9 @@ $q_msg = "CREATE TABLE IF NOT EXISTS messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
     conversation_id INT NOT NULL,
     sender_id INT NOT NULL,
-    message_text TEXT NOT NULL,
+    message_text TEXT,
+    message_type ENUM('text', 'audio') DEFAULT 'text',
+    media_url VARCHAR(255),
     is_read BOOLEAN DEFAULT FALSE,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,

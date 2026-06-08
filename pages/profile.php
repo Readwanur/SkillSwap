@@ -20,8 +20,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $bio = trim($_POST['bio'] ?? '');
 
         if (!empty($name)) {
-            $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ? WHERE user_id = ?");
-            $stmt->bind_param("sssi", $name, $location, $bio, $user_id);
+            $img_data = null;
+            $file_mime = null;
+            if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
+                $file_tmp = $_FILES['profile_photo']['tmp_name'];
+                $file_mime = mime_content_type($file_tmp);
+                if (strpos($file_mime, 'image/') === 0) {
+                    $img_data = file_get_contents($file_tmp);
+                }
+            }
+
+            if ($img_data) {
+                $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ?, profile_photo = ?, profile_photo_mime = ? WHERE user_id = ?");
+                $stmt->bind_param("sssssi", $name, $location, $bio, $img_data, $file_mime, $user_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE users SET name = ?, location = ?, bio = ? WHERE user_id = ?");
+                $stmt->bind_param("sssi", $name, $location, $bio, $user_id);
+            }
+
             if ($stmt->execute()) {
                 $_SESSION['user_name'] = $name;
                 $success = 'Profile updated successfully.';
@@ -77,11 +93,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $start = $_POST['start_time'] ?? '';
         $end = $_POST['end_time'] ?? '';
         if ($day && $start && $end) {
-            $stmt = $conn->prepare("INSERT INTO user_availability (user_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("isss", $user_id, $day, $start, $end);
-            $stmt->execute();
-            $stmt->close();
-            $success = 'Availability added.';
+            if (strtotime($start) >= strtotime($end)) {
+                $error = 'End time must be after start time.';
+            } else {
+                // Check if an overlapping slot already exists
+                $check_stmt = $conn->prepare("SELECT availability_id FROM user_availability WHERE user_id = ? AND day_of_week = ? AND start_time < ? AND end_time > ?");
+                $check_stmt->bind_param("isss", $user_id, $day, $end, $start);
+                $check_stmt->execute();
+                $result = $check_stmt->get_result();
+                
+                if ($result->num_rows > 0) {
+                    $error = 'This time slot overlaps with an existing availability.';
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO user_availability (user_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("isss", $user_id, $day, $start, $end);
+                    $stmt->execute();
+                    $stmt->close();
+                    $success = 'Availability added.';
+                }
+                $check_stmt->close();
+            }
         }
     }
 
@@ -96,7 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Fetch user data
-$user = $conn->query("SELECT * FROM users WHERE user_id = $user_id")->fetch_assoc();
+$res = $conn->query("SELECT user_id, name, email, location, bio, created_at, last_active_at, IF(profile_photo IS NOT NULL AND LENGTH(profile_photo) > 0, 1, 0) AS profile_photo FROM users WHERE user_id = $user_id");
+if (!$res) {
+    die("SQL Error: " . $conn->error);
+}
+$user = $res->fetch_assoc();
 $rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
 
 // Fetch skills offered & requested
@@ -106,8 +141,21 @@ $requested = $conn->query("SELECT s.skill_id, s.skill_name FROM user_skills_requ
 // All skills for dropdowns
 $all_skills = $conn->query("SELECT skill_id, skill_name FROM skills ORDER BY skill_name");
 
+// Sorting parameters
+$sort = trim($_GET['sort'] ?? 'day');
+$order = trim($_GET['order'] ?? 'asc');
+
+$allowed_sorts = [
+    'day' => "FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')",
+    'start' => 'start_time',
+    'end' => 'end_time'
+];
+
+$sort_col = $allowed_sorts[$sort] ?? $allowed_sorts['day'];
+$order_sql = (strtolower($order) === 'desc') ? 'DESC' : 'ASC';
+
 // Availability
-$availability = $conn->query("SELECT * FROM user_availability WHERE user_id = $user_id ORDER BY FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')");
+$availability = $conn->query("SELECT * FROM user_availability WHERE user_id = $user_id ORDER BY $sort_col $order_sql");
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -127,8 +175,31 @@ include __DIR__ . '/../includes/header.php';
             <!-- Profile Info -->
             <div class="card">
                 <h3 class="section-title">Personal Information</h3>
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="update_profile">
+
+                    <div class="profile-photo-upload-container">
+                        <div>
+                            <?php if (!empty($user['profile_photo'])): ?>
+                                <img src="../api/user_photo.php?user_id=<?php echo $user_id; ?>&v=<?php echo time(); ?>"
+                                    class="avatar-img avatar-lg" alt="Profile Photo">
+                            <?php else: ?>
+                                <div class="avatar avatar-lg" style="margin: 0;">
+                                    <?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-weight:600; margin-bottom:8px;">Profile Picture</label>
+                            <div class="upload-btn-wrapper">
+                                <button type="button" class="btn btn-sm btn-secondary"><i data-lucide="upload"
+                                        class="lucide-sm"></i> Choose Image</button>
+                                <input type="file" name="profile_photo" accept="image/jpeg, image/png, image/webp" />
+                            </div>
+                            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Recommended: Square
+                                image, max 2MB. Updates when you click Save Changes.</p>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="name">Full Name</label>
                         <input type="text" id="name" name="name" class="form-control"
@@ -188,9 +259,11 @@ include __DIR__ . '/../includes/header.php';
                 <div class="card">
                     <h3 class="section-title">Member Since</h3>
                     <p style="color: var(--text-secondary);">
-                        <?php echo date('F j, Y', strtotime($user['created_at'])); ?></p>
+                        <?php echo date('F j, Y', strtotime($user['created_at'])); ?>
+                    </p>
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Last active:
-                        <?php echo date('M j, Y g:i A', strtotime($user['last_active_at'])); ?></p>
+                        <?php echo date('M j, Y g:i A', strtotime($user['last_active_at'])); ?>
+                    </p>
                 </div>
             </div>
         </div>
@@ -274,9 +347,24 @@ include __DIR__ . '/../includes/header.php';
                     <table>
                         <thead>
                             <tr>
-                                <th>Day</th>
-                                <th>Start</th>
-                                <th>End</th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Day</span>
+                                        <?php echo renderTableSort('day', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>Start</span>
+                                        <?php echo renderTableSort('start', $sort, $order); ?>
+                                    </span>
+                                </th>
+                                <th>
+                                    <span class="th-content">
+                                        <span>End</span>
+                                        <?php echo renderTableSort('end', $sort, $order); ?>
+                                    </span>
+                                </th>
                                 <th>Action</th>
                             </tr>
                         </thead>

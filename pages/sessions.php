@@ -57,13 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt1 = $conn->prepare("UPDATE exchange_sessions SET status = 'disputed' WHERE session_id = ? AND status IN ('scheduled', 'under-review') AND (provider_id = ? OR requester_id = ?)");
                     $stmt1->bind_param("iii", $session_id, $user_id, $user_id);
                     $stmt1->execute();
-                    
+
                     if ($stmt1->affected_rows > 0) {
                         $stmt2 = $conn->prepare("INSERT INTO disputes (session_id, filed_by_user_id, reason) VALUES (?, ?, ?)");
                         $stmt2->bind_param("iis", $session_id, $user_id, $submission_note);
                         $stmt2->execute();
                         $stmt2->close();
-                        
+
                         $conn->commit();
                         $success = 'Formal dispute filed successfully! Admin has been notified and the session is locked.';
                     } else {
@@ -139,14 +139,16 @@ elseif ($filter === 'disputed')
 $sessions = $conn->query("
     SELECT es.*, s.skill_name,
            u_req.name AS requester_name,
-           u_prov.name AS provider_name
+           u_prov.name AS provider_name,
+           IF(u_req.profile_photo IS NOT NULL AND LENGTH(u_req.profile_photo) > 0, 1, 0) AS req_has_photo,
+           IF(u_prov.profile_photo IS NOT NULL AND LENGTH(u_prov.profile_photo) > 0, 1, 0) AS prov_has_photo
     FROM exchange_sessions es
     JOIN skills s ON es.skill_id = s.skill_id
     JOIN users u_req ON es.requester_id = u_req.user_id
     JOIN users u_prov ON es.provider_id = u_prov.user_id
     WHERE (es.requester_id = $user_id OR es.provider_id = $user_id)
     $filter_sql
-    ORDER BY es.scheduled_time DESC
+    ORDER BY es.session_id DESC
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -166,11 +168,16 @@ include __DIR__ . '/../includes/header.php';
         <!-- Filter Tabs -->
         <div class="tabs">
             <a href="?filter=all" class="tab-btn <?php echo $filter === 'all' ? 'active' : ''; ?>">All</a>
-            <a href="?filter=scheduled" class="tab-btn <?php echo $filter === 'scheduled' ? 'active' : ''; ?>">Scheduled</a>
-            <a href="?filter=under-review" class="tab-btn <?php echo $filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
-            <a href="?filter=completed" class="tab-btn <?php echo $filter === 'completed' ? 'active' : ''; ?>">Completed</a>
-            <a href="?filter=cancelled" class="tab-btn <?php echo $filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
-            <a href="?filter=disputed" class="tab-btn <?php echo $filter === 'disputed' ? 'active' : ''; ?>">Disputed</a>
+            <a href="?filter=scheduled"
+                class="tab-btn <?php echo $filter === 'scheduled' ? 'active' : ''; ?>">Scheduled</a>
+            <a href="?filter=under-review"
+                class="tab-btn <?php echo $filter === 'under-review' ? 'active' : ''; ?>">Under Review</a>
+            <a href="?filter=completed"
+                class="tab-btn <?php echo $filter === 'completed' ? 'active' : ''; ?>">Completed</a>
+            <a href="?filter=cancelled"
+                class="tab-btn <?php echo $filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
+            <a href="?filter=disputed"
+                class="tab-btn <?php echo $filter === 'disputed' ? 'active' : ''; ?>">Disputed</a>
         </div>
 
         <!-- Sessions List -->
@@ -178,6 +185,8 @@ include __DIR__ . '/../includes/header.php';
             <?php while ($s = $sessions->fetch_assoc()):
                 $is_requester = ($s['requester_id'] == $user_id);
                 $partner_name = $is_requester ? $s['provider_name'] : $s['requester_name'];
+                $partner_id = $is_requester ? $s['provider_id'] : $s['requester_id'];
+                $partner_has_photo = $is_requester ? $s['prov_has_photo'] : $s['req_has_photo'];
                 $role = $is_requester ? 'Learner' : 'Teacher';
 
                 $status_class = 'badge-warning';
@@ -189,7 +198,11 @@ include __DIR__ . '/../includes/header.php';
                     $status_class = 'badge-danger';
                 ?>
                 <div class="session-card">
-                    <div class="avatar"><?php echo strtoupper(substr($partner_name, 0, 1)); ?></div>
+                    <?php if (!empty($partner_has_photo)): ?>
+                        <img src="../api/user_photo.php?user_id=<?php echo $partner_id; ?>" class="avatar-img" alt="<?php echo htmlspecialchars($partner_name); ?>" style="object-fit:cover; width: 45px; height: 45px; flex-shrink: 0;">
+                    <?php else: ?>
+                        <div class="avatar"><?php echo strtoupper(substr($partner_name, 0, 1)); ?></div>
+                    <?php endif; ?>
                     <div class="session-info">
                         <h4><?php echo htmlspecialchars($s['skill_name']); ?></h4>
                         <p>
@@ -199,18 +212,24 @@ include __DIR__ . '/../includes/header.php';
                             &middot; <?php echo $s['session_duration']; ?> min
                             &middot; <?php echo number_format($s['time_credit_transfer'], 2); ?> TC
                             <?php if ($is_requester && $s['status'] === 'scheduled'): ?>
-                                <br><span class="badge badge-info mt-1">Your OTP: <?php echo htmlspecialchars($s['completion_otp']); ?></span>
+                                <br><span class="badge badge-info mt-1">Your OTP:
+                                    <?php echo htmlspecialchars($s['completion_otp']); ?></span>
                             <?php endif; ?>
                         </p>
                     </div>
                     <div class="session-actions">
                         <span class="badge <?php echo $status_class; ?>"><?php echo ucfirst($s['status']); ?></span>
 
+                        <a href="../pages/messages.php?start_with_user_id=<?php echo $partner_id; ?>"
+                            class="btn btn-secondary btn-sm" style="margin-left: 5px;">Message User</a>
+
                         <?php if ($s['status'] === 'scheduled' || $s['status'] === 'under-review'): ?>
                             <?php if ($s['status'] === 'scheduled' && !$is_requester): ?>
-                                <button class="btn btn-sm btn-success" onclick="openComplete(<?php echo $s['session_id']; ?>)">Complete Session</button>
+                                <button class="btn btn-sm btn-success" onclick="openComplete(<?php echo $s['session_id']; ?>)">Complete
+                                    Session</button>
                             <?php endif; ?>
-                            <button class="btn btn-sm btn-secondary" onclick="openDispute(<?php echo $s['session_id']; ?>)">Submit Proof / Dispute</button>
+                            <button class="btn btn-sm btn-secondary" onclick="openDispute(<?php echo $s['session_id']; ?>)">Submit
+                                Proof / Dispute</button>
                             <?php if ($s['status'] === 'scheduled'): ?>
                                 <form method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="cancel">
@@ -324,7 +343,8 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="session_id" id="complete_session_id">
             <div class="form-group">
                 <label for="otp">Enter 4-Digit OTP from Learner</label>
-                <input type="text" name="otp" id="otp" class="form-control" maxlength="4" placeholder="e.g. 1234" required>
+                <input type="text" name="otp" id="otp" class="form-control" maxlength="4" placeholder="e.g. 1234"
+                    required>
             </div>
             <button type="submit" class="btn btn-success btn-block">Confirm Completion</button>
         </form>
@@ -341,7 +361,7 @@ include __DIR__ . '/../includes/header.php';
         <form method="POST">
             <input type="hidden" name="action" value="submit_proof">
             <input type="hidden" name="session_id" id="dispute_session_id">
-            
+
             <div class="form-group">
                 <label for="dispute_action">Action Type</label>
                 <select name="dispute_action" id="dispute_action" class="form-control">
@@ -349,10 +369,11 @@ include __DIR__ . '/../includes/header.php';
                     <option value="dispute">File Formal Dispute (No-show, conflict, or credit issue)</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="submission_note">Details / Note / Reason</label>
-                <textarea name="submission_note" id="submission_note" class="form-control" placeholder="Provide details, proof notes, or dispute reason..." required></textarea>
+                <textarea name="submission_note" id="submission_note" class="form-control"
+                    placeholder="Provide details, proof notes, or dispute reason..." required></textarea>
             </div>
             <button type="submit" class="btn btn-primary btn-block">Submit to Admin</button>
         </form>

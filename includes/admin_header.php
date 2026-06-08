@@ -20,11 +20,22 @@ $page_titles = [
     'community_tasks' => 'Community Tasks',
     'analytics' => 'Analytics',
     'system_audit' => 'System Audit Logs',
-    'transaction_simulator' => 'ACID Transaction Simulator',
     'stress_test' => 'Stress Test & Index Profiler',
     'formal_disputes' => 'Formal Disputes',
+    'fraud_detection' => 'Fraud Detection',
 ];
 $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
+
+// Fetch pending counts for sidebar notification dots
+$nav_pending_reports = 0;
+$nav_pending_tasks = 0;
+if (isset($conn)) {
+    $nav_reports_res = $conn->query("SELECT COUNT(*) as cnt FROM exchange_sessions WHERE status = 'disputed'");
+    if ($nav_reports_res) $nav_pending_reports = $nav_reports_res->fetch_assoc()['cnt'];
+    
+    $nav_tasks_res = $conn->query("SELECT COUNT(*) as cnt FROM community_task WHERE status = 'under-review'");
+    if ($nav_tasks_res) $nav_pending_tasks = $nav_tasks_res->fetch_assoc()['cnt'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -34,15 +45,39 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SkillSwap Admin Panel">
     <title>SkillSwap Admin — <?php echo $breadcrumb_title; ?></title>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo time(); ?>">
+    <script>
+        // Check local storage for theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
 </head>
 
 <body>
 
+    <!-- Preloader -->
+    <div id="page-preloader" class="preloader" style="opacity: 0; visibility: hidden;">
+        <div class="preloader-content">
+            <img src="../assets/loading.png" alt="SkillSwap Loading" class="preloader-logo">
+            <div class="preloader-progress"><div class="preloader-progress-bar"></div></div>
+        </div>
+    </div>
+    <script>
+        window.preloaderTimer = setTimeout(function() {
+            var p = document.getElementById("page-preloader");
+            if (p) {
+                p.style.visibility = "visible";
+                p.style.opacity = "1";
+            }
+        }, 300);
+    </script>
+
     <nav class="navbar">
         <div class="container" style="max-width: 100%; padding: 0 30px;">
             <a href="../admin/dashboard.php" class="navbar-brand">
-                <img src="../assets/skillswap.png" alt="SkillSwap Logo"><span
+                <img src="../assets/loading.png" alt="SkillSwap Logo"><span
                     style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">ADMIN</span>
             </a>
 
@@ -52,9 +87,24 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </span>
             </div>
 
-            <div class="nav-user">
-                <span class="admin-clock" id="admin-clock"></span>
-                <a href="../pages/logout.php" class="btn-logout"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</a>
+            <div class="nav-user" style="display:flex; align-items:center;">
+                <!-- Theme Toggle -->
+                <div id="themeToggleBtnAdmin" class="theme-toggle-pill" role="button" tabindex="0" title="Toggle Dark Mode">
+                    <div class="theme-toggle-thumb"></div>
+                    <div class="theme-toggle-icons">
+                        <i data-lucide="moon" class="moon-icon"></i>
+                        <i data-lucide="sun" class="sun-icon"></i>
+                    </div>
+                </div>
+                <span class="admin-clock" id="admin-clock" style="margin-right: 15px;"></span>
+                <div class="glass-button-wrap">
+                    <a href="../pages/logout.php" class="glass-button">
+                        <span class="glass-button-text">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout
+                        </span>
+                    </a>
+                    <div class="glass-button-shadow"></div>
+                </div>
             </div>
         </div>
     </nav>
@@ -77,12 +127,22 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                         <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span> Skills</a>
                 </li>
                 <li><a href="../admin/disputes.php"
-                        class="<?php echo $current_page === 'disputes' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span> Reports</a>
+                        class="<?php echo $current_page === 'disputes' ? 'active' : ''; ?>" style="display:flex; align-items:center;">
+                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span> 
+                        <span style="flex:1;">Reports</span>
+                        <?php if ($nav_pending_reports > 0): ?>
+                            <span style="background:var(--danger); color:white; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight:bold; line-height:1;"><?php echo $nav_pending_reports; ?></span>
+                        <?php endif; ?>
+                    </a>
                 </li>
                 <li><a href="../admin/community_tasks.php"
-                        class="<?php echo $current_page === 'community_tasks' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span> Tasks</a>
+                        class="<?php echo $current_page === 'community_tasks' ? 'active' : ''; ?>" style="display:flex; align-items:center;">
+                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span> 
+                        <span style="flex:1;">Tasks</span>
+                        <?php if ($nav_pending_tasks > 0): ?>
+                            <span style="background:var(--danger); color:white; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight:bold; line-height:1;"><?php echo $nav_pending_tasks; ?></span>
+                        <?php endif; ?>
+                    </a>
                 </li>
                 <li><a href="../admin/analytics.php"
                         class="<?php echo $current_page === 'analytics' ? 'active' : ''; ?>">
@@ -90,43 +150,60 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
                 </li>
             </ul>
 
-            <div class="sidebar-section-label" style="margin-top: 20px;">DBMS SHOWCASE</div>
+
             <ul class="sidebar-menu">
                 <li><a href="../admin/system_audit.php"
                         class="<?php echo $current_page === 'system_audit' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">🛡️</span> Audit Logs</a>
-                </li>
-                <li><a href="../admin/transaction_simulator.php"
-                        class="<?php echo $current_page === 'transaction_simulator' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">⚡</span> ACID Simulator</a>
+                        <span class="sidebar-icon"><i data-lucide="shield" class="lucide-sm"></i></span> Audit Logs</a>
                 </li>
                 <li><a href="../admin/stress_test.php"
                         class="<?php echo $current_page === 'stress_test' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">🚀</span> Stress Test</a>
+                        <span class="sidebar-icon"><i data-lucide="rocket" class="lucide-sm"></i></span> Stress Test</a>
                 </li>
                 <li><a href="../admin/formal_disputes.php"
                         class="<?php echo $current_page === 'formal_disputes' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon">⚖️</span> Formal Disputes</a>
+                        <span class="sidebar-icon"><i data-lucide="scale" class="lucide-sm"></i></span> Formal Disputes</a>
+                </li>
+                <li><a href="../admin/fraud_detection.php"
+                        class="<?php echo $current_page === 'fraud_detection' ? 'active' : ''; ?>">
+                        <span class="sidebar-icon"><i data-lucide="shield" class="lucide-sm"></i></span> Fraud Detection</a>
                 </li>
             </ul>
 
-            <div class="sidebar-section-label" style="margin-top: 20px;">QUICK LINKS</div>
-            <ul class="sidebar-menu">
-                <li><a href="../index.php" target="_blank" style="font-size:0.82rem;">
-                        <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span> View Site</a>
-                </li>
-            </ul>
         </aside>
         <main class="admin-content">
 
             <!-- Breadcrumb -->
             <div class="admin-breadcrumb">
                 <a href="../admin/dashboard.php">Admin</a>
-                <span class="breadcrumb-sep">&#x276F;</span>
+                <span class="breadcrumb-sep"><i data-lucide="chevron-right" class="lucide-sm"></i></span>
                 <span class="breadcrumb-current"><?php echo $breadcrumb_title; ?></span>
             </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const themeBtnAdmin = document.getElementById('themeToggleBtnAdmin');
+    const themeIconAdmin = document.getElementById('themeIconAdmin');
+    
+    const currentThemeAdmin = document.documentElement.getAttribute('data-theme') || 'light';
+    if (currentThemeAdmin === 'dark' && themeIconAdmin) {
+        themeIconAdmin.setAttribute('data-lucide', 'sun');
+    }
+
+    if (themeBtnAdmin) {
+        themeBtnAdmin.addEventListener('click', function() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        });
+    }
+});
+
 // Live clock in navbar
 function updateClock() {
     const now = new Date();
@@ -136,4 +213,21 @@ function updateClock() {
 }
 updateClock();
 setInterval(updateClock, 30000);
+</script>
+
+<!-- Global CSRF Auto-Injection -->
+<script>
+window.csrfToken = "<?php echo $_SESSION['csrf_token'] ?? ''; ?>";
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[method="POST"], form[method="post"]');
+    forms.forEach(form => {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = window.csrfToken;
+            form.appendChild(input);
+        }
+    });
+});
 </script>

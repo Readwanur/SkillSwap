@@ -17,33 +17,34 @@ header("Pragma: no-cache");
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
     <style>
-        /* Modern Design System Tokens */
+        html {
+            scroll-behavior: smooth;
+        }        /* Modern Design System Tokens */
         :root {
             --primary: #00386c;
             --primary-dark: #002548;
             --primary-glow: rgba(0, 56, 108, 0.05);
             --secondary: #f3b922;
-            --secondary-dark: #cca41b;
-            --success: #1a7a42;
-            --danger: #ba1a1a;
-            --info: #2f5f9c;
+            --secondary-dark: #b88a14;
             --bg-primary: #ffffff;
-            --bg-secondary: #f7f9fc;
+            --bg-secondary: #f4f7f9;
             --bg-card: #ffffff;
-            --text-primary: #191c20;
-            --text-secondary: #43474e;
-            --text-muted: #737781;
-            --border-color: #dbe2f9;
-            --border-light: #f0f4ff;
-            --radius-sm: 8px;
-            --radius-md: 16px;
-            --radius-lg: 24px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --shadow-sm: 0 2px 8px rgba(0, 56, 108, 0.05);
-            --shadow-md: 0 8px 24px rgba(0, 56, 108, 0.08);
-            --shadow-lg: 0 16px 40px rgba(0, 56, 108, 0.12);
+            --text-primary: #121826;
+            --text-secondary: #4a5568;
+            --text-muted: #8492a6;
+            --border-light: #e2e8f0;
+            --border-color: #cbd5e1;
+            --success: #10b981;
+            --info: #3b82f6;
+            --radius-sm: 12px;
+            --radius-md: 20px;
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.03);
+            --shadow-md: 0 12px 30px rgba(0,0,0,0.05);
+            --shadow-lg: 0 20px 40px rgba(0,56,108,0.1);
+            --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         /* Reset & Base Styles */
@@ -56,10 +57,21 @@ header("Pragma: no-cache");
         body {
             font-family: 'Inter', sans-serif;
             color: var(--text-primary);
-            background: var(--bg-primary);
+            background: transparent;
             line-height: 1.6;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: var(--bg-primary);
+            pointer-events: none;
         }
 
         h1, h2, h3, h4 {
@@ -713,7 +725,7 @@ header("Pragma: no-cache");
     <nav class="navbar">
         <div class="container">
             <a href="index.php" class="logo">
-                <img src="assets/skillswap.png" alt="SkillSwap Logo">
+                <img src="assets/loading.png" alt="SkillSwap Logo">
             </a>
             
             <ul class="nav-links">
@@ -739,10 +751,10 @@ header("Pragma: no-cache");
     <header class="hero">
         <div class="container">
             <div class="hero-grid">
-                <div class="hero-text">
+                <div class="hero-text" data-aos="fade-right" data-aos-duration="1000">
                     <h1>Time as <span>Currency.</span></h1>
                     <p>
-                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not dollars. Exchange your knowledge, build your reputation, and invest in your growth.
+                        SkillSwap is a scholarly marketplace where your expertise is measured in hours, not in Taka. Exchange your knowledge, build your reputation, and invest in your growth.
                     </p>
                     <div class="hero-actions">
                         <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']): ?>
@@ -755,13 +767,13 @@ header("Pragma: no-cache");
                         <a href="#how-it-works" class="btn btn-secondary">How it Works</a>
                     </div>
                 </div>
-                <div class="hero-image">
+                <div class="hero-image" data-aos="fade-left" data-aos-duration="1000" data-aos-delay="200">
                     <!-- Embedded Vector illustration generated previously -->
                     <img src="assets/landing_hero.png" alt="SkillSwap Illustration">
                     
                     <!-- Floating Current Balance Badge -->
                     <div class="balance-badge">
-                        <span class="icon">⏱️</span>
+                        <span class="icon"><i data-lucide="clock"></i></span>
                         <div>
                             <div class="label">Current Balance</div>
                             <div class="value">12.5 Hours</div>
@@ -775,7 +787,7 @@ header("Pragma: no-cache");
     <!-- Exchange Process section (How it Works) -->
     <section class="section" id="how-it-works" style="background: var(--bg-secondary);">
         <div class="container">
-            <div class="section-header">
+            <div class="section-header" data-aos="fade-up">
                 <h2>The Exchange Process</h2>
                 <p>Simple, equitable, and transparent time-banking.</p>
             </div>
@@ -784,9 +796,9 @@ header("Pragma: no-cache");
                 <div class="process-line"></div>
                 
                 <!-- Step 1: Request -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="100">
                     <div class="badge-icon badge-blue">
-                        <span>✏️</span>
+                        <span><i data-lucide="edit-3"></i></span>
                     </div>
                     <h3>1. Request</h3>
                     <div class="card-bar"></div>
@@ -796,9 +808,9 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Step 2: Session -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="200">
                     <div class="badge-icon badge-yellow">
-                        <span>👥</span>
+                        <span><i data-lucide="users"></i></span>
                     </div>
                     <h3>2. Session</h3>
                     <div class="card-bar"></div>
@@ -808,9 +820,9 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Step 3: Transfer -->
-                <div class="process-card">
+                <div class="process-card" data-aos="fade-up" data-aos-delay="300">
                     <div class="badge-icon badge-grey">
-                        <span>🔄</span>
+                        <span><i data-lucide="refresh-cw"></i></span>
                     </div>
                     <h3>3. Transfer</h3>
                     <div class="card-bar"></div>
@@ -825,7 +837,7 @@ header("Pragma: no-cache");
     <!-- Features Showcase section -->
     <section class="section" id="features">
         <div class="container">
-            <div class="section-header">
+            <div class="section-header" data-aos="fade-up">
                 <h2>Built for Students & Peer Learning</h2>
                 <p>A complete framework for exchange, collaboration, and growth.</p>
             </div>
@@ -834,7 +846,7 @@ header("Pragma: no-cache");
             <div class="features-grid">
                 
                 <!-- Scholarly Reliability -->
-                <div class="feature-card reliability-card">
+                <div class="feature-card reliability-card" data-aos="fade-right" data-aos-delay="100">
                     <span class="badge badge-orange" style="text-transform:uppercase; letter-spacing:0.5px; font-size:0.65rem;">Reputation System</span>
                     <h3 style="margin-top: 10px; font-size:1.5rem;">Scholarly Reliability</h3>
                     <p style="color:var(--text-secondary); font-size:0.92rem; margin-top:8px;">
@@ -853,15 +865,15 @@ header("Pragma: no-cache");
                     </div>
 
                     <div class="meta-badges">
-                        <span class="meta-badge">🏆 Top Mentor</span>
-                        <span class="meta-badge">✔️ 50+ Sessions</span>
+                        <span class="meta-badge"><i data-lucide="award" class="lucide-sm"></i> Top Mentor</span>
+                        <span class="meta-badge"><i data-lucide="check-circle" class="lucide-sm"></i> 50+ Sessions</span>
                     </div>
                 </div>
 
                 <!-- Community Tasks -->
-                <div class="feature-card tasks-card">
+                <div class="feature-card tasks-card" data-aos="fade-left" data-aos-delay="200">
                     <div>
-                        <div class="icon-header">📋</div>
+                        <div class="icon-header"><i data-lucide="clipboard-list"></i></div>
                         <h3>Community Tasks</h3>
                         <p>
                             Earn hours by contributing to university projects or helping peers with short-form tasks.
@@ -881,8 +893,8 @@ header("Pragma: no-cache");
             <div class="features-grid">
                 
                 <!-- Smart Matching -->
-                <div class="feature-card matching-card">
-                    <div class="badge-icon">🔍</div>
+                <div class="feature-card matching-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="badge-icon"><i data-lucide="search"></i></div>
                     <h3>Smart Matching</h3>
                     <p>
                         Our AI suggests skills you might need based on your academic path and current gaps.
@@ -890,13 +902,13 @@ header("Pragma: no-cache");
                 </div>
 
                 <!-- Transaction Transparency -->
-                <div class="feature-card transparency-card">
+                <div class="feature-card transparency-card" data-aos="fade-up" data-aos-delay="200">
                     <h3>Transaction Transparency</h3>
                     
                     <div class="transparency-list">
                         <div class="transparency-item">
                             <div class="details">
-                                <div class="icon">📖</div>
+                                <div class="icon"><i data-lucide="book-open"></i></div>
                                 <div class="name">Advanced Python Tutoring</div>
                             </div>
                             <div class="amount amount-plus">+2.0h</div>
@@ -904,7 +916,7 @@ header("Pragma: no-cache");
 
                         <div class="transparency-item">
                             <div class="details">
-                                <div class="icon">🎨</div>
+                                <div class="icon"><i data-lucide="palette"></i></div>
                                 <div class="name">UI Design Review</div>
                             </div>
                             <div class="amount amount-minus">-1.5h</div>
@@ -916,7 +928,7 @@ header("Pragma: no-cache");
     </section>
 
     <!-- Footer CTA Call to Action Section -->
-    <section class="cta-section">
+    <section class="cta-section" data-aos="zoom-in" data-aos-duration="1000">
         <div class="container">
             <h2>Ready to exchange your time?</h2>
             <p>
@@ -927,7 +939,7 @@ header("Pragma: no-cache");
             <?php elseif (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0): ?>
                 <a href="pages/dashboard.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Go to Dashboard</a>
             <?php else: ?>
-                <a href="pages/register.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Exchange Time Now</a>
+                <a href="pages/login.php" class="btn btn-orange btn-lg" style="padding: 16px 36px; font-size:1.05rem;">Exchange Time Now</a>
             <?php endif; ?>
         </div>
     </section>
@@ -940,5 +952,222 @@ header("Pragma: no-cache");
         </div>
     </footer>
 
+    <!-- AOS Scripts -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        AOS.init({
+            once: true,
+            offset: 50,
+            duration: 800,
+            easing: 'ease-out-cubic'
+        });
+        
+        // Initialize Lucide Icons
+        document.addEventListener("DOMContentLoaded", function() {
+            lucide.createIcons();
+        });
+    </script>
+    <canvas id="bg-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let nodes = [];
+        let particles = [];
+        let flowParticles = [];
+        const maxDistance = 180;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        
+        function getBezierPoint(t, p0, p1, p2, p3) {
+            const u = 1 - t;
+            const tt = t * t;
+            const uu = u * u;
+            let x = (uu * u) * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + (tt * t) * p3.x;
+            let y = (uu * u) * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + (tt * t) * p3.y;
+            return {x, y};
+        }
+
+        class Node {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.radius = Math.random() * 2 + 1.5;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 56, 108, 0.4)';
+                ctx.fill();
+            }
+        }
+        
+        class Particle {
+            constructor(source, target) {
+                this.source = source;
+                this.target = target;
+                this.progress = 0;
+                this.speed = Math.random() * 0.004 + 0.002;
+            }
+            update() {
+                this.progress += this.speed;
+                return this.progress >= 1;
+            }
+            draw() {
+                const x = this.source.x + (this.target.x - this.source.x) * this.progress;
+                const y = this.source.y + (this.target.y - this.source.y) * this.progress;
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(243, 185, 34, 0.9)'; // Theme yellow
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = 'rgba(243, 185, 34, 0.6)';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class FlowParticle {
+            constructor(curveIndex) {
+                this.curveIndex = curveIndex;
+                this.progress = Math.random();
+                this.speed = Math.random() * 0.0015 + 0.0005;
+                this.size = Math.random() * 2.5 + 1.5;
+                this.opacity = Math.random() * 0.5 + 0.4;
+            }
+            update() {
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    this.progress = 0;
+                    this.curveIndex = Math.random() > 0.5 ? 0 : 1;
+                }
+            }
+            draw(flowOffset) {
+                let p0, p1, p2, p3;
+                if (this.curveIndex === 0) {
+                    p0 = {x: -100, y: height * 0.2 + Math.sin(flowOffset) * 50};
+                    p1 = {x: width * 0.3, y: height * 0.1 + Math.cos(flowOffset) * 50};
+                    p2 = {x: width * 0.6, y: height * 0.8 + Math.sin(flowOffset) * 50};
+                    p3 = {x: width + 100, y: height * 0.4};
+                } else {
+                    p0 = {x: -100, y: height * 0.8 + Math.cos(flowOffset) * 50};
+                    p1 = {x: width * 0.4, y: height * 0.9 + Math.sin(flowOffset) * 50};
+                    p2 = {x: width * 0.7, y: height * 0.2 + Math.cos(flowOffset) * 50};
+                    p3 = {x: width + 100, y: height * 0.6};
+                }
+                const pos = getBezierPoint(this.progress, p0, p1, p2, p3);
+                
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(243, 185, 34, ${this.opacity})`; // Theme yellow
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(243, 185, 34, 0.5)';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function init() {
+            nodes = [];
+            particles = [];
+            flowParticles = [];
+            const nodeCount = Math.floor((width * height) / 15000); 
+            for (let i = 0; i < nodeCount; i++) {
+                nodes.push(new Node());
+            }
+            for (let i = 0; i < 12; i++) {
+                flowParticles.push(new FlowParticle(Math.random() > 0.5 ? 0 : 1));
+            }
+        }
+        init();
+        
+        let flowOffset = 0;
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            flowOffset += 0.001;
+            
+            ctx.beginPath();
+            ctx.moveTo(-100, height * 0.2 + Math.sin(flowOffset) * 50);
+            ctx.bezierCurveTo(
+                width * 0.3, height * 0.1 + Math.cos(flowOffset) * 50, 
+                width * 0.6, height * 0.8 + Math.sin(flowOffset) * 50, 
+                width + 100, height * 0.4
+            );
+            ctx.strokeStyle = 'rgba(0, 56, 108, 0.03)';
+            ctx.lineWidth = 120;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-100, height * 0.8 + Math.cos(flowOffset) * 50);
+            ctx.bezierCurveTo(
+                width * 0.4, height * 0.9 + Math.sin(flowOffset) * 50, 
+                width * 0.7, height * 0.2 + Math.cos(flowOffset) * 50, 
+                width + 100, height * 0.6
+            );
+            ctx.strokeStyle = 'rgba(0, 56, 108, 0.025)';
+            ctx.lineWidth = 180;
+            ctx.stroke();
+
+            flowParticles.forEach(fp => {
+                fp.update();
+                fp.draw(flowOffset);
+            });
+
+            for (let i = 0; i < nodes.length; i++) {
+                nodes[i].update();
+                nodes[i].draw();
+                
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const dx = nodes[i].x - nodes[j].x;
+                    const dy = nodes[i].y - nodes[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < maxDistance) {
+                        ctx.beginPath();
+                        ctx.moveTo(nodes[i].x, nodes[i].y);
+                        ctx.lineTo(nodes[j].x, nodes[j].y);
+                        const alpha = 1 - (dist / maxDistance);
+                        ctx.strokeStyle = `rgba(0, 56, 108, ${alpha * 0.15})`;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        
+                        if (Math.random() < 0.0005) {
+                            particles.push(new Particle(nodes[i], nodes[j]));
+                        }
+                    }
+                }
+            }
+            
+            particles = particles.filter(p => {
+                const reached = p.update();
+                p.draw();
+                return !reached;
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        window.addEventListener('resize', () => {
+            resize();
+            init();
+        });
+    </script>
 </body>
 </html>

@@ -60,7 +60,8 @@ $sort_col = $allowed_sorts[$sort] ?? 'timestamp';
 $order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
 
 // Sort URL generator
-function getSortUrl($col, $dir) {
+function getSortUrl($col, $dir)
+{
     $query = [
         'sort' => $col,
         'order' => $dir
@@ -69,7 +70,8 @@ function getSortUrl($col, $dir) {
 }
 
 // Sort Buttons generator (single toggle button beside column header)
-function renderSortButtons($col, $current_sort, $current_order) {
+function renderSortButtons($col, $current_sort, $current_order)
+{
     if ($current_sort === $col) {
         if (strtolower($current_order) === 'asc') {
             $url = getSortUrl($col, 'desc');
@@ -105,10 +107,12 @@ $recent_txn = $conn->query("
 ");
 
 // --- COMPLEX QUERY CQ-7: User Activity Timeline ---
-// Uses UNION ALL to merge events from 4 different tables into
-// a single chronological activity feed. Each subquery contributes
-// a different event type with standardized columns.
-$activity_timeline = $conn->query("
+$activity_page = max(1, intval($_GET['activity_page'] ?? 1));
+$activity_limit = 5;
+$activity_offset = ($activity_page - 1) * $activity_limit;
+$activity_limit_plus_one = $activity_limit + 1;
+
+$activity_timeline_query = "
     (SELECT 'session_booked' AS event_type, es.scheduled_time AS event_time,
             CONCAT('Booked session for ', s.skill_name) AS description
      FROM exchange_sessions es
@@ -131,12 +135,78 @@ $activity_timeline = $conn->query("
      FROM transactions t
      WHERE t.to_user_id = $user_id)
     ORDER BY event_time DESC
-    LIMIT 10
+    LIMIT $activity_limit_plus_one OFFSET $activity_offset
+";
+$activity_timeline_res = $conn->query($activity_timeline_query);
+
+$activities = [];
+if ($activity_timeline_res) {
+    while ($row = $activity_timeline_res->fetch_assoc()) {
+        $activities[] = $row;
+    }
+}
+$has_next_activity = count($activities) > $activity_limit;
+if ($has_next_activity) {
+    array_pop($activities); // Remove the N+1th element for display
+}
+
+// --- FEATURE 3: COLLABORATIVE FILTERING RECOMMENDATIONS ---
+// CTE-based collaborative filtering: finds skills learned by users
+// who learned the same skills as the current user.
+// Step 1: CTE my_skills = skills current user has learned (completed sessions as requester)
+// Step 2: CTE similar_users = other users who also learned those same skills
+// Step 3: Find OTHER skills those similar users learned, excluding my_skills
+// Step 4: Rank by frequency (how many similar users learned each skill)
+$recommendations = $conn->query("
+    WITH my_skills AS (
+        SELECT DISTINCT skill_id 
+        FROM exchange_sessions
+        WHERE requester_id = $user_id AND status = 'completed'
+    ),
+    similar_users AS (
+        SELECT DISTINCT es.requester_id
+        FROM exchange_sessions es
+        JOIN my_skills ms ON es.skill_id = ms.skill_id
+        WHERE es.requester_id != $user_id AND es.status = 'completed'
+    )
+    SELECT s.skill_id, s.skill_name, s.catagory, s.difficulty_level, 
+           COUNT(*) AS learn_count,
+           (SELECT ROUND(AVG(es2.rating), 1) FROM exchange_sessions es2 
+            WHERE es2.skill_id = s.skill_id AND es2.rating IS NOT NULL) AS avg_rating
+    FROM exchange_sessions es
+    JOIN similar_users su ON es.requester_id = su.requester_id
+    JOIN skills s ON es.skill_id = s.skill_id
+    WHERE es.status = 'completed'
+      AND es.skill_id NOT IN (SELECT skill_id FROM my_skills)
+    GROUP BY s.skill_id
+    ORDER BY learn_count DESC
+    LIMIT 6
 ");
 
-include __DIR__ . '/../includes/header.php';
-?>
-<link rel="stylesheet" href="../assets/css/style.css">
+// --- Leaderboard badges for current user ---
+$my_badges = $conn->query("
+    WITH provider_scores AS (
+        SELECT es.provider_id, s.catagory AS category,
+            DENSE_RANK() OVER (PARTITION BY s.catagory ORDER BY 
+                (COUNT(*) * 0.4) + (COALESCE(AVG(es.rating),0)*6*0.3) + (COALESCE(r.current_score,5)*4*0.2) + (COALESCE(SUM(es.session_duration),0)/60.0*0.1) DESC
+            ) AS rank_pos
+        FROM exchange_sessions es
+        JOIN skills s ON es.skill_id = s.skill_id
+        LEFT JOIN reputation r ON es.provider_id = r.user_id
+        WHERE es.status = 'completed' AND s.catagory IS NOT NULL
+        GROUP BY es.provider_id, s.catagory
+    )
+    SELECT category, rank_pos FROM provider_scores 
+    WHERE provider_id = $user_id AND rank_pos <= 3
+");
+$badge_list = [];
+if ($my_badges) {
+    while ($b = $my_badges->fetch_assoc()) {
+        $badge_list[] = $b;
+    }
+}
+
+include __DIR__ . '/../includes/header.php'; ?>
 <div class="page-wrapper">
     <div class="container">
         <h1 class="page-title">Dashboard</h1>
@@ -161,76 +231,165 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <div class="grid-2">
-            <!-- Skills Offered -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>Skills I Teach</h3>
-                    <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
-                </div>
-                <?php if ($skills_offered->num_rows > 0): ?>
-                    <div>
-                        <?php while ($s = $skills_offered->fetch_assoc()): ?>
-                            <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
-                        <?php endwhile; ?>
+        <div class="grid-2 mt-3">
+            <!-- First Column: Skills I Teach & Skills I Want to Learn -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Skills Offered -->
+                <div class="card" style="height: 100%;">
+                    <div class="card-header">
+                        <h3>Skills I Teach</h3>
+                        <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
                     </div>
-                <?php else: ?>
-                    <p class="empty-state">No skills listed yet.</p>
-                <?php endif; ?>
+                    <?php if ($skills_offered->num_rows > 0): ?>
+                        <div>
+                            <?php while ($s = $skills_offered->fetch_assoc()): ?>
+                                <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="empty-state">No skills listed yet.</p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Skills Requested -->
+                <div class="card" style="height: 100%;">
+                    <div class="card-header">
+                        <h3>Skills I Want to Learn</h3>
+                        <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
+                    </div>
+                    <?php if ($skills_requested->num_rows > 0): ?>
+                        <div>
+                            <?php while ($s = $skills_requested->fetch_assoc()): ?>
+                                <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="empty-state">No skills listed yet.</p>
+                    <?php endif; ?>
+                </div>
             </div>
 
-            <!-- Skills Requested -->
-            <div class="card">
+            <!-- Second Column: Upcoming Sessions -->
+            <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div class="card-header">
-                    <h3>Skills I Want to Learn</h3>
-                    <a href="../pages/profile.php" class="btn btn-sm btn-secondary">Edit</a>
+                    <h3>Upcoming Sessions</h3>
+                    <a href="../pages/sessions.php" class="btn btn-sm btn-secondary">View All</a>
                 </div>
-                <?php if ($skills_requested->num_rows > 0): ?>
-                    <div>
-                        <?php while ($s = $skills_requested->fetch_assoc()): ?>
-                            <span class="skill-tag"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+
+                <?php if ($upcoming_q->num_rows > 0): ?>
+                    <div style="flex-grow: 1;">
+                        <?php while ($session = $upcoming_q->fetch_assoc()): ?>
+                            <div class="session-card">
+                                <div class="avatar">
+                                    <?php
+                                    $partner_name = ($session['requester_id'] == $user_id) ? $session['provider_name'] : $session['requester_name'];
+                                    echo strtoupper(substr($partner_name, 0, 1));
+                                    ?>
+                                </div>
+                                <div class="session-info">
+                                    <h4><?php echo htmlspecialchars($session['skill_name']); ?></h4>
+                                    <p>
+                                        with <strong><?php echo htmlspecialchars($partner_name); ?></strong>
+                                        &middot; <?php echo date('M d, Y h:i A', strtotime($session['scheduled_time'])); ?>
+                                        &middot; <?php echo $session['session_duration']; ?> min
+                                    </p>
+                                </div>
+                                <span class="badge badge-warning">Scheduled</span>
+                            </div>
                         <?php endwhile; ?>
                     </div>
                 <?php else: ?>
-                    <p class="empty-state">No skills listed yet.</p>
+                    <div class="empty-state"
+                        style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                        <div class="icon">&#128197;</div>
+                        <p>No upcoming sessions. <a href="../pages/skills.php">Browse skills</a> to book one!</p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
 
-        <!-- Upcoming Sessions -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3>Upcoming Sessions</h3>
-                <a href="../pages/sessions.php" class="btn btn-sm btn-secondary">View All</a>
+        <!-- Feature 3: Recommended Skills (Collaborative Filtering) & Badges -->
+        <div class="grid-2 mt-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i data-lucide="lightbulb" class="lucide-sm"></i> Recommended For You</h3>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Collaborative Filtering via CTEs</span>
+                </div>
+                <?php if ($recommendations && $recommendations->num_rows > 0): ?>
+                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">Users who learned the same
+                        skills as you also learned:</p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <?php while ($rec = $recommendations->fetch_assoc()): ?>
+                            <a href="skill_detail.php?id=<?php echo $rec['skill_id']; ?>"
+                                style="display:block; text-decoration:none; padding:10px 12px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); transition:var(--transition);"
+                                onmouseover="this.style.borderColor='var(--primary)'"
+                                onmouseout="this.style.borderColor='var(--border-light)'">
+                                <strong
+                                    style="color:var(--primary); font-size:0.88rem;"><?php echo htmlspecialchars($rec['skill_name']); ?></strong>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                                    <span class="badge badge-orange"
+                                        style="font-size:0.65rem;"><?php echo htmlspecialchars($rec['catagory']); ?></span>
+                                    <span style="font-size:0.75rem; color:var(--text-muted);">
+                                        <?php echo $rec['avg_rating'] ? '<i data-lucide="star" class="lucide-sm"></i> ' . $rec['avg_rating'] : ''; ?>
+                                        · <?php echo $rec['learn_count']; ?> similar
+                                    </span>
+                                </div>
+                            </a>
+                        <?php endwhile; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state" style="padding:20px;">
+                        <p>Complete some sessions to get personalized recommendations!</p>
+                    </div>
+                <?php endif; ?>
             </div>
 
-            <?php if ($upcoming_q->num_rows > 0): ?>
-                <?php while ($session = $upcoming_q->fetch_assoc()): ?>
-                    <div class="session-card">
-                        <div class="avatar">
-                            <?php
-                            $partner_name = ($session['requester_id'] == $user_id) ? $session['provider_name'] : $session['requester_name'];
-                            echo strtoupper(substr($partner_name, 0, 1));
+            <!-- Leaderboard Badges -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i data-lucide="award" class="lucide-sm"></i> Your Badges</h3>
+                    <a href="../pages/leaderboard.php" class="btn btn-sm btn-secondary">Full Leaderboard</a>
+                </div>
+                <?php if (!empty($badge_list)): ?>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                        <?php foreach ($badge_list as $badge):
+                            $icon = '<i data-lucide="medal" class="lucide-sm"></i>';
+                            $color = 'var(--info)';
+                            if ($badge['rank_pos'] == 1) {
+                                $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>';
+                                $color = 'var(--warning)';
+                            } elseif ($badge['rank_pos'] == 2) {
+                                $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>';
+                                $color = 'var(--info)';
+                            } elseif ($badge['rank_pos'] == 3) {
+                                $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>';
+                                $color = 'var(--primary)';
+                            }
                             ?>
-                        </div>
-                        <div class="session-info">
-                            <h4><?php echo htmlspecialchars($session['skill_name']); ?></h4>
-                            <p>
-                                with <strong><?php echo htmlspecialchars($partner_name); ?></strong>
-                                &middot; <?php echo date('M d, Y h:i A', strtotime($session['scheduled_time'])); ?>
-                                &middot; <?php echo $session['session_duration']; ?> min
-                            </p>
-                        </div>
-                        <span class="badge badge-warning">Scheduled</span>
+                            <div
+                                style="text-align:center; padding:12px 16px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); min-width:100px;">
+                                <span style="font-size:1.6rem;"><?php echo $icon; ?></span>
+                                <div style="font-weight:700; color:<?php echo $color; ?>; font-size:0.9rem;">
+                                    #<?php echo $badge['rank_pos']; ?></div>
+                                <div
+                                    style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">
+                                    <?php echo htmlspecialchars($badge['category']); ?></div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="icon">&#128197;</div>
-                    <p>No upcoming sessions. <a href="../pages/skills.php">Browse skills</a> to book one!</p>
-                </div>
-            <?php endif; ?>
+                <?php else: ?>
+                    <div class="empty-state" style="padding:20px;">
+                        <p>Complete teaching sessions to earn category badges!</p>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 3 in any skill category
+                            earns <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i><i data-lucide="medal"
+                                style="color: silver;" class="lucide-sm"></i><i data-lucide="medal" style="color: #cd7f32;"
+                                class="lucide-sm"></i></p>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
+
+
 
         <!-- Recent Transactions -->
         <div class="card mt-3">
@@ -264,7 +423,8 @@ include __DIR__ . '/../includes/header.php';
                         <tbody>
                             <?php while ($txn = $recent_txn->fetch_assoc()): ?>
                                 <tr>
-                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($txn['transaction_category']); ?></span>
+                                    <td><span
+                                            class="badge badge-orange"><?php echo htmlspecialchars($txn['transaction_category']); ?></span>
                                     </td>
                                     <td><?php echo htmlspecialchars($txn['sender_name'] ?? 'System'); ?></td>
                                     <td><?php echo htmlspecialchars($txn['receiver_name']); ?></td>
@@ -280,38 +440,73 @@ include __DIR__ . '/../includes/header.php';
                     <p>No transactions yet.</p>
                 </div>
             <?php endif; ?>
-        <!-- CQ-7: Activity Timeline (UNION ALL query) -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3>Activity Timeline</h3>
-                <span style="font-size:0.8rem; color:var(--text-muted);">Powered by UNION ALL across 4 tables</span>
-            </div>
-            <?php if ($activity_timeline && $activity_timeline->num_rows > 0): ?>
-                <?php while ($event = $activity_timeline->fetch_assoc()):
-                    $icon = '📌';
-                    $badge = 'badge-info';
-                    if ($event['event_type'] === 'session_booked') { $icon = '📅'; $badge = 'badge-warning'; }
-                    elseif ($event['event_type'] === 'session_taught') { $icon = '🎓'; $badge = 'badge-success'; }
-                    elseif ($event['event_type'] === 'task_completed') { $icon = '✅'; $badge = 'badge-primary'; }
-                    elseif ($event['event_type'] === 'credit_received') { $icon = '💰'; $badge = 'badge-orange'; }
-                ?>
-                    <div class="session-card">
-                        <div class="avatar"><?php echo $icon; ?></div>
-                        <div class="session-info">
-                            <h4><?php echo htmlspecialchars($event['description']); ?></h4>
-                            <p><?php echo $event['event_time'] ? date('M d, Y h:i A', strtotime($event['event_time'])) : 'N/A'; ?></p>
-                        </div>
-                        <span class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <p>No activity yet. Start learning or teaching!</p>
+            <!-- CQ-7: Activity Timeline (UNION ALL query) -->
+            <div class="card mt-3" id="timeline">
+                <div class="card-header">
+                    <h3>Activity Timeline</h3>
                 </div>
-            <?php endif; ?>
+                <?php if (count($activities) > 0): ?>
+                    <?php foreach ($activities as $event):
+                        $icon = '<i data-lucide="pin" class="lucide-sm"></i>';
+                        $badge = 'badge-info';
+                        if ($event['event_type'] === 'session_booked') {
+                            $icon = '<i data-lucide="calendar" class="lucide-sm"></i>';
+                            $badge = 'badge-warning';
+                        } elseif ($event['event_type'] === 'session_taught') {
+                            $icon = '<i data-lucide="graduation-cap" class="lucide-sm"></i>';
+                            $badge = 'badge-success';
+                        } elseif ($event['event_type'] === 'task_completed') {
+                            $icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
+                            $badge = 'badge-primary';
+                        } elseif ($event['event_type'] === 'credit_received') {
+                            $icon = '<i data-lucide="coins" class="lucide-sm"></i>';
+                            $badge = 'badge-orange';
+                        }
+                        ?>
+                        <div class="session-card">
+                            <div class="avatar"><?php echo $icon; ?></div>
+                            <div class="session-info">
+                                <h4><?php echo htmlspecialchars($event['description']); ?></h4>
+                                <p><?php echo $event['event_time'] ? date('M d, Y h:i A', strtotime($event['event_time'])) : 'N/A'; ?>
+                                </p>
+                            </div>
+                            <span
+                                class="badge <?php echo $badge; ?>"><?php echo ucfirst(str_replace('_', ' ', $event['event_type'])); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+
+                    <!-- Pagination -->
+                    <div class="flex justify-between items-center mt-3"
+                        style="border-top: 1px solid var(--border-light); padding-top: 16px;">
+                        <div>
+                            <?php if ($activity_page > 1): ?>
+                                <a href="dashboard.php?activity_page=<?php echo $activity_page - 1; ?>#timeline"
+                                    class="btn btn-sm btn-secondary" style="border-radius: 99px;">&larr; Previous</a>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-secondary" disabled
+                                    style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">&larr; Previous</button>
+                            <?php endif; ?>
+                        </div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); font-weight:500;">Page
+                            <?php echo $activity_page; ?></div>
+                        <div>
+                            <?php if ($has_next_activity): ?>
+                                <a href="dashboard.php?activity_page=<?php echo $activity_page + 1; ?>#timeline"
+                                    class="btn btn-sm btn-secondary" style="border-radius: 99px;">Next &rarr;</a>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-secondary" disabled
+                                    style="opacity:0.5; cursor:not-allowed; border-radius: 99px;">Next &rarr;</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <p>No activity yet. Start learning or teaching!</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
         </div>
-
     </div>
-</div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+    <?php include __DIR__ . '/../includes/footer.php'; ?>
