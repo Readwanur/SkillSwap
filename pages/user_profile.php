@@ -83,7 +83,9 @@ $user_badges = $conn->query("
 ");
 $profile_badges = [];
 if ($user_badges) {
-    while ($b = $user_badges->fetch_assoc()) { $profile_badges[] = $b; }
+    while ($b = $user_badges->fetch_assoc()) {
+        $profile_badges[] = $b;
+    }
 }
 
 // Fetch availability
@@ -107,48 +109,66 @@ include __DIR__ . '/../includes/header.php';
         <div class="card mt-2 mb-3">
             <div class="flex gap-2 items-center">
                 <?php if (!empty($user['profile_photo'])): ?>
-                    <img src="../api/user_photo.php?user_id=<?php echo $profile_id; ?>" class="avatar-img avatar-lg" alt="Profile Photo" onclick="openLightbox(this.src)">
+                    <img src="../api/user_photo.php?user_id=<?php echo $profile_id; ?>" class="avatar-img avatar-lg"
+                        alt="Profile Photo" onclick="openLightbox(this.src)" style="width: 120px; height: 120px;">
                 <?php else: ?>
-                    <div class="avatar avatar-lg"><?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                    <div class="avatar avatar-lg" style="width: 120px; height: 120px; font-size: 3rem; line-height: 120px;">
+                        <?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
                 <?php endif; ?>
                 <div style="flex:1;">
                     <h1 style="margin:0; font-size:1.8rem;"><?php echo htmlspecialchars($user['name']); ?></h1>
-                    <p style="color:var(--text-secondary); margin-bottom: 8px;"><?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
-                    <a href="messages.php?start_with_user_id=<?php echo $profile_id; ?>" class="btn btn-secondary btn-sm" style="display:inline-block; text-decoration:none;">
+                    <p style="color:var(--text-secondary); margin-bottom: 8px;">
+                        <?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
+                    <a href="messages.php?start_with_user_id=<?php echo $profile_id; ?>"
+                        class="btn btn-secondary btn-sm" style="display:inline-block; text-decoration:none;">
                         <i data-lucide="message-square" class="lucide-sm"></i> Message User
                     </a>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">&#11088; <?php echo $user['current_score'] ?? '5.00'; ?></div>
-                    <div style="color: var(--text-muted); font-size: 0.9rem;"><?php echo $user['completed_sessions'] ?? 0; ?> Sessions</div>
-                    <span class="badge badge-orange mt-1" style="display:inline-block;"><?php echo htmlspecialchars($user['mentor_level'] ?? 'Novice'); ?></span>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">&#11088;
+                        <?php echo $user['current_score'] ?? '5.00'; ?></div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">
+                        <?php echo $user['completed_sessions'] ?? 0; ?> Sessions</div>
+                    <span class="badge badge-orange mt-1"
+                        style="display:inline-block;"><?php echo htmlspecialchars($user['mentor_level'] ?? 'Novice'); ?></span>
                 </div>
             </div>
-            
+
             <hr style="margin: 16px 0; border: 0; border-top: 1px solid var(--border-color);">
-            
+
             <h3>About</h3>
-            <p style="color:var(--text-secondary); margin-top:8px;"><?php echo htmlspecialchars($user['bio'] ?? 'No bio provided.'); ?></p>
-            
+            <p style="color:var(--text-secondary); margin-top:8px;">
+                <?php echo htmlspecialchars($user['bio'] ?? 'No bio provided.'); ?></p>
+
             <div class="mt-2" style="font-size:0.85rem; color:var(--text-muted);">
-                Member since: <?php echo date('F j, Y', strtotime($user['created_at'])); ?> &middot; 
+                Member since: <?php echo date('F j, Y', strtotime($user['created_at'])); ?> &middot;
                 Last active: <?php echo date('M j, Y', strtotime($user['last_active_at'])); ?>
             </div>
 
             <?php if (!empty($profile_badges)): ?>
-            <div class="mt-2" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;"><i data-lucide="award" class="lucide-sm"></i> Badges:</span>
-                <?php foreach ($profile_badges as $badge):
-                    $icon = '<i data-lucide="medal" class="lucide-sm"></i>'; $badge_cls = 'badge-info';
-                    if ($badge['rank_pos'] == 1) { $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>'; $badge_cls = 'badge-warning'; }
-                    elseif ($badge['rank_pos'] == 2) { $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>'; $badge_cls = 'badge-info'; }
-                    elseif ($badge['rank_pos'] == 3) { $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>'; $badge_cls = 'badge-orange'; }
-                ?>
-                    <span class="badge <?php echo $badge_cls; ?>" style="font-size:0.75rem;">
-                        <?php echo $icon; ?> #<?php echo $badge['rank_pos']; ?> <?php echo htmlspecialchars($badge['category']); ?>
-                    </span>
-                <?php endforeach; ?>
-            </div>
+                <div class="mt-2" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;"><i data-lucide="award"
+                            class="lucide-sm"></i> Badges:</span>
+                    <?php foreach ($profile_badges as $badge):
+                        $icon = '<i data-lucide="medal" class="lucide-sm"></i>';
+                        $badge_cls = 'badge-info';
+                        if ($badge['rank_pos'] == 1) {
+                            $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>';
+                            $badge_cls = 'badge-warning';
+                        } elseif ($badge['rank_pos'] == 2) {
+                            $icon = '<i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>';
+                            $badge_cls = 'badge-info';
+                        } elseif ($badge['rank_pos'] == 3) {
+                            $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>';
+                            $badge_cls = 'badge-orange';
+                        }
+                        ?>
+                        <span class="badge <?php echo $badge_cls; ?>" style="font-size:0.75rem;">
+                            <?php echo $icon; ?> #<?php echo $badge['rank_pos']; ?>
+                            <?php echo htmlspecialchars($badge['category']); ?>
+                        </span>
+                    <?php endforeach; ?>
+                </div>
             <?php endif; ?>
         </div>
 
@@ -162,10 +182,13 @@ include __DIR__ . '/../includes/header.php';
                             <li style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-color);">
                                 <div class="flex justify-between items-center" style="gap:10px;">
                                     <div>
-                                        <strong><a href="skill_detail.php?id=<?php echo $s['skill_id']; ?>" style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($s['skill_name']); ?></a></strong>
-                                        <span class="badge badge-info" style="font-size:0.7rem; margin-left:8px; display:inline-block;"><?php echo htmlspecialchars($s['difficulty_level']); ?></span>
+                                        <strong><a href="skill_detail.php?id=<?php echo $s['skill_id']; ?>"
+                                                style="color:var(--primary); text-decoration:none;"><?php echo htmlspecialchars($s['skill_name']); ?></a></strong>
+                                        <span class="badge badge-info"
+                                            style="font-size:0.7rem; margin-left:8px; display:inline-block;"><?php echo htmlspecialchars($s['difficulty_level']); ?></span>
                                     </div>
-                                    <button class="btn btn-primary btn-sm" onclick="openBooking(<?php echo $s['skill_id']; ?>, '<?php echo htmlspecialchars(addslashes($s['skill_name'])); ?>')">
+                                    <button class="btn btn-primary btn-sm"
+                                        onclick="openBooking(<?php echo $s['skill_id']; ?>, '<?php echo htmlspecialchars(addslashes($s['skill_name'])); ?>')">
                                         Book Session
                                     </button>
                                 </div>
@@ -183,11 +206,13 @@ include __DIR__ . '/../includes/header.php';
                 <?php if ($requested && $requested->num_rows > 0): ?>
                     <div class="flex flex-wrap gap-1 mt-1">
                         <?php while ($s = $requested->fetch_assoc()): ?>
-                            <span class="badge" style="background:var(--bg-secondary); color:var(--text-primary);"><?php echo htmlspecialchars($s['skill_name']); ?></span>
+                            <span class="badge"
+                                style="background:var(--bg-secondary); color:var(--text-primary);"><?php echo htmlspecialchars($s['skill_name']); ?></span>
                         <?php endwhile; ?>
                     </div>
                 <?php else: ?>
-                    <p style="color:var(--text-muted); font-size:0.9rem;">This user isn't looking to learn any specific skills right now.</p>
+                    <p style="color:var(--text-muted); font-size:0.9rem;">This user isn't looking to learn any specific
+                        skills right now.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -199,13 +224,15 @@ include __DIR__ . '/../includes/header.php';
                 <div class="flex flex-wrap gap-1 mt-1">
                     <?php while ($a = $availability->fetch_assoc()): ?>
                         <span class="badge badge-info" style="font-size:0.85rem; padding: 6px 10px;">
-                            <i data-lucide="clock" class="lucide-sm"></i> <?php echo $a['day_of_week']; ?>: 
-                            <?php echo date('h:i A', strtotime($a['start_time'])); ?> - <?php echo date('h:i A', strtotime($a['end_time'])); ?>
+                            <i data-lucide="clock" class="lucide-sm"></i> <?php echo $a['day_of_week']; ?>:
+                            <?php echo date('h:i A', strtotime($a['start_time'])); ?> -
+                            <?php echo date('h:i A', strtotime($a['end_time'])); ?>
                         </span>
                     <?php endwhile; ?>
                 </div>
             <?php else: ?>
-                <p style="color:var(--text-muted); font-size:0.9rem;">This user hasn't set any specific availability times.</p>
+                <p style="color:var(--text-muted); font-size:0.9rem;">This user hasn't set any specific availability times.
+                </p>
             <?php endif; ?>
         </div>
     </div>
@@ -222,29 +249,35 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" value="<?php echo $profile_id; ?>">
             <input type="hidden" name="skill_id" id="modal_skill_id">
-            
-            <p style="color:var(--text-secondary); margin-bottom:8px;">Provider: <strong><?php echo htmlspecialchars($user['name']); ?></strong></p>
-            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong></p>
-            
+
+            <p style="color:var(--text-secondary); margin-bottom:8px;">Provider:
+                <strong><?php echo htmlspecialchars($user['name']); ?></strong></p>
+            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong>
+            </p>
+            <div id="surge-info" style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;"></div>
+
             <div class="form-group">
                 <label for="scheduled_time">Preferred Date & Time</label>
                 <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
-                <select name="duration" id="duration" class="form-control">
-                    <option value="30">30 minutes (5 TC)</option>
-                    <option value="60" selected>60 minutes (10 TC)</option>
-                    <option value="90">90 minutes (15 TC)</option>
-                    <option value="120">120 minutes (20 TC)</option>
+                <select name="duration" id="duration" class="form-control" onchange="updateSurgeCost()">
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>60 minutes</option>
+                    <option value="90">90 minutes</option>
+                    <option value="120">120 minutes</option>
                 </select>
             </div>
+            <div id="cost-display" style="text-align:center; margin-bottom:12px; font-size:0.9rem; color:var(--text-secondary);">Estimated cost: <strong id="cost-value">10.00 TC</strong></div>
             <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
         </form>
     </div>
 </div>
 
 <script>
+    var currentSurgeMultiplier = 1.0;
+
     // Set min datetime to the user's local "now"
     function setMinDateTime() {
         var now = new Date();
@@ -256,10 +289,46 @@ include __DIR__ . '/../includes/header.php';
         document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
     }
 
+    function updateSurgeCost() {
+        var duration = parseInt(document.getElementById('duration').value);
+        var baseCost = (duration / 60) * 10;
+        var surgedCost = (baseCost * currentSurgeMultiplier).toFixed(2);
+        var costEl = document.getElementById('cost-value');
+        if (currentSurgeMultiplier > 1) {
+            costEl.innerHTML = '<span style="text-decoration:line-through;color:var(--text-muted);">' + baseCost.toFixed(2) + ' TC</span> → <span style="color:var(--danger);">' + surgedCost + ' TC</span>';
+        } else {
+            costEl.textContent = baseCost.toFixed(2) + ' TC';
+        }
+    }
+
     function openBooking(skillId, skillName) {
         document.getElementById('modal_skill_id').value = skillId;
         document.getElementById('modal_skill_name').textContent = skillName;
         setMinDateTime();
+        
+        var providerId = <?php echo $profile_id; ?>;
+        
+        // Fetch surge pricing for this provider
+        fetch('../api/surge_pricing.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                currentSurgeMultiplier = data.surge_multiplier || 1.0;
+                var infoEl = document.getElementById('surge-info');
+                if (data.surge_multiplier > 1) {
+                    var level = data.demand_level;
+                    var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
+                    var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
+                    infoEl.style.display = 'block';
+                    infoEl.style.background = bgColor;
+                    infoEl.style.border = '1px solid ' + borderColor;
+                    infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
+                } else {
+                    infoEl.style.display = 'none';
+                }
+                updateSurgeCost();
+            })
+            .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
         document.getElementById('bookingModal').classList.add('active');
     }
 
@@ -282,7 +351,7 @@ include __DIR__ . '/../includes/header.php';
         setTimeout(() => document.getElementById('lightbox_img').src = '', 400); // Clear after animation
     }
 
-    document.getElementById('imageLightbox').addEventListener('click', function(e) {
+    document.getElementById('imageLightbox').addEventListener('click', function (e) {
         if (e.target === this) closeLightbox();
     });
 </script>

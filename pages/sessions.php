@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Fetch sessions
-$filter = $_GET['filter'] ?? 'all';
+$filter = $_GET['filter'] ?? 'scheduled';
 $filter_sql = "";
 if ($filter === 'scheduled')
     $filter_sql = "AND es.status = 'scheduled'";
@@ -136,6 +136,14 @@ elseif ($filter === 'cancelled')
 elseif ($filter === 'disputed')
     $filter_sql = "AND es.status = 'disputed'";
 
+$role = $_GET['role'] ?? 'all';
+$role_sql = "(es.requester_id = $user_id OR es.provider_id = $user_id)";
+if ($role === 'guided') {
+    $role_sql = "es.provider_id = $user_id";
+} elseif ($role === 'learned') {
+    $role_sql = "es.requester_id = $user_id";
+}
+
 $sessions = $conn->query("
     SELECT es.*, s.skill_name,
            u_req.name AS requester_name,
@@ -146,9 +154,9 @@ $sessions = $conn->query("
     JOIN skills s ON es.skill_id = s.skill_id
     JOIN users u_req ON es.requester_id = u_req.user_id
     JOIN users u_prov ON es.provider_id = u_prov.user_id
-    WHERE (es.requester_id = $user_id OR es.provider_id = $user_id)
+    WHERE $role_sql
     $filter_sql
-    ORDER BY es.session_id DESC
+    ORDER BY es.scheduled_time DESC
 ");
 
 include __DIR__ . '/../includes/header.php';
@@ -167,7 +175,6 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Filter Tabs -->
         <div class="tabs">
-            <a href="?filter=all" class="tab-btn <?php echo $filter === 'all' ? 'active' : ''; ?>">All</a>
             <a href="?filter=scheduled"
                 class="tab-btn <?php echo $filter === 'scheduled' ? 'active' : ''; ?>">Scheduled</a>
             <a href="?filter=under-review"
@@ -178,6 +185,7 @@ include __DIR__ . '/../includes/header.php';
                 class="tab-btn <?php echo $filter === 'cancelled' ? 'active' : ''; ?>">Cancelled</a>
             <a href="?filter=disputed"
                 class="tab-btn <?php echo $filter === 'disputed' ? 'active' : ''; ?>">Disputed</a>
+            <a href="?filter=all" class="tab-btn <?php echo $filter === 'all' ? 'active' : ''; ?>">All</a>
         </div>
 
         <!-- Sessions List -->
@@ -228,8 +236,9 @@ include __DIR__ . '/../includes/header.php';
                                 <button class="btn btn-sm btn-success" onclick="openComplete(<?php echo $s['session_id']; ?>)">Complete
                                     Session</button>
                             <?php endif; ?>
-                            <button class="btn btn-sm btn-secondary" onclick="openDispute(<?php echo $s['session_id']; ?>)">Submit
-                                Proof / Dispute</button>
+                            <button class="btn btn-sm btn-secondary" onclick="openDispute(<?php echo $s['session_id']; ?>, '<?php echo $s['status']; ?>')">
+                                <?php echo $s['status'] === 'under-review' ? 'File Dispute' : 'Submit Proof / Dispute'; ?>
+                            </button>
                             <?php if ($s['status'] === 'scheduled'): ?>
                                 <form method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="cancel">
@@ -317,8 +326,18 @@ include __DIR__ . '/../includes/header.php';
         if (e.target === this) closeComplete();
     });
 
-    function openDispute(sessionId) {
+    function openDispute(sessionId, status) {
         document.getElementById('dispute_session_id').value = sessionId;
+        
+        const actionSelect = document.getElementById('dispute_action');
+        if (status === 'under-review') {
+            actionSelect.value = 'dispute';
+            actionSelect.options[0].style.display = 'none';
+        } else {
+            actionSelect.value = 'proof';
+            actionSelect.options[0].style.display = 'block';
+        }
+
         document.getElementById('disputeModal').classList.add('active');
     }
 

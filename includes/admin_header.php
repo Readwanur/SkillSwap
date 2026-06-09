@@ -30,11 +30,14 @@ $breadcrumb_title = $page_titles[$current_page] ?? ucfirst($current_page);
 $nav_pending_reports = 0;
 $nav_pending_tasks = 0;
 if (isset($conn)) {
-    $nav_reports_res = $conn->query("SELECT COUNT(*) as cnt FROM exchange_sessions WHERE status = 'disputed'");
+    $nav_reports_res = $conn->query("SELECT COUNT(*) as cnt FROM exchange_sessions WHERE status = 'under-review'");
     if ($nav_reports_res) $nav_pending_reports = $nav_reports_res->fetch_assoc()['cnt'];
     
     $nav_tasks_res = $conn->query("SELECT COUNT(*) as cnt FROM community_task WHERE status = 'under-review'");
     if ($nav_tasks_res) $nav_pending_tasks = $nav_tasks_res->fetch_assoc()['cnt'];
+
+    $nav_formal_disputes_res = $conn->query("SELECT COUNT(*) as cnt FROM disputes WHERE status = 'open'");
+    if ($nav_formal_disputes_res) $nav_pending_formal_disputes = $nav_formal_disputes_res->fetch_assoc()['cnt'];
 }
 ?>
 <!DOCTYPE html>
@@ -161,8 +164,13 @@ if (isset($conn)) {
                         <span class="sidebar-icon"><i data-lucide="rocket" class="lucide-sm"></i></span> Stress Test</a>
                 </li>
                 <li><a href="../admin/formal_disputes.php"
-                        class="<?php echo $current_page === 'formal_disputes' ? 'active' : ''; ?>">
-                        <span class="sidebar-icon"><i data-lucide="scale" class="lucide-sm"></i></span> Formal Disputes</a>
+                        class="<?php echo $current_page === 'formal_disputes' ? 'active' : ''; ?>" style="display:flex; align-items:center;">
+                        <span class="sidebar-icon"><i data-lucide="scale" class="lucide-sm"></i></span> 
+                        <span style="flex:1;">Formal Disputes</span>
+                        <?php if (isset($nav_pending_formal_disputes) && $nav_pending_formal_disputes > 0): ?>
+                            <span style="background:var(--danger); color:white; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight:bold; line-height:1;"><?php echo $nav_pending_formal_disputes; ?></span>
+                        <?php endif; ?>
+                    </a>
                 </li>
                 <li><a href="../admin/fraud_detection.php"
                         class="<?php echo $current_page === 'fraud_detection' ? 'active' : ''; ?>">

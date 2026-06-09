@@ -16,8 +16,11 @@ $user = $conn->query("SELECT * FROM vw_user_dashboard WHERE user_id = $user_id")
 $balance = $user ? number_format($user['wallet_balance'], 2) : '0.00';
 $rep_score = $user ? $user['reputation_score'] : '5.00';
 $mentor_level = $user ? $user['mentor_level'] : 'Novice';
-$total_sessions = $user ? $user['total_completed_sessions'] : 0;
+$guided_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_sessions WHERE provider_id = $user_id AND status = 'completed'");
+$guided_sessions = $guided_sessions_query->fetch_assoc()['total'] ?? 0;
 
+$learned_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_sessions WHERE requester_id = $user_id AND status = 'completed'");
+$learned_sessions = $learned_sessions_query->fetch_assoc()['total'] ?? 0;
 // Upcoming sessions (JOIN with users and skills)
 $upcoming_q = $conn->query("
     SELECT es.*, s.skill_name,
@@ -221,9 +224,15 @@ include __DIR__ . '/../includes/header.php'; ?>
                 <span class="stat-value"><?php echo $rep_score; ?>/5</span>
                 <span class="stat-label">Reputation Score</span>
             </div>
-            <div class="stat-card">
-                <span class="stat-value"><?php echo $total_sessions; ?></span>
-                <span class="stat-label">Sessions Completed</span>
+            <div class="stat-card" style="padding: 0; display: flex; flex-direction: row;">
+                <a href="../pages/sessions.php?filter=completed&role=guided" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-decoration: none; color: inherit; padding: 10px; border-right: 1px solid var(--border-light); transition: background 0.2s;" onmouseover="this.style.backgroundColor='var(--bg-hover)'" onmouseout="this.style.backgroundColor='transparent'">
+                    <span class="stat-value" style="font-size: 1.5rem;"><?php echo $guided_sessions; ?></span>
+                    <span class="stat-label" style="font-size: 0.75rem;">Sessions Guided</span>
+                </a>
+                <a href="../pages/sessions.php?filter=completed&role=learned" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-decoration: none; color: inherit; padding: 10px; transition: background 0.2s;" onmouseover="this.style.backgroundColor='var(--bg-hover)'" onmouseout="this.style.backgroundColor='transparent'">
+                    <span class="stat-value" style="font-size: 1.5rem;"><?php echo $learned_sessions; ?></span>
+                    <span class="stat-label" style="font-size: 0.75rem;">Sessions Learned</span>
+                </a>
             </div>
             <div class="stat-card">
                 <span class="stat-value"><?php echo htmlspecialchars($mentor_level); ?></span>
