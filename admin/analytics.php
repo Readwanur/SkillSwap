@@ -140,6 +140,19 @@ $top_skills = $conn->query("
     LIMIT 10
 ");
 
+// Prepare chart data arrays
+$skills_chart_labels = [];
+$skills_chart_values = [];
+$skills_chart_categories = [];
+if ($top_skills && $top_skills->num_rows > 0) {
+    while ($s = $top_skills->fetch_assoc()) {
+        $skills_chart_labels[] = $s['skill_name'];
+        $skills_chart_values[] = (int) $s['session_count'];
+        $skills_chart_categories[] = $s['catagory'] ?? 'General';
+    }
+    $top_skills->data_seek(0);
+}
+
 // Users above average balance (subquery)
 $above_avg_users = $conn->query("
     SELECT u.name, w.balance
@@ -367,8 +380,51 @@ $mom_growth = $conn->query("
     LIMIT 12
 ");
 
+// Prepare revenue chart data
+$rev_chart_months = [];
+$rev_chart_session = [];
+$rev_chart_community = [];
+$rev_chart_refunds = [];
+$rev_chart_net = [];
+$rev_chart_cumulative = [];
+if ($revenue_trends && $revenue_trends->num_rows > 0) {
+    $rev_rows = [];
+    while ($rev = $revenue_trends->fetch_assoc()) {
+        $rev_rows[] = $rev;
+    }
+    $rev_rows = array_reverse($rev_rows);
+    foreach ($rev_rows as $rev) {
+        $rev_chart_months[] = $rev['month'];
+        $rev_chart_session[] = (float) $rev['session_revenue'];
+        $rev_chart_community[] = (float) $rev['community_rewards'];
+        $rev_chart_refunds[] = (float) $rev['refunds'];
+        $rev_chart_net[] = (float) $rev['net_revenue'];
+        $rev_chart_cumulative[] = (float) $rev['cumulative_net'];
+    }
+    $revenue_trends->data_seek(0);
+}
+
+// Prepare moving avg chart data
+$ma_chart_dates = [];
+$ma_chart_daily = [];
+$ma_chart_avg = [];
+if ($moving_avg_result && $moving_avg_result->num_rows > 0) {
+    $ma_rows = [];
+    while ($m = $moving_avg_result->fetch_assoc()) {
+        $ma_rows[] = $m;
+    }
+    $ma_rows = array_reverse($ma_rows);
+    foreach ($ma_rows as $m) {
+        $ma_chart_dates[] = date('M d', strtotime($m['full_date']));
+        $ma_chart_daily[] = (float) $m['daily_credits'];
+        $ma_chart_avg[] = (float) $m['moving_avg'];
+    }
+    $moving_avg_result->data_seek(0);
+}
+
 include __DIR__ . '/../includes/admin_header.php';
 ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
 <h1 class="page-title">System Analytics</h1>
 
@@ -415,7 +471,9 @@ include __DIR__ . '/../includes/admin_header.php';
                         <tr>
                             <td><strong>#<?php echo $p['teaching_rank']; ?></strong></td>
                             <td><strong><?php echo htmlspecialchars($p['name']); ?></strong></td>
-                            <td><?php echo $p['hours_taught']; ?>h <small style="color:var(--text-muted);">(<?php echo $p['session_count']; ?> sessions)</small></td>
+                            <td><?php echo $p['hours_taught']; ?>h <small
+                                    style="color:var(--text-muted);">(<?php echo $p['session_count']; ?> sessions)</small>
+                            </td>
                             <td><i data-lucide="star" class="lucide-sm"></i> <?php echo $p['avg_rating'] ?? 'N/A'; ?></td>
                             <td><span class="badge badge-info">#<?php echo $p['rating_rank']; ?></span></td>
                         </tr>
@@ -425,32 +483,14 @@ include __DIR__ . '/../includes/admin_header.php';
         </div>
     </div>
 
-    <!-- Top Skills -->
+    <!-- Top Skills Chart -->
     <div class="card">
         <div class="card-header">
             <h3>Most Popular Skills</h3>
+            <span class="badge badge-orange">Top 10</span>
         </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Skill</th>
-                        <th>Category</th>
-                        <th>Sessions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($s = $top_skills->fetch_assoc()): ?>
-                        <tr>
-                            <td><strong><?php echo htmlspecialchars($s['skill_name']); ?></strong></td>
-                            <td><span
-                                    class="badge badge-orange"><?php echo htmlspecialchars($s['catagory'] ?? 'N/A'); ?></span>
-                            </td>
-                            <td><?php echo $s['session_count']; ?></td>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+        <div style="padding: 16px; height: 380px;">
+            <canvas id="skillsChart"></canvas>
         </div>
     </div>
 </div>
@@ -473,17 +513,22 @@ include __DIR__ . '/../includes/admin_header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($cat = $categories_engagement->fetch_assoc()): 
+                    <?php while ($cat = $categories_engagement->fetch_assoc()):
                         $badge_class = 'badge-orange';
-                        if ($cat['category_status'] === 'Hot <i data-lucide="flame" class="lucide-sm"></i>') $badge_class = 'badge-danger';
-                        elseif ($cat['category_status'] === 'Growing <i data-lucide="trending-up" class="lucide-sm"></i>') $badge_class = 'badge-info';
+                        if ($cat['category_status'] === 'Hot <i data-lucide="flame" class="lucide-sm"></i>')
+                            $badge_class = 'badge-danger';
+                        elseif ($cat['category_status'] === 'Growing <i data-lucide="trending-up" class="lucide-sm"></i>')
+                            $badge_class = 'badge-info';
                         ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($cat['catagory']); ?></strong></td>
                             <td><?php echo $cat['skill_count']; ?></td>
                             <td><?php echo $cat['completed_sessions']; ?></td>
-                            <td><i data-lucide="star" class="lucide-sm"></i> <?php echo $cat['avg_category_rating'] ?? 'N/A'; ?></td>
-                            <td><span class="badge <?php echo $badge_class; ?>"><?php echo $cat['category_status']; ?></span></td>
+                            <td><i data-lucide="star" class="lucide-sm"></i>
+                                <?php echo $cat['avg_category_rating'] ?? 'N/A'; ?></td>
+                            <td><span
+                                    class="badge <?php echo $badge_class; ?>"><?php echo $cat['category_status']; ?></span>
+                            </td>
                         </tr>
                     <?php endwhile; ?>
                 </tbody>
@@ -509,19 +554,23 @@ include __DIR__ . '/../includes/admin_header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($r = $reliability_stats->fetch_assoc()): 
+                    <?php while ($r = $reliability_stats->fetch_assoc()):
                         $rel_badge = 'badge-success';
-                        if ($r['reliability_status'] === 'At Risk <i data-lucide="x-circle" class="lucide-sm"></i>') $rel_badge = 'badge-danger';
-                        elseif ($r['reliability_status'] === 'Good <i data-lucide="alert-triangle" class="lucide-sm"></i>') $rel_badge = 'badge-warning';
+                        if ($r['reliability_status'] === 'At Risk <i data-lucide="x-circle" class="lucide-sm"></i>')
+                            $rel_badge = 'badge-danger';
+                        elseif ($r['reliability_status'] === 'Good <i data-lucide="alert-triangle" class="lucide-sm"></i>')
+                            $rel_badge = 'badge-warning';
                         ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($r['name']); ?></strong></td>
                             <td><?php echo $r['completed_sessions']; ?></td>
                             <td><?php echo $r['cancelled_sessions']; ?></td>
-                            <td style="font-weight: 600; color: <?php echo $r['cancellation_rate_pct'] > 20 ? 'var(--danger)' : 'var(--text-secondary)'; ?>;">
+                            <td
+                                style="font-weight: 600; color: <?php echo $r['cancellation_rate_pct'] > 20 ? 'var(--danger)' : 'var(--text-secondary)'; ?>;">
                                 <?php echo $r['cancellation_rate_pct']; ?>%
                             </td>
-                            <td><span class="badge <?php echo $rel_badge; ?>"><?php echo $r['reliability_status']; ?></span></td>
+                            <td><span class="badge <?php echo $rel_badge; ?>"><?php echo $r['reliability_status']; ?></span>
+                            </td>
                         </tr>
                     <?php endwhile; ?>
                 </tbody>
@@ -531,37 +580,14 @@ include __DIR__ . '/../includes/admin_header.php';
 </div>
 
 <div class="grid-2 mb-3">
-    <!-- Monthly Revenue Trends (CQ-6) -->
+    <!-- Monthly Revenue Trends Chart (CQ-6) -->
     <div class="card">
         <div class="card-header">
             <h3>Financial & Revenue Trends</h3>
             <span class="badge badge-info">In Time Credits</span>
         </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Month</th>
-                        <th>Volume</th>
-                        <th>Session Inflows</th>
-                        <th>Refunds</th>
-                        <th>Net Inflow</th>
-                        <th>Cumulative Net</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($rev = $revenue_trends->fetch_assoc()): ?>
-                        <tr>
-                            <td><strong><?php echo $rev['month']; ?></strong></td>
-                            <td><?php echo $rev['transaction_count']; ?> tx</td>
-                            <td style="color:var(--success); font-weight:600;">+<?php echo number_format($rev['session_revenue'], 1); ?> TC</td>
-                            <td style="color:var(--danger); font-weight:600;">-<?php echo number_format($rev['refunds'], 1); ?> TC</td>
-                            <td style="color:var(--primary); font-weight:600;"><?php echo number_format($rev['net_revenue'], 1); ?> TC</td>
-                            <td><strong><?php echo number_format($rev['cumulative_net'], 1); ?> TC</strong></td>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+        <div style="padding: 16px; height: 380px;">
+            <canvas id="revenueChart"></canvas>
         </div>
     </div>
 
@@ -569,7 +595,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Market Gaps (Demand with No Providers)</h3>
-            </div>
+        </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -585,14 +611,19 @@ include __DIR__ . '/../includes/admin_header.php';
                         <?php while ($sg = $skills_gap->fetch_assoc()): ?>
                             <tr>
                                 <td><strong><?php echo htmlspecialchars($sg['skill_name']); ?></strong></td>
-                                <td><span class="badge badge-orange"><?php echo htmlspecialchars($sg['catagory'] ?? 'General'); ?></span></td>
-                                <td style="color:var(--danger); font-weight:600; text-align:center;"><?php echo $sg['demand_count']; ?> requests</td>
+                                <td><span
+                                        class="badge badge-orange"><?php echo htmlspecialchars($sg['catagory'] ?? 'General'); ?></span>
+                                </td>
+                                <td style="color:var(--danger); font-weight:600; text-align:center;">
+                                    <?php echo $sg['demand_count']; ?> requests
+                                </td>
                                 <td style="text-align:center;"><span class="badge badge-danger">0</span></td>
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="4" style="text-align:center; color:var(--text-muted);">No market gaps identified. All requested skills have providers!</td>
+                            <td colspan="4" style="text-align:center; color:var(--text-muted);">No market gaps identified.
+                                All requested skills have providers!</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -622,7 +653,8 @@ include __DIR__ . '/../includes/admin_header.php';
                             <tr>
                                 <td><?php echo htmlspecialchars($u['name']); ?></td>
                                 <td style="color:var(--success); font-weight:600;">
-                                    <?php echo number_format($u['balance'], 2); ?> TC</td>
+                                    <?php echo number_format($u['balance'], 2); ?> TC
+                                </td>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
@@ -635,25 +667,13 @@ include __DIR__ . '/../includes/admin_header.php';
         <?php endif; ?>
     </div>
 
-    <!-- Community Task Stats -->
+    <!-- Community Tasks Chart -->
     <div class="card">
         <div class="card-header">
             <h3>Community Tasks Summary</h3>
         </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-value" style="color:var(--warning);"><?php echo $task_data['pending'] ?? 0; ?></span>
-                <span class="stat-label">Pending</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" style="color:var(--info);"><?php echo $task_data['in-progress'] ?? 0; ?></span>
-                <span class="stat-label">In Progress</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value"
-                    style="color:var(--success);"><?php echo $task_data['completed'] ?? 0; ?></span>
-                <span class="stat-label">Completed</span>
-            </div>
+        <div style="padding: 16px; height: 320px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="tasksChart"></canvas>
         </div>
     </div>
 </div>
@@ -663,7 +683,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <div class="card">
         <div class="card-header">
             <h3>Community Task Contributors</h3>
-            </div>
+        </div>
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -681,12 +701,14 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <td><strong>#<?php echo $tl['task_rank']; ?></strong></td>
                                 <td><strong><?php echo htmlspecialchars($tl['name']); ?></strong></td>
                                 <td><?php echo $tl['tasks_completed']; ?> tasks completed</td>
-                                <td style="color:var(--success); font-weight:600;">+<?php echo number_format($tl['total_rewards'], 2); ?> TC</td>
+                                <td style="color:var(--success); font-weight:600;">
+                                    +<?php echo number_format($tl['total_rewards'], 2); ?> TC</td>
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="4" style="text-align:center; color:var(--text-muted);">No task completions recorded.</td>
+                            <td colspan="4" style="text-align:center; color:var(--text-muted);">No task completions
+                                recorded.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -714,7 +736,8 @@ include __DIR__ . '/../includes/admin_header.php';
                             <td>
                                 <div class="flex items-center gap-1">
                                     <div class="progress-bar" style="max-width:200px;">
-                                        <div class="fill" style="width: <?php echo min($g['user_count'] * 20, 100); ?>%;"></div>
+                                        <div class="fill" style="width: <?php echo min($g['user_count'] * 20, 100); ?>%;">
+                                        </div>
                                     </div>
                                     <span><?php echo $g['user_count']; ?></span>
                                 </div>
@@ -731,18 +754,24 @@ include __DIR__ . '/../includes/admin_header.php';
 <!-- OLAP DATA WAREHOUSE REPORTS -->
 <!-- ============================================================ -->
 <div class="card mb-3" style="border: 2px solid var(--primary);">
-    <div class="card-header" style="background: var(--primary-glow); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
+    <div class="card-header"
+        style="background: var(--primary-glow); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
         <div>
-            <h2 style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="bar-chart" class="lucide-sm"></i> OLAP Data Warehouse Analytics</h2>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced reporting engine executing cross-dimensional aggregations over Fact & Dimension views.</p>
+            <h2
+                style="color: var(--primary); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">
+                <i data-lucide="bar-chart" class="lucide-sm"></i> OLAP Data Warehouse Analytics
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced reporting engine
+                executing cross-dimensional aggregations over Fact & Dimension views.</p>
         </div>
-        </div>
-    
+    </div>
+
     <div style="padding: 20px;">
         <div class="grid-2 mb-3">
             <!-- Quarter-over-Quarter Growth -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-                <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <div class="card-header"
+                    style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
                     <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">Quarter-over-Quarter (QoQ) Growth</h4>
                 </div>
                 <div class="table-wrapper">
@@ -757,7 +786,7 @@ include __DIR__ . '/../includes/admin_header.php';
                         </thead>
                         <tbody>
                             <?php if ($qoq_result && $qoq_result->num_rows > 0): ?>
-                                <?php while ($q = $qoq_result->fetch_assoc()): 
+                                <?php while ($q = $qoq_result->fetch_assoc()):
                                     $growth = $q['qoq_growth_pct'];
                                     $growth_color = 'var(--text-secondary)';
                                     $growth_text = $growth . '%';
@@ -768,17 +797,24 @@ include __DIR__ . '/../includes/admin_header.php';
                                         $growth_color = 'var(--danger)';
                                         $growth_text = '▼ ' . $growth . '%';
                                     }
-                                ?>
+                                    ?>
                                     <tr style="border-bottom: 1px solid var(--border-light);">
                                         <td><strong><?php echo $q['year'] . ' Q' . $q['quarter']; ?></strong></td>
-                                        <td style="text-align: right; font-weight: 600;"><?php echo number_format($q['total_credits'], 2); ?> TC</td>
-                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $q['total_sessions']; ?></td>
-                                        <td style="text-align: right; font-weight: bold; color: <?php echo $growth_color; ?>;"><?php echo $growth_text; ?></td>
+                                        <td style="text-align: right; font-weight: 600;">
+                                            <?php echo number_format($q['total_credits'], 2); ?> TC
+                                        </td>
+                                        <td style="text-align: center; color: var(--text-muted);">
+                                            <?php echo $q['total_sessions']; ?>
+                                        </td>
+                                        <td style="text-align: right; font-weight: bold; color: <?php echo $growth_color; ?>;">
+                                            <?php echo $growth_text; ?>
+                                        </td>
                                     </tr>
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 15px;">No historical quarter data available.</td>
+                                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 15px;">No
+                                        historical quarter data available.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -786,44 +822,24 @@ include __DIR__ . '/../includes/admin_header.php';
                 </div>
             </div>
 
-            <!-- 7-Day Moving Average -->
+            <!-- 7-Day Moving Average Chart -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-                <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <div class="card-header"
+                    style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
                     <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">7-Day Moving Average of Exchanges</h4>
                 </div>
-                <div class="table-wrapper">
-                    <table style="font-size: 0.8rem; background: var(--bg-secondary);">
-                        <thead>
-                            <tr style="background: var(--bg-primary);">
-                                <th>Date</th>
-                                <th style="text-align: right;">Daily Credits</th>
-                                <th style="text-align: right;">7-Day Moving Avg</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($moving_avg_result && $moving_avg_result->num_rows > 0): ?>
-                                <?php while ($m = $moving_avg_result->fetch_assoc()): ?>
-                                    <tr style="border-bottom: 1px solid var(--border-light);">
-                                        <td><strong><?php echo date('M d, Y', strtotime($m['full_date'])); ?></strong></td>
-                                        <td style="text-align: right; color: var(--text-secondary);"><?php echo number_format($m['daily_credits'], 2); ?> TC</td>
-                                        <td style="text-align: right; font-weight: bold; color: var(--info);"><?php echo number_format($m['moving_avg'], 2); ?> TC</td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">No recent exchange session history.</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                <div style="padding: 16px; height: 320px;">
+                    <canvas id="movingAvgChart"></canvas>
                 </div>
             </div>
         </div>
 
         <!-- Multi-Dimensional Roll-up Pivot -->
         <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-            <div class="card-header" style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">OLAP Roll-up Pivot (Category & Difficulty)</h4>
+            <div class="card-header"
+                style="padding: 10px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <h4 style="margin:0; font-size:0.9rem; color:var(--primary);">OLAP Roll-up Pivot (Category & Difficulty)
+                </h4>
             </div>
             <div class="table-wrapper">
                 <table style="font-size: 0.8rem; background: var(--bg-secondary);">
@@ -838,15 +854,15 @@ include __DIR__ . '/../includes/admin_header.php';
                     </thead>
                     <tbody>
                         <?php if ($rollup_result && $rollup_result->num_rows > 0): ?>
-                            <?php while ($r = $rollup_result->fetch_assoc()): 
+                            <?php while ($r = $rollup_result->fetch_assoc()):
                                 $is_category_total = is_null($r['difficulty_level']) && !is_null($r['category']);
                                 $is_grand_total = is_null($r['category']) && is_null($r['difficulty_level']);
-                                
+
                                 $row_bg = 'transparent';
                                 $font_weight = 'normal';
                                 $cat_display = htmlspecialchars($r['category'] ?? '');
                                 $diff_display = htmlspecialchars($r['difficulty_level'] ?? '');
-                                
+
                                 if ($is_grand_total) {
                                     $row_bg = 'var(--primary-glow)';
                                     $font_weight = 'bold';
@@ -858,18 +874,21 @@ include __DIR__ . '/../includes/admin_header.php';
                                     $cat_display = '<i data-lucide="folder" class="lucide-sm"></i> ' . $cat_display;
                                     $diff_display = 'Subtotal';
                                 }
-                            ?>
-                                <tr style="background: <?php echo $row_bg; ?>; font-weight: <?php echo $font_weight; ?>; border-bottom: 1px solid var(--border-light);">
+                                ?>
+                                <tr
+                                    style="background: <?php echo $row_bg; ?>; font-weight: <?php echo $font_weight; ?>; border-bottom: 1px solid var(--border-light);">
                                     <td><strong><?php echo $cat_display; ?></strong></td>
                                     <td><?php echo $diff_display; ?></td>
                                     <td style="text-align: center;"><?php echo round($r['total_minutes'] / 60.0, 1); ?>h</td>
                                     <td style="text-align: right;"><?php echo number_format($r['total_credits'], 2); ?> TC</td>
-                                    <td style="text-align: center; color: var(--text-muted);"><?php echo $r['session_count']; ?></td>
+                                    <td style="text-align: center; color: var(--text-muted);"><?php echo $r['session_count']; ?>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No aggregated OLAP cube data found.</td>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No
+                                    aggregated OLAP cube data found.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
@@ -883,20 +902,27 @@ include __DIR__ . '/../includes/admin_header.php';
 <!-- BUSINESS INTELLIGENCE OLAP PANELS -->
 <!-- ============================================================ -->
 <div class="card mb-3" style="border: 2px solid var(--info);">
-    <div class="card-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(14, 165, 233, 0.08)); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
+    <div class="card-header"
+        style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(14, 165, 233, 0.08)); border-bottom: 1px solid var(--border-light); padding: 15px 20px;">
         <div>
-            <h2 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;"><i data-lucide="brain" class="lucide-sm"></i> Business Intelligence Analytics</h2>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
+            <h2
+                style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">
+                <i data-lucide="brain" class="lucide-sm"></i> Business Intelligence Analytics
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using
+                NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
         </div>
-        </div>
+    </div>
 
     <div style="padding: 20px;">
 
         <!-- Demand-to-Supply Ratio -->
         <div class="card mb-3" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-            <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="bar-chart" class="lucide-sm"></i> Demand-to-Supply Ratio (Market Economics)</h4>
-                </div>
+            <div class="card-header"
+                style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="bar-chart"
+                        class="lucide-sm"></i> Demand-to-Supply Ratio (Market Economics)</h4>
+            </div>
             <div class="table-wrapper">
                 <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                     <thead>
@@ -914,32 +940,50 @@ include __DIR__ . '/../includes/admin_header.php';
                             <?php while ($ds = $demand_supply->fetch_assoc()):
                                 $ratio = $ds['demand_supply_ratio'];
                                 $ratio_color = 'var(--text-secondary)';
-                                if ($ratio >= 999) $ratio_color = 'var(--danger)';
-                                elseif ($ratio > 3) $ratio_color = '#ef4444';
-                                elseif ($ratio > 1.5) $ratio_color = 'var(--warning)';
-                                elseif ($ratio >= 0.8) $ratio_color = 'var(--success)';
-                                else $ratio_color = 'var(--info)';
+                                if ($ratio >= 999)
+                                    $ratio_color = 'var(--danger)';
+                                elseif ($ratio > 3)
+                                    $ratio_color = '#ef4444';
+                                elseif ($ratio > 1.5)
+                                    $ratio_color = 'var(--warning)';
+                                elseif ($ratio >= 0.8)
+                                    $ratio_color = 'var(--success)';
+                                else
+                                    $ratio_color = 'var(--info)';
 
                                 $status_badge = 'badge-info';
-                                if (strpos($ds['market_status'], 'Critical') !== false) $status_badge = 'badge-danger';
-                                elseif (strpos($ds['market_status'], 'High') !== false) $status_badge = 'badge-warning';
-                                elseif (strpos($ds['market_status'], 'Growing') !== false) $status_badge = 'badge-orange';
-                                elseif (strpos($ds['market_status'], 'Balanced') !== false) $status_badge = 'badge-success';
-                            ?>
+                                if (strpos($ds['market_status'], 'Critical') !== false)
+                                    $status_badge = 'badge-danger';
+                                elseif (strpos($ds['market_status'], 'High') !== false)
+                                    $status_badge = 'badge-warning';
+                                elseif (strpos($ds['market_status'], 'Growing') !== false)
+                                    $status_badge = 'badge-orange';
+                                elseif (strpos($ds['market_status'], 'Balanced') !== false)
+                                    $status_badge = 'badge-success';
+                                ?>
                                 <tr style="border-bottom: 1px solid var(--border-light);">
                                     <td><strong><?php echo htmlspecialchars($ds['skill_name']); ?></strong></td>
-                                    <td><span class="badge badge-orange"><?php echo htmlspecialchars($ds['catagory'] ?? 'General'); ?></span></td>
-                                    <td style="text-align: center; color: var(--danger); font-weight: 600;"><?php echo $ds['demand_count']; ?></td>
-                                    <td style="text-align: center; color: var(--success); font-weight: 600;"><?php echo $ds['supply_count']; ?></td>
+                                    <td><span
+                                            class="badge badge-orange"><?php echo htmlspecialchars($ds['catagory'] ?? 'General'); ?></span>
+                                    </td>
+                                    <td style="text-align: center; color: var(--danger); font-weight: 600;">
+                                        <?php echo $ds['demand_count']; ?>
+                                    </td>
+                                    <td style="text-align: center; color: var(--success); font-weight: 600;">
+                                        <?php echo $ds['supply_count']; ?>
+                                    </td>
                                     <td style="text-align: right; font-weight: bold; color: <?php echo $ratio_color; ?>;">
                                         <?php echo $ratio >= 999 ? '∞' : $ratio . ':1'; ?>
                                     </td>
-                                    <td style="text-align: center;"><span class="badge <?php echo $status_badge; ?>"><?php echo $ds['market_status']; ?></span></td>
+                                    <td style="text-align: center;"><span
+                                            class="badge <?php echo $status_badge; ?>"><?php echo $ds['market_status']; ?></span>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No demand/supply data available.</td>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No
+                                    demand/supply data available.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
@@ -950,9 +994,11 @@ include __DIR__ . '/../includes/admin_header.php';
         <div class="grid-2 mb-3">
             <!-- Skill Popularity Percentiles (NTILE) -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-                <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="medal" class="lucide-sm"></i> Skill Popularity Percentiles</h4>
-                    </div>
+                <div class="card-header"
+                    style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="medal"
+                            class="lucide-sm"></i> Skill Popularity Percentiles</h4>
+                </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>
@@ -967,22 +1013,27 @@ include __DIR__ . '/../includes/admin_header.php';
                         <tbody>
                             <?php if ($skill_percentiles && $skill_percentiles->num_rows > 0): ?>
                                 <?php while ($sp = $skill_percentiles->fetch_assoc()):
-                                    $q = (int)$sp['popularity_quartile'];
+                                    $q = (int) $sp['popularity_quartile'];
                                     $quartile_labels = [1 => 'Top 25% <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>', 2 => 'Top 50% <i data-lucide="medal" style="color: silver;" class="lucide-sm"></i>', 3 => 'Top 75% <i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>', 4 => 'Bottom 25%'];
                                     $quartile_badges = [1 => 'badge-success', 2 => 'badge-info', 3 => 'badge-warning', 4 => 'badge-danger'];
-                                    $pct = round((1 - (float)$sp['pct_rank']) * 100, 0);
-                                ?>
+                                    $pct = round((1 - (float) $sp['pct_rank']) * 100, 0);
+                                    ?>
                                     <tr style="border-bottom: 1px solid var(--border-light);">
                                         <td>
                                             <strong><?php echo htmlspecialchars($sp['skill_name']); ?></strong>
-                                            <br><small style="color:var(--text-muted);"><?php echo htmlspecialchars($sp['catagory'] ?? 'General'); ?></small>
+                                            <br><small
+                                                style="color:var(--text-muted);"><?php echo htmlspecialchars($sp['catagory'] ?? 'General'); ?></small>
                                         </td>
-                                        <td style="text-align: center; font-weight: 600;"><?php echo $sp['total_sessions']; ?></td>
-                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $sp['total_hours']; ?>h</td>
-                                        <td style="text-align: center;"><i data-lucide="star" class="lucide-sm"></i> <?php echo $sp['avg_rating']; ?></td>
+                                        <td style="text-align: center; font-weight: 600;"><?php echo $sp['total_sessions']; ?>
+                                        </td>
+                                        <td style="text-align: center; color: var(--text-muted);">
+                                            <?php echo $sp['total_hours']; ?>h
+                                        </td>
+                                        <td style="text-align: center;"><i data-lucide="star" class="lucide-sm"></i>
+                                            <?php echo $sp['avg_rating']; ?></td>
                                         <td style="text-align: center;">
                                             <span class="badge <?php echo $quartile_badges[$q] ?? 'badge-info'; ?>">
-                                                <?php echo $quartile_labels[$q] ?? 'Q'.$q; ?>
+                                                <?php echo $quartile_labels[$q] ?? 'Q' . $q; ?>
                                             </span>
                                             <br><small style="color:var(--text-muted);">Top <?php echo $pct; ?>%</small>
                                         </td>
@@ -990,7 +1041,8 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No completed sessions to rank.</td>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 15px;">No
+                                        completed sessions to rank.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -1000,9 +1052,11 @@ include __DIR__ . '/../includes/admin_header.php';
 
             <!-- Month-over-Month Growth -->
             <div class="card" style="background: var(--bg-primary); border: 1px solid var(--border-light);">
-                <div class="card-header" style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
-                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="trending-up" class="lucide-sm"></i> Month-over-Month Session Growth</h4>
-                    </div>
+                <div class="card-header"
+                    style="padding: 12px 15px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light);">
+                    <h4 style="margin:0; font-size:0.95rem; color:var(--primary);"><i data-lucide="trending-up"
+                            class="lucide-sm"></i> Month-over-Month Session Growth</h4>
+                </div>
                 <div class="table-wrapper">
                     <table style="font-size: 0.82rem; background: var(--bg-secondary);">
                         <thead>
@@ -1032,19 +1086,28 @@ include __DIR__ . '/../includes/admin_header.php';
                                             $mom_text = '→ 0%';
                                         }
                                     }
-                                ?>
+                                    ?>
                                     <tr style="border-bottom: 1px solid var(--border-light);">
                                         <td><strong><?php echo $mg['month']; ?></strong></td>
-                                        <td style="text-align: center; font-weight: 600;"><?php echo $mg['total_bookings']; ?></td>
-                                        <td style="text-align: center; color: var(--success);"><?php echo $mg['completed']; ?></td>
-                                        <td style="text-align: center; color: var(--text-muted);"><?php echo $mg['avg_duration_mins']; ?> min</td>
-                                        <td style="text-align: right; font-weight: bold; color: <?php echo $mom_color; ?>;"><?php echo $mom_text; ?></td>
-                                        <td style="text-align: right; font-weight: 600;"><?php echo $mg['cumulative_bookings']; ?></td>
+                                        <td style="text-align: center; font-weight: 600;"><?php echo $mg['total_bookings']; ?>
+                                        </td>
+                                        <td style="text-align: center; color: var(--success);"><?php echo $mg['completed']; ?>
+                                        </td>
+                                        <td style="text-align: center; color: var(--text-muted);">
+                                            <?php echo $mg['avg_duration_mins']; ?> min
+                                        </td>
+                                        <td style="text-align: right; font-weight: bold; color: <?php echo $mom_color; ?>;">
+                                            <?php echo $mom_text; ?>
+                                        </td>
+                                        <td style="text-align: right; font-weight: 600;">
+                                            <?php echo $mg['cumulative_bookings']; ?>
+                                        </td>
                                     </tr>
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No monthly booking data found.</td>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 15px;">No
+                                        monthly booking data found.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -1055,5 +1118,365 @@ include __DIR__ . '/../includes/admin_header.php';
 
     </div>
 </div>
+
+<script>
+    (function () {
+        // ========== Chart Theme Colors ==========
+        var cs = getComputedStyle(document.documentElement);
+        var textColor = cs.getPropertyValue('--text-secondary').trim() || '#8b8fa3';
+        var gridColor = 'rgba(128,128,128,0.12)';
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.font.family = "'Inter', 'Segoe UI', sans-serif";
+        Chart.defaults.plugins.legend.labels.usePointStyle = true;
+        Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+        Chart.defaults.plugins.legend.labels.padding = 16;
+
+        // ========== 1. Most Popular Skills (Horizontal Bar) ==========
+        var skillLabels = <?php echo json_encode($skills_chart_labels); ?>;
+        var skillValues = <?php echo json_encode($skills_chart_values); ?>;
+        var skillCategories = <?php echo json_encode($skills_chart_categories); ?>;
+
+        var catColors = {
+            'Technology': 'rgba(99, 102, 241, 0.85)',
+            'Design': 'rgba(236, 72, 153, 0.85)',
+            'Language': 'rgba(14, 165, 233, 0.85)',
+            'Health': 'rgba(16, 185, 129, 0.85)',
+            'Marketing': 'rgba(245, 158, 11, 0.85)',
+            'Academic': 'rgba(139, 92, 246, 0.85)',
+            'Arts': 'rgba(244, 63, 94, 0.85)',
+            'Fitness': 'rgba(34, 197, 94, 0.85)',
+            'Finance': 'rgba(6, 182, 212, 0.85)',
+            'Cooking': 'rgba(251, 146, 60, 0.85)',
+            'Photography': 'rgba(168, 85, 247, 0.85)',
+            'Music': 'rgba(251, 191, 36, 0.85)'
+        };
+        var defaultBarColor = 'rgba(99, 102, 241, 0.85)';
+        var barBgColors = skillCategories.map(function (c) { return catColors[c] || defaultBarColor; });
+        var barBorderColors = barBgColors.map(function (c) { return c.replace('0.85', '1'); });
+
+        if (document.getElementById('skillsChart')) {
+            new Chart(document.getElementById('skillsChart'), {
+                type: 'bar',
+                data: {
+                    labels: skillLabels,
+                    datasets: [{
+                        label: 'Sessions',
+                        data: skillValues,
+                        backgroundColor: barBgColors,
+                        borderColor: barBorderColors,
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.92)',
+                            titleFont: { size: 13, weight: '600' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 10,
+                            displayColors: true,
+                            callbacks: {
+                                afterLabel: function (ctx) {
+                                    return 'Category: ' + skillCategories[ctx.dataIndex];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor, drawBorder: false },
+                            ticks: { font: { size: 11 } },
+                            title: { display: true, text: 'Session Count', font: { size: 12, weight: '600' } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { font: { size: 12, weight: '500' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ========== 2. Financial & Revenue Trends (Area Chart) ==========
+        var revMonths = <?php echo json_encode($rev_chart_months); ?>;
+        var revSession = <?php echo json_encode($rev_chart_session); ?>;
+        var revRefunds = <?php echo json_encode($rev_chart_refunds); ?>;
+        var revNet = <?php echo json_encode($rev_chart_net); ?>;
+        var revCumulative = <?php echo json_encode($rev_chart_cumulative); ?>;
+
+        if (document.getElementById('revenueChart')) {
+            var revCtx = document.getElementById('revenueChart').getContext('2d');
+            var gradientGreen = revCtx.createLinearGradient(0, 0, 0, 350);
+            gradientGreen.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            gradientGreen.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
+            var gradientPurple = revCtx.createLinearGradient(0, 0, 0, 350);
+            gradientPurple.addColorStop(0, 'rgba(99, 102, 241, 0.30)');
+            gradientPurple.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
+
+            new Chart(revCtx, {
+                type: 'line',
+                data: {
+                    labels: revMonths,
+                    datasets: [
+                        {
+                            label: 'Session Inflows',
+                            data: revSession,
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            backgroundColor: gradientGreen,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#fff',
+                            pointBorderWidth: 3,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Refunds',
+                            data: revRefunds,
+                            borderColor: 'rgba(239, 68, 68, 0.9)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#fff',
+                            pointBorderWidth: 2,
+                            borderWidth: 2,
+                            borderDash: [5, 3]
+                        },
+                        {
+                            label: 'Cumulative Net',
+                            data: revCumulative,
+                            borderColor: 'rgba(99, 102, 241, 1)',
+                            backgroundColor: gradientPurple,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#fff',
+                            pointBorderWidth: 3,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.92)',
+                            titleFont: { size: 13, weight: '600' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' TC';
+                                }
+                            }
+                        },
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor, drawBorder: false },
+                            ticks: { font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: gridColor, drawBorder: false },
+                            ticks: { font: { size: 11 }, callback: function (v) { return v + ' TC'; } },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // ========== 3. Community Tasks Summary (Doughnut) ==========
+        var taskLabels = ['Pending', 'In Progress', 'Under Review', 'Completed', 'Cancelled'];
+        var taskValues = [
+            <?php echo $task_data['pending'] ?? 0; ?>,
+            <?php echo $task_data['in-progress'] ?? 0; ?>,
+            <?php echo $task_data['under-review'] ?? 0; ?>,
+            <?php echo $task_data['completed'] ?? 0; ?>,
+            <?php echo $task_data['cancelled'] ?? 0; ?>
+        ];
+        var taskColors = [
+            'rgba(245, 158, 11, 0.85)',
+            'rgba(14, 165, 233, 0.85)',
+            'rgba(168, 85, 247, 0.85)',
+            'rgba(16, 185, 129, 0.85)',
+            'rgba(239, 68, 68, 0.85)'
+        ];
+        var taskBorders = taskColors.map(function (c) { return c.replace('0.85', '1'); });
+        var taskTotal = taskValues.reduce(function (a, b) { return a + b; }, 0);
+
+        if (document.getElementById('tasksChart')) {
+            new Chart(document.getElementById('tasksChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: taskLabels,
+                    datasets: [{
+                        data: taskValues,
+                        backgroundColor: taskColors,
+                        borderColor: taskBorders,
+                        borderWidth: 2,
+                        hoverOffset: 12,
+                        spacing: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { size: 12, weight: '500' },
+                                padding: 14,
+                                generateLabels: function (chart) {
+                                    var data = chart.data;
+                                    return data.labels.map(function (label, i) {
+                                        return {
+                                            text: label + ' (' + data.datasets[0].data[i] + ')',
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: data.datasets[0].borderColor[i],
+                                            lineWidth: 2,
+                                            pointStyle: 'circle',
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.92)',
+                            titleFont: { size: 13, weight: '600' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: function (ctx) {
+                                    var pct = taskTotal > 0 ? ((ctx.parsed / taskTotal) * 100).toFixed(1) : 0;
+                                    return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function (chart) {
+                        var ctx = chart.ctx;
+                        var width = chart.width;
+                        var height = chart.height;
+                        ctx.save();
+                        ctx.font = 'bold 28px Inter, sans-serif';
+                        ctx.fillStyle = textColor;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        var centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+                        var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+                        ctx.fillText(taskTotal, centerX, centerY - 8);
+                        ctx.font = '500 12px Inter, sans-serif';
+                        ctx.fillText('Total Tasks', centerX, centerY + 16);
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
+
+        // ========== 4. 7-Day Moving Average (Combo Bar + Line) ==========
+        var maDates = <?php echo json_encode($ma_chart_dates); ?>;
+        var maDaily = <?php echo json_encode($ma_chart_daily); ?>;
+        var maAvg = <?php echo json_encode($ma_chart_avg); ?>;
+
+        if (document.getElementById('movingAvgChart')) {
+            var maCtx = document.getElementById('movingAvgChart').getContext('2d');
+            var gradientBlue = maCtx.createLinearGradient(0, 0, 0, 300);
+            gradientBlue.addColorStop(0, 'rgba(14, 165, 233, 0.5)');
+            gradientBlue.addColorStop(1, 'rgba(14, 165, 233, 0.05)');
+
+            new Chart(maCtx, {
+                type: 'bar',
+                data: {
+                    labels: maDates,
+                    datasets: [
+                        {
+                            label: 'Daily Credits',
+                            data: maDaily,
+                            type: 'bar',
+                            backgroundColor: gradientBlue,
+                            borderColor: 'rgba(14, 165, 233, 0.9)',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            order: 2
+                        },
+                        {
+                            label: '7-Day Moving Avg',
+                            data: maAvg,
+                            type: 'line',
+                            borderColor: 'rgba(244, 63, 94, 1)',
+                            backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#fff',
+                            pointBorderWidth: 3,
+                            pointBorderColor: 'rgba(244, 63, 94, 1)',
+                            borderWidth: 3,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.92)',
+                            titleFont: { size: 13, weight: '600' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' TC';
+                                }
+                            }
+                        },
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor, drawBorder: false },
+                            ticks: { font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: gridColor, drawBorder: false },
+                            ticks: { font: { size: 11 }, callback: function (v) { return v + ' TC'; } },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    })();
+</script>
 
 <?php include __DIR__ . '/../includes/admin_footer.php'; ?>

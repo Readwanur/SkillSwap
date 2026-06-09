@@ -606,6 +606,7 @@ h3 {
 
 .btn-danger:hover {
   background: #93000a;
+  color: #fff;
 }
 
 .btn-success {
@@ -615,6 +616,7 @@ h3 {
 
 .btn-success:hover {
   background: #145e33;
+  color: #fff;
 }
 
 .btn-sm {

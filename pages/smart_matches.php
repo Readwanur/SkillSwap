@@ -203,14 +203,13 @@ include __DIR__ . '/../includes/header.php';
                                 <!-- Skill Exchange -->
                                 <div class="mt-2" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                                     <div style="background:var(--bg-hover); border-radius:var(--radius-sm); padding:8px 14px; flex:1; min-width:150px;">
-                                        <span style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">You learn</span><br>
+                                        <span style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">They can teach you:</span><br>
                                         <a href="skill_detail.php?id=<?php echo $m['user_a_requests_skill_id']; ?>" style="font-weight:600; color:var(--primary); text-decoration:none;">
                                             <?php echo htmlspecialchars($m['user_a_requests_skill_name']); ?>
                                         </a>
                                     </div>
-                                    <span style="font-size:1.2rem;">⇄</span>
                                     <div style="background:var(--bg-hover); border-radius:var(--radius-sm); padding:8px 14px; flex:1; min-width:150px;">
-                                        <span style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">You teach</span><br>
+                                        <span style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:600;">They want to learn:</span><br>
                                         <a href="skill_detail.php?id=<?php echo $m['user_b_requests_skill_id']; ?>" style="font-weight:600; color:var(--success); text-decoration:none;">
                                             <?php echo htmlspecialchars($m['user_b_requests_skill_name']); ?>
                                         </a>
@@ -237,9 +236,18 @@ include __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
 
                                 <!-- Actions -->
-                                <div class="mt-2 flex gap-1">
+                                <div class="mt-2 flex gap-1" style="flex-wrap: wrap;">
+                                    <button onclick="openBooking(<?php echo $m['user_b_id']; ?>, '<?php echo htmlspecialchars(addslashes($m['user_b_name'])); ?>', <?php echo $m['user_a_requests_skill_id']; ?>)" class="btn btn-sm btn-primary"><i data-lucide="calendar" class="lucide-sm"></i> Book to Learn</button>
+                                    
+                                    <?php 
+                                    $prefill = "Hi! I saw in Smart Matches that you're looking to learn **" . $m['user_b_requests_skill_name'] . "**. I teach it! Let me know when you're free, or click below to book a session.";
+                                    $prefill_encoded = urlencode($prefill);
+                                    $offer_skill_id = $m['user_b_requests_skill_id'];
+                                    $offer_skill_name = urlencode($m['user_b_requests_skill_name']);
+                                    ?>
+                                    <a href="messages.php?start_with_user_id=<?php echo $m['user_b_id']; ?>&prefill_msg=<?php echo $prefill_encoded; ?>&offer_skill_id=<?php echo $offer_skill_id; ?>&offer_skill_name=<?php echo $offer_skill_name; ?>" class="btn btn-sm btn-success"><i data-lucide="award" class="lucide-sm"></i> Offer to Teach</a>
+                                    
                                     <a href="messages.php?start_with_user_id=<?php echo $m['user_b_id']; ?>" class="btn btn-sm btn-secondary"><i data-lucide="message-square" class="lucide-sm"></i> Message</a>
-                                    <button onclick="openBooking(<?php echo $m['user_b_id']; ?>, '<?php echo htmlspecialchars(addslashes($m['user_b_name'])); ?>', <?php echo $m['user_a_requests_skill_id']; ?>)" class="btn btn-sm btn-primary"><i data-lucide="calendar" class="lucide-sm"></i> Book Session</button>
                                 </div>
                             </div>
                         </div>

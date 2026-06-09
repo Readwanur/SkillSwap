@@ -305,41 +305,958 @@ INSERT INTO skills (skill_name, catagory, description, difficulty_level) VALUES
 -- The users table only contains regular platform users.
 
 -- NOTE: All sample users below have the password "password" (securely hashed)
-INSERT INTO users (name, email, password_hash, location, bio, reliability_score, availability_schedule) VALUES
-('Mr. Bobuddin', 'bob@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'San Francisco', 'Professional designer with 10 years experience.', 4.50, 'Tue 10:00-15:00'),
-('Fida Haque Charlie', 'charlie@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Madrid', 'Native Spanish speaker and travel blogger.', 4.90, 'Fri 18:00-21:00'),
-('Bhondu Mahi', 'mahi@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Los Angeles', 'Certified Yoga instructor with a focus on mindfulness.', 5.00, 'Sat 08:00-10:00'),
-('Hukna Rafi', 'rafi@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'London', 'Digital marketing specialist and SEO consultant.', 4.20, NULL);
+INSERT INTO users (name, email, password_hash, location, bio, reliability_score, status, created_at) VALUES
+('Rahim Rahman', 'rahim.rahman@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Passionate about teaching and learning new things every day.', 4.03, 'active', '2025-10-14 13:34:58'),
+('Karim Hossain', 'karim.hossain@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'Full-stack developer who loves sharing knowledge with the community.', 4.18, 'active', '2026-03-28 13:34:58'),
+('Rafiq Islam', 'rafiq.islam@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sylhet, Bangladesh', 'Creative designer with a knack for minimalist interfaces.', 3.57, 'active', '2026-03-08 13:34:58'),
+('Shafiq Ahmed', 'shafiq.ahmed@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rajshahi, Bangladesh', 'Language enthusiast who speaks 3 languages fluently.', 4.39, 'active', '2026-04-06 13:34:58'),
+('Jashim Ali', 'jashim.ali@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Khulna, Bangladesh', 'Music teacher with 10 years of experience in classical piano.', 4.37, 'active', '2025-07-25 13:34:58'),
+('Kabir Chowdhury', 'kabir.chowdhury@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Barisal, Bangladesh', 'Data scientist exploring the intersection of AI and education.', 4.81, 'active', '2026-03-16 13:34:58'),
+('Nazmul Khan', 'nazmul.khan@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rangpur, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 4.09, 'active', '2025-07-14 13:34:58'),
+('Sakib Sikder', 'sakib.sikder@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mymensingh, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 4.23, 'active', '2026-02-07 13:34:58'),
+('Tamim Molla', 'tamim.molla@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Comilla, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 4.47, 'active', '2026-04-11 13:34:58'),
+('Mushfiq Mia', 'mushfiq.mia@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Narayanganj, Bangladesh', 'College student eager to learn everything from cooking to coding.', 4.49, 'active', '2026-02-28 13:34:58'),
+('Mahmudullah Haque', 'mahmudullah.haque@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gazipur, Bangladesh', 'Passionate about teaching and learning new things every day.', 4.10, 'active', '2025-10-05 13:34:58'),
+('Liton Siddique', 'liton.siddique@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Bogra, Bangladesh', 'Full-stack developer who loves sharing knowledge with the community.', 4.88, 'active', '2026-03-13 13:34:58'),
+('Soumya Khandaker', 'soumya.khandaker@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Creative designer with a knack for minimalist interfaces.', 4.83, 'active', '2025-06-12 13:34:58'),
+('Mehidy Bhuiyan', 'mehidy.bhuiyan@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'Language enthusiast who speaks 3 languages fluently.', 4.69, 'active', '2025-08-19 13:34:58'),
+('Taskin Majumder', 'taskin.majumder@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sylhet, Bangladesh', 'Music teacher with 10 years of experience in classical piano.', 4.02, 'active', '2026-03-20 13:34:58'),
+('Mustafizur Talukder', 'mustafizur.talukder@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rajshahi, Bangladesh', 'Data scientist exploring the intersection of AI and education.', 4.71, 'active', '2025-09-30 13:34:58'),
+('Rubel Howlader', 'rubel.howlader@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Khulna, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 4.98, 'active', '2025-12-06 13:34:58'),
+('Anamul Sardar', 'anamul.sardar@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Barisal, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 4.79, 'active', '2025-10-31 13:34:58'),
+('Mominul Dewan', 'mominul.dewan@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rangpur, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 4.52, 'active', '2025-06-16 13:34:58'),
+('Imrul Munshi', 'imrul.munshi@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mymensingh, Bangladesh', 'College student eager to learn everything from cooking to coding.', 4.87, 'active', '2026-03-22 13:34:58'),
+('Sadia Akter', 'sadia.akter@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Comilla, Bangladesh', 'Passionate about teaching and learning new things every day.', 4.58, 'active', '2025-08-10 13:34:58'),
+('Nusrat Begum', 'nusrat.begum@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Narayanganj, Bangladesh', 'Full-stack developer who loves sharing knowledge with the community.', 4.34, 'active', '2026-03-10 13:34:58'),
+('Sumaiya Khatun', 'sumaiya.khatun@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gazipur, Bangladesh', 'Creative designer with a knack for minimalist interfaces.', 4.29, 'active', '2026-02-13 13:34:58'),
+('Fatima Nesa', 'fatima.nesa@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Bogra, Bangladesh', 'Language enthusiast who speaks 3 languages fluently.', 4.13, 'active', '2026-03-16 13:34:58'),
+('Ayesha Banu', 'ayesha.banu@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Music teacher with 10 years of experience in classical piano.', 4.95, 'active', '2026-02-20 13:34:58'),
+('Khadija Mahmud', 'khadija.mahmud@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'Data scientist exploring the intersection of AI and education.', 4.78, 'active', '2025-08-23 13:34:58'),
+('Tania Hasan', 'tania.hasan@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sylhet, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 3.53, 'active', '2026-03-18 13:34:58'),
+('Farzana Uddin', 'farzana.uddin@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rajshahi, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 4.64, 'active', '2026-02-12 13:34:58'),
+('Jahanara Karim', 'jahanara.karim@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Khulna, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 4.40, 'active', '2026-03-25 13:34:58'),
+('Rumana Habib', 'rumana.habib@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Barisal, Bangladesh', 'College student eager to learn everything from cooking to coding.', 3.80, 'active', '2026-02-05 13:34:58'),
+('Salma Kabir', 'salma.kabir@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rangpur, Bangladesh', 'Passionate about teaching and learning new things every day.', 4.62, 'active', '2025-11-18 13:34:58'),
+('Panna Miah', 'panna.miah@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mymensingh, Bangladesh', 'Full-stack developer who loves sharing knowledge with the community.', 3.54, 'active', '2025-10-09 13:34:58'),
+('Fahima Sarker', 'fahima.sarker@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Comilla, Bangladesh', 'Creative designer with a knack for minimalist interfaces.', 3.51, 'active', '2025-10-01 13:34:58'),
+('Nahida Das', 'nahida.das@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Narayanganj, Bangladesh', 'Language enthusiast who speaks 3 languages fluently.', 3.98, 'active', '2026-03-08 13:34:58'),
+('Ritu Roy', 'ritu.roy@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gazipur, Bangladesh', 'Music teacher with 10 years of experience in classical piano.', 3.81, 'active', '2025-08-02 13:34:58'),
+('Sharmin Barua', 'sharmin.barua@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Bogra, Bangladesh', 'Data scientist exploring the intersection of AI and education.', 4.12, 'active', '2026-01-10 13:34:58'),
+('Nigar Chakma', 'nigar.chakma@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 3.70, 'active', '2026-04-30 13:34:58'),
+('Shamima Tripura', 'shamima.tripura@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 3.94, 'active', '2026-02-16 13:34:58'),
+('Fargana Marma', 'fargana.marma@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sylhet, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 3.99, 'active', '2025-10-31 13:34:58'),
+('Sanjida Debnath', 'sanjida.debnath@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rajshahi, Bangladesh', 'College student eager to learn everything from cooking to coding.', 3.56, 'active', '2025-07-16 13:34:58'),
+('Hasan Saha', 'hasan.saha@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Khulna, Bangladesh', 'Passionate about teaching and learning new things every day.', 3.80, 'active', '2025-08-21 13:34:58'),
+('Ali Ghosh', 'ali.ghosh@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Barisal, Bangladesh', 'Full-stack developer who loves sharing knowledge with the community.', 4.68, 'active', '2026-04-26 13:34:58'),
+('Ahmed Basu', 'ahmed.basu@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Rangpur, Bangladesh', 'Creative designer with a knack for minimalist interfaces.', 3.91, 'active', '2025-09-15 13:34:58'),
+('Mia Mitra', 'mia.mitra@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mymensingh, Bangladesh', 'Language enthusiast who speaks 3 languages fluently.', 3.59, 'active', '2025-09-18 13:34:58'),
+('Khan Datta', 'khan.datta@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Comilla, Bangladesh', 'Music teacher with 10 years of experience in classical piano.', 3.72, 'active', '2025-12-12 13:34:58'),
+('Chowdhury Pal', 'chowdhury.pal@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Narayanganj, Bangladesh', 'Data scientist exploring the intersection of AI and education.', 4.91, 'active', '2025-08-26 13:34:58'),
+('Hossain Shil', 'hossain.shil@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gazipur, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 4.99, 'active', '2025-12-04 13:34:58'),
+('Rahman Banik', 'rahman.banik@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Bogra, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 3.58, 'active', '2025-08-14 13:34:58'),
+('Siddique Bhowmik', 'siddique.bhowmik@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 3.68, 'active', '2025-10-05 13:34:58'),
+('Hoque Sen', 'hoque.sen@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'College student eager to learn everything from cooking to coding.', 3.53, 'active', '2026-02-14 13:34:58');
+
+REPLACE INTO wallet (user_id, balance) VALUES
+(1, 192.84),
+(2, 101.19),
+(3, 136.68),
+(4, 84.21),
+(5, 173.19),
+(6, 102.50),
+(7, 32.93),
+(8, 86.17),
+(9, 91.05),
+(10, 131.41),
+(11, 136.19),
+(12, 96.09),
+(13, 164.55),
+(14, 25.96),
+(15, 172.71),
+(16, 56.83),
+(17, 177.05),
+(18, 73.25),
+(19, 146.39),
+(20, 104.01),
+(21, 94.88),
+(22, 179.40),
+(23, 190.60),
+(24, 114.92),
+(25, 78.11),
+(26, 105.04),
+(27, 157.09),
+(28, 153.57),
+(29, 119.94),
+(30, 100.77),
+(31, 137.13),
+(32, 150.68),
+(33, 95.48),
+(34, 33.74),
+(35, 134.45),
+(36, 191.03),
+(37, 106.80),
+(38, 185.67),
+(39, 87.05),
+(40, 56.31),
+(41, 124.16),
+(42, 154.13),
+(43, 86.72),
+(44, 165.67),
+(45, 47.35),
+(46, 57.22),
+(47, 199.65),
+(48, 131.78),
+(49, 22.85),
+(50, 105.57);
+
+REPLACE INTO reputation (user_id, current_score, completed_sessions, cancelled_sessions, mentor_level) VALUES
+(1, 3.65, 1, 3, 'Novice'),
+(2, 3.75, 9, 2, 'Professional'),
+(3, 3.84, 2, 2, 'Novice'),
+(4, 3.15, 22, 3, 'Master'),
+(5, 3.13, 23, 3, 'Master'),
+(6, 4.20, 21, 0, 'Master'),
+(7, 4.04, 21, 2, 'Master'),
+(8, 3.37, 3, 2, 'Novice'),
+(9, 3.63, 8, 2, 'Professional'),
+(10, 3.15, 19, 3, 'Expert'),
+(11, 4.27, 13, 1, 'Expert'),
+(12, 3.68, 6, 2, 'Professional'),
+(13, 3.46, 0, 3, 'Novice'),
+(14, 4.19, 6, 1, 'Professional'),
+(15, 4.27, 8, 0, 'Professional'),
+(16, 3.44, 15, 3, 'Expert'),
+(17, 3.96, 2, 2, 'Novice'),
+(18, 3.94, 4, 0, 'Novice'),
+(19, 3.34, 14, 2, 'Expert'),
+(20, 3.80, 13, 3, 'Expert'),
+(21, 4.16, 15, 1, 'Expert'),
+(22, 3.66, 18, 1, 'Expert'),
+(23, 3.90, 6, 2, 'Professional'),
+(24, 4.31, 24, 0, 'Master'),
+(25, 4.07, 2, 2, 'Novice'),
+(26, 3.83, 12, 3, 'Expert'),
+(27, 4.12, 9, 1, 'Professional'),
+(28, 3.10, 11, 2, 'Expert'),
+(29, 3.90, 20, 2, 'Master'),
+(30, 3.92, 24, 0, 'Master'),
+(31, 3.16, 22, 2, 'Master'),
+(32, 3.54, 18, 3, 'Expert'),
+(33, 3.68, 13, 0, 'Expert'),
+(34, 3.90, 10, 0, 'Expert'),
+(35, 4.10, 0, 1, 'Novice'),
+(36, 3.47, 16, 3, 'Expert'),
+(37, 3.13, 14, 3, 'Expert'),
+(38, 3.19, 8, 2, 'Professional'),
+(39, 3.41, 24, 3, 'Master'),
+(40, 3.33, 17, 1, 'Expert'),
+(41, 3.92, 14, 2, 'Expert'),
+(42, 3.59, 20, 2, 'Master'),
+(43, 3.92, 24, 2, 'Master'),
+(44, 4.34, 15, 0, 'Expert'),
+(45, 4.08, 3, 2, 'Novice'),
+(46, 3.64, 20, 2, 'Master'),
+(47, 3.75, 20, 2, 'Master'),
+(48, 3.08, 15, 3, 'Expert'),
+(49, 4.13, 16, 0, 'Expert'),
+(50, 3.46, 10, 1, 'Expert');
 
 INSERT INTO user_skills_offered (user_id, skill_id) VALUES
-(1, 8), (2, 7), (3, 6), (4, 5);
+(1, 27),
+(1, 2),
+(1, 1),
+(1, 11),
+(2, 21),
+(2, 16),
+(2, 35),
+(2, 25),
+(2, 20),
+(3, 16),
+(3, 12),
+(4, 21),
+(4, 34),
+(4, 16),
+(5, 27),
+(5, 13),
+(6, 30),
+(6, 16),
+(6, 1),
+(6, 14),
+(7, 28),
+(7, 3),
+(8, 32),
+(8, 31),
+(8, 9),
+(8, 13),
+(8, 23),
+(9, 5),
+(9, 15),
+(10, 35),
+(10, 18),
+(10, 1),
+(10, 10),
+(10, 13),
+(11, 15),
+(11, 35),
+(11, 4),
+(11, 22),
+(12, 6),
+(12, 35),
+(12, 7),
+(13, 21),
+(13, 31),
+(13, 27),
+(13, 26),
+(14, 5),
+(14, 28),
+(14, 24),
+(15, 20),
+(15, 18),
+(15, 26),
+(16, 6),
+(16, 17),
+(16, 8),
+(16, 22),
+(16, 33),
+(17, 8),
+(17, 20),
+(17, 1),
+(18, 15),
+(18, 27),
+(18, 23),
+(19, 20),
+(19, 12),
+(19, 22),
+(20, 34),
+(20, 7),
+(20, 9),
+(20, 19),
+(20, 29),
+(21, 12),
+(21, 34),
+(21, 7),
+(21, 13),
+(22, 4),
+(22, 14),
+(22, 25),
+(22, 29),
+(22, 22),
+(23, 11),
+(23, 18),
+(23, 25),
+(23, 3),
+(24, 25),
+(24, 14),
+(25, 13),
+(25, 24),
+(25, 26),
+(26, 14),
+(26, 5),
+(26, 18),
+(26, 27),
+(26, 17),
+(27, 31),
+(27, 26),
+(27, 10),
+(27, 13),
+(27, 29),
+(28, 25),
+(28, 14),
+(28, 11),
+(29, 6),
+(29, 2),
+(29, 4),
+(29, 25),
+(29, 29),
+(30, 14),
+(30, 10),
+(31, 28),
+(31, 20),
+(31, 2),
+(32, 28),
+(32, 16),
+(33, 1),
+(33, 12),
+(33, 23),
+(33, 16),
+(34, 10),
+(34, 9),
+(34, 13),
+(34, 15),
+(35, 30),
+(35, 28),
+(35, 35),
+(35, 8),
+(35, 24),
+(36, 22),
+(36, 35),
+(37, 24),
+(37, 27),
+(37, 1),
+(38, 34),
+(38, 21),
+(38, 2),
+(38, 22),
+(39, 13),
+(39, 27),
+(39, 16),
+(39, 26),
+(39, 34),
+(40, 34),
+(40, 24),
+(40, 23),
+(40, 4),
+(41, 1),
+(41, 14),
+(41, 30),
+(41, 3),
+(42, 2),
+(42, 35),
+(42, 15),
+(42, 21),
+(43, 29),
+(43, 24),
+(44, 8),
+(44, 20),
+(44, 10),
+(45, 20),
+(45, 22),
+(45, 32),
+(45, 23),
+(46, 19),
+(46, 6),
+(46, 18),
+(46, 29),
+(47, 18),
+(47, 13),
+(48, 6),
+(48, 7),
+(49, 7),
+(49, 32),
+(50, 21),
+(50, 34),
+(50, 1),
+(50, 15);
 
 INSERT INTO user_skills_requested (user_id, skill_id) VALUES
-(1, 9), (2, 1), (3, 7), (4, 2);
+(1, 25),
+(1, 32),
+(2, 28),
+(2, 13),
+(3, 23),
+(3, 11),
+(3, 15),
+(4, 35),
+(4, 4),
+(4, 28),
+(5, 31),
+(5, 23),
+(5, 8),
+(6, 7),
+(6, 3),
+(7, 14),
+(7, 18),
+(7, 29),
+(8, 20),
+(8, 12),
+(9, 24),
+(9, 28),
+(9, 31),
+(10, 25),
+(10, 34),
+(11, 7),
+(11, 17),
+(11, 1),
+(11, 8),
+(12, 25),
+(12, 2),
+(13, 8),
+(13, 20),
+(13, 6),
+(13, 30),
+(14, 15),
+(14, 6),
+(14, 19),
+(15, 29),
+(15, 8),
+(15, 9),
+(16, 10),
+(16, 30),
+(17, 30),
+(17, 29),
+(17, 13),
+(17, 31),
+(18, 17),
+(18, 20),
+(19, 32),
+(19, 21),
+(19, 15),
+(19, 26),
+(20, 15),
+(20, 4),
+(20, 27),
+(20, 11),
+(21, 28),
+(21, 8),
+(21, 5),
+(22, 23),
+(22, 13),
+(22, 12),
+(23, 12),
+(23, 2),
+(23, 13),
+(24, 2),
+(24, 8),
+(24, 35),
+(24, 24),
+(25, 3),
+(25, 10),
+(25, 25),
+(26, 2),
+(26, 29),
+(26, 9),
+(27, 28),
+(27, 32),
+(28, 4),
+(28, 24),
+(28, 23),
+(29, 13),
+(29, 22),
+(30, 8),
+(30, 16),
+(30, 21),
+(30, 5),
+(31, 5),
+(31, 31),
+(32, 18),
+(32, 6),
+(32, 8),
+(32, 14),
+(33, 32),
+(33, 25),
+(33, 33),
+(33, 11),
+(34, 18),
+(34, 34),
+(35, 4),
+(35, 10),
+(35, 11),
+(35, 14),
+(36, 34),
+(36, 8),
+(36, 7),
+(37, 2),
+(37, 28),
+(37, 17),
+(38, 15),
+(38, 13),
+(38, 19),
+(39, 4),
+(39, 7),
+(39, 30),
+(39, 20),
+(40, 15),
+(40, 21),
+(40, 30),
+(41, 5),
+(41, 10),
+(41, 19),
+(42, 22),
+(42, 13),
+(42, 20),
+(42, 10),
+(43, 16),
+(43, 9),
+(43, 13),
+(44, 7),
+(44, 14),
+(44, 4),
+(44, 23),
+(45, 26),
+(45, 10),
+(45, 35),
+(45, 18),
+(46, 27),
+(46, 5),
+(46, 7),
+(47, 20),
+(47, 16),
+(48, 28),
+(48, 8),
+(48, 2),
+(48, 16),
+(49, 21),
+(49, 28),
+(49, 11),
+(49, 33),
+(50, 26),
+(50, 18),
+(50, 31);
 
-INSERT INTO reputation (user_id, current_score, completed_sessions) VALUES
-(1, 4.5, 8), (2, 4.9, 15), (3, 5.0, 5), (4, 4.2, 7);
+INSERT INTO user_availability (user_id, day_of_week, start_time, end_time) VALUES
+(1, 'Thursday', '08:00:00', '11:00:00'),
+(1, 'Wednesday', '08:00:00', '10:00:00'),
+(2, 'Sunday', '17:00:00', '19:00:00'),
+(2, 'Saturday', '10:00:00', '13:00:00'),
+(2, 'Wednesday', '16:00:00', '20:00:00'),
+(3, 'Tuesday', '16:00:00', '18:00:00'),
+(3, 'Thursday', '11:00:00', '15:00:00'),
+(4, 'Tuesday', '13:00:00', '17:00:00'),
+(4, 'Monday', '12:00:00', '15:00:00'),
+(4, 'Wednesday', '08:00:00', '11:00:00'),
+(5, 'Tuesday', '16:00:00', '18:00:00'),
+(5, 'Wednesday', '09:00:00', '13:00:00'),
+(5, 'Sunday', '08:00:00', '12:00:00'),
+(6, 'Wednesday', '09:00:00', '13:00:00'),
+(6, 'Tuesday', '16:00:00', '19:00:00'),
+(6, 'Friday', '09:00:00', '11:00:00'),
+(7, 'Tuesday', '11:00:00', '15:00:00'),
+(7, 'Sunday', '10:00:00', '12:00:00'),
+(8, 'Monday', '17:00:00', '20:00:00'),
+(8, 'Friday', '10:00:00', '13:00:00'),
+(8, 'Sunday', '15:00:00', '18:00:00'),
+(9, 'Thursday', '16:00:00', '18:00:00'),
+(9, 'Friday', '16:00:00', '18:00:00'),
+(10, 'Monday', '13:00:00', '15:00:00'),
+(10, 'Friday', '08:00:00', '11:00:00'),
+(10, 'Saturday', '17:00:00', '19:00:00'),
+(11, 'Tuesday', '15:00:00', '19:00:00'),
+(12, 'Thursday', '14:00:00', '16:00:00'),
+(12, 'Wednesday', '09:00:00', '12:00:00'),
+(12, 'Friday', '18:00:00', '21:00:00'),
+(13, 'Sunday', '17:00:00', '20:00:00'),
+(13, 'Tuesday', '10:00:00', '13:00:00'),
+(13, 'Friday', '18:00:00', '20:00:00'),
+(14, 'Wednesday', '16:00:00', '19:00:00'),
+(14, 'Thursday', '10:00:00', '12:00:00'),
+(15, 'Monday', '17:00:00', '19:00:00'),
+(15, 'Thursday', '10:00:00', '13:00:00'),
+(16, 'Thursday', '14:00:00', '16:00:00'),
+(16, 'Saturday', '14:00:00', '16:00:00'),
+(17, 'Monday', '10:00:00', '12:00:00'),
+(17, 'Tuesday', '15:00:00', '18:00:00'),
+(18, 'Tuesday', '16:00:00', '19:00:00'),
+(18, 'Thursday', '08:00:00', '10:00:00'),
+(18, 'Wednesday', '16:00:00', '18:00:00'),
+(19, 'Tuesday', '09:00:00', '12:00:00'),
+(19, 'Monday', '10:00:00', '12:00:00'),
+(19, 'Wednesday', '12:00:00', '16:00:00'),
+(20, 'Saturday', '12:00:00', '16:00:00'),
+(20, 'Thursday', '11:00:00', '15:00:00'),
+(21, 'Monday', '09:00:00', '13:00:00'),
+(21, 'Tuesday', '15:00:00', '19:00:00'),
+(21, 'Saturday', '08:00:00', '10:00:00'),
+(22, 'Sunday', '11:00:00', '14:00:00'),
+(22, 'Friday', '08:00:00', '11:00:00'),
+(22, 'Tuesday', '17:00:00', '21:00:00'),
+(23, 'Sunday', '09:00:00', '12:00:00'),
+(23, 'Wednesday', '11:00:00', '15:00:00'),
+(24, 'Saturday', '09:00:00', '11:00:00'),
+(24, 'Thursday', '15:00:00', '19:00:00'),
+(25, 'Monday', '16:00:00', '19:00:00'),
+(25, 'Thursday', '12:00:00', '15:00:00'),
+(26, 'Thursday', '13:00:00', '17:00:00'),
+(27, 'Monday', '16:00:00', '20:00:00'),
+(27, 'Friday', '09:00:00', '12:00:00'),
+(28, 'Tuesday', '11:00:00', '13:00:00'),
+(28, 'Monday', '17:00:00', '20:00:00'),
+(29, 'Saturday', '18:00:00', '22:00:00'),
+(29, 'Wednesday', '10:00:00', '13:00:00'),
+(30, 'Sunday', '18:00:00', '20:00:00'),
+(30, 'Tuesday', '15:00:00', '19:00:00'),
+(30, 'Saturday', '16:00:00', '19:00:00'),
+(31, 'Sunday', '09:00:00', '11:00:00'),
+(31, 'Monday', '18:00:00', '21:00:00'),
+(31, 'Friday', '15:00:00', '17:00:00'),
+(31, 'Tuesday', '12:00:00', '16:00:00'),
+(32, 'Thursday', '15:00:00', '18:00:00'),
+(32, 'Wednesday', '17:00:00', '19:00:00'),
+(32, 'Friday', '16:00:00', '19:00:00'),
+(32, 'Tuesday', '18:00:00', '22:00:00'),
+(33, 'Sunday', '08:00:00', '11:00:00'),
+(33, 'Thursday', '11:00:00', '13:00:00'),
+(34, 'Tuesday', '13:00:00', '16:00:00'),
+(34, 'Sunday', '15:00:00', '17:00:00'),
+(34, 'Thursday', '08:00:00', '12:00:00'),
+(35, 'Tuesday', '10:00:00', '14:00:00'),
+(35, 'Sunday', '14:00:00', '16:00:00'),
+(36, 'Sunday', '08:00:00', '12:00:00'),
+(36, 'Friday', '14:00:00', '16:00:00'),
+(36, 'Tuesday', '17:00:00', '20:00:00'),
+(36, 'Saturday', '14:00:00', '17:00:00'),
+(37, 'Wednesday', '18:00:00', '22:00:00'),
+(37, 'Thursday', '09:00:00', '13:00:00'),
+(38, 'Monday', '15:00:00', '19:00:00'),
+(38, 'Saturday', '13:00:00', '17:00:00'),
+(38, 'Wednesday', '09:00:00', '13:00:00'),
+(39, 'Tuesday', '15:00:00', '18:00:00'),
+(39, 'Wednesday', '15:00:00', '17:00:00'),
+(39, 'Saturday', '16:00:00', '20:00:00'),
+(40, 'Sunday', '11:00:00', '15:00:00'),
+(40, 'Thursday', '11:00:00', '13:00:00'),
+(40, 'Monday', '10:00:00', '14:00:00'),
+(41, 'Wednesday', '11:00:00', '14:00:00'),
+(41, 'Saturday', '15:00:00', '17:00:00'),
+(41, 'Friday', '10:00:00', '12:00:00'),
+(42, 'Sunday', '16:00:00', '20:00:00'),
+(42, 'Saturday', '14:00:00', '16:00:00'),
+(42, 'Monday', '14:00:00', '17:00:00'),
+(42, 'Thursday', '11:00:00', '15:00:00'),
+(43, 'Thursday', '12:00:00', '14:00:00'),
+(43, 'Tuesday', '09:00:00', '13:00:00'),
+(43, 'Wednesday', '09:00:00', '13:00:00'),
+(44, 'Sunday', '16:00:00', '19:00:00'),
+(44, 'Tuesday', '18:00:00', '22:00:00'),
+(45, 'Sunday', '08:00:00', '12:00:00'),
+(45, 'Friday', '13:00:00', '16:00:00'),
+(46, 'Tuesday', '09:00:00', '11:00:00'),
+(46, 'Wednesday', '15:00:00', '18:00:00'),
+(47, 'Tuesday', '14:00:00', '17:00:00'),
+(47, 'Friday', '12:00:00', '16:00:00'),
+(47, 'Wednesday', '15:00:00', '19:00:00'),
+(48, 'Thursday', '16:00:00', '19:00:00'),
+(48, 'Tuesday', '16:00:00', '19:00:00'),
+(49, 'Saturday', '18:00:00', '22:00:00'),
+(49, 'Monday', '11:00:00', '14:00:00'),
+(49, 'Friday', '11:00:00', '15:00:00'),
+(50, 'Sunday', '11:00:00', '13:00:00');
 
-INSERT INTO wallet (user_id, balance) VALUES
-(1, 50.00), (2, 75.00), (3, 120.00), (4, 30.00);
+INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, completion_time, session_duration, time_credit_transfer, rating, feedback_given, bonus_multiplier, completion_otp) VALUES
+(32, 1, 27, 'completed', '2026-01-12 13:34:58', '2026-01-12 14:04:58', 30, 5.00, 5, TRUE, 1.00, '5165'),
+(18, 27, 34, 'completed', '2026-04-19 13:34:58', '2026-04-19 15:04:58', 90, 15.00, 5, TRUE, 1.00, '8481'),
+(10, 25, 10, 'completed', '2026-02-09 13:34:58', '2026-02-09 15:04:58', 90, 15.00, 5, TRUE, 1.00, '7848'),
+(23, 48, 18, 'completed', '2026-06-01 13:34:58', '2026-06-01 15:34:58', 120, 20.00, 3, TRUE, 1.00, '7904'),
+(45, 18, 22, 'completed', '2026-01-22 13:34:58', '2026-01-22 14:34:58', 60, 10.00, 3, TRUE, 1.00, '3894'),
+(1, 33, 12, 'completed', '2026-01-26 13:34:58', '2026-01-26 15:04:58', 90, 15.00, 3, TRUE, 1.00, '9335'),
+(26, 16, 19, 'completed', '2026-02-22 13:34:58', '2026-02-22 14:34:58', 60, 10.00, 4, TRUE, 1.00, '9861'),
+(11, 27, 33, 'completed', '2026-01-04 13:34:58', '2026-01-04 14:34:58', 60, 10.00, 5, TRUE, 1.00, '2615'),
+(50, 2, 19, 'completed', '2026-03-03 13:34:58', '2026-03-03 14:04:58', 30, 5.00, 5, TRUE, 1.00, '0734'),
+(46, 26, 4, 'completed', '2026-05-02 13:34:58', '2026-05-02 15:34:58', 120, 20.00, 5, TRUE, 1.00, '5481'),
+(2, 34, 33, 'completed', '2026-03-04 13:34:58', '2026-03-04 15:34:58', 120, 20.00, 5, TRUE, 1.00, '0675'),
+(50, 2, 7, 'completed', '2026-05-28 13:34:58', '2026-05-28 14:04:58', 30, 5.00, 3, TRUE, 1.00, '3045'),
+(13, 24, 13, 'completed', '2025-12-30 13:34:58', '2025-12-30 14:34:58', 60, 10.00, 5, TRUE, 1.00, '4998'),
+(39, 31, 20, 'completed', '2026-05-28 13:34:58', '2026-05-28 14:34:58', 60, 10.00, 5, TRUE, 1.00, '0422'),
+(6, 7, 11, 'completed', '2025-12-21 13:34:58', '2025-12-21 15:34:58', 120, 20.00, 5, TRUE, 1.00, '4050'),
+(30, 1, 5, 'completed', '2026-04-18 13:34:58', '2026-04-18 14:34:58', 60, 10.00, 5, TRUE, 1.00, '2867'),
+(3, 32, 34, 'completed', '2026-05-14 13:34:58', '2026-05-14 15:04:58', 90, 15.00, 5, TRUE, 1.00, '5597'),
+(18, 49, 29, 'completed', '2026-01-30 13:34:58', '2026-01-30 14:34:58', 60, 10.00, 5, TRUE, 1.00, '2217'),
+(12, 36, 11, 'completed', '2026-02-08 13:34:58', '2026-02-08 14:34:58', 60, 10.00, 3, TRUE, 1.00, '6237'),
+(30, 49, 12, 'completed', '2026-05-14 13:34:58', '2026-05-14 14:34:58', 60, 10.00, 4, TRUE, 1.00, '8633'),
+(27, 3, 22, 'completed', '2026-03-12 13:34:58', '2026-03-12 14:34:58', 60, 10.00, 4, TRUE, 1.00, '5759'),
+(1, 11, 28, 'completed', '2026-06-08 13:34:58', '2026-06-08 15:34:58', 120, 20.00, 5, TRUE, 1.00, '8484'),
+(32, 9, 1, 'completed', '2026-03-23 13:34:58', '2026-03-23 14:34:58', 60, 10.00, 4, TRUE, 1.00, '0150'),
+(4, 46, 19, 'completed', '2026-02-21 13:34:58', '2026-02-21 14:34:58', 60, 10.00, 4, TRUE, 1.00, '3077'),
+(13, 33, 5, 'completed', '2026-04-27 13:34:58', '2026-04-27 14:34:58', 60, 10.00, 4, TRUE, 1.00, '5144'),
+(47, 40, 17, 'completed', '2026-02-15 13:34:58', '2026-02-15 15:04:58', 90, 15.00, 3, TRUE, 1.00, '5850'),
+(38, 27, 15, 'completed', '2026-02-17 13:34:58', '2026-02-17 14:34:58', 60, 10.00, 4, TRUE, 1.00, '4010'),
+(19, 42, 18, 'completed', '2026-05-08 13:34:58', '2026-05-08 14:34:58', 60, 10.00, 4, TRUE, 1.00, '4518'),
+(13, 18, 2, 'completed', '2026-03-19 13:34:58', '2026-03-19 14:34:58', 60, 10.00, 3, TRUE, 1.00, '3122'),
+(5, 20, 2, 'completed', '2026-01-24 13:34:58', '2026-01-24 14:04:58', 30, 5.00, 4, TRUE, 1.00, '3397'),
+(34, 24, 34, 'completed', '2026-05-09 13:34:58', '2026-05-09 14:34:58', 60, 10.00, 3, TRUE, 1.00, '2684'),
+(36, 29, 23, 'completed', '2026-04-13 13:34:58', '2026-04-13 15:34:58', 120, 20.00, 5, TRUE, 1.00, '2566'),
+(44, 34, 22, 'completed', '2026-05-21 13:34:58', '2026-05-21 14:34:58', 60, 10.00, 3, TRUE, 1.00, '6839'),
+(34, 2, 16, 'completed', '2026-04-11 13:34:58', '2026-04-11 14:34:58', 60, 10.00, 5, TRUE, 1.00, '9757'),
+(36, 31, 27, 'completed', '2026-01-04 13:34:58', '2026-01-04 14:34:58', 60, 10.00, 5, TRUE, 1.00, '3176'),
+(17, 50, 20, 'completed', '2026-02-16 13:34:58', '2026-02-16 14:34:58', 60, 10.00, 5, TRUE, 1.00, '6470'),
+(41, 43, 10, 'completed', '2026-04-16 13:34:58', '2026-04-16 14:34:58', 60, 10.00, 5, TRUE, 1.00, '8748'),
+(34, 20, 6, 'completed', '2026-01-16 13:34:58', '2026-01-16 15:34:58', 120, 20.00, 3, TRUE, 1.00, '5049'),
+(27, 10, 35, 'completed', '2026-03-07 13:34:58', '2026-03-07 15:34:58', 120, 20.00, 4, TRUE, 1.00, '0819'),
+(48, 40, 20, 'completed', '2026-04-08 13:34:58', '2026-04-08 14:04:58', 30, 5.00, 4, TRUE, 1.00, '2228'),
+(42, 2, 3, 'completed', '2026-04-04 13:34:58', '2026-04-04 15:34:58', 120, 20.00, 5, TRUE, 1.00, '8182'),
+(36, 13, 23, 'completed', '2026-01-14 13:34:58', '2026-01-14 14:34:58', 60, 10.00, 4, TRUE, 1.00, '7023'),
+(32, 24, 16, 'completed', '2026-03-30 13:34:58', '2026-03-30 14:34:58', 60, 10.00, 4, TRUE, 1.00, '2497'),
+(30, 21, 20, 'completed', '2026-01-06 13:34:58', '2026-01-06 14:04:58', 30, 5.00, 4, TRUE, 1.00, '4902'),
+(20, 13, 32, 'completed', '2026-01-09 13:34:58', '2026-01-09 14:34:58', 60, 10.00, 4, TRUE, 1.00, '4057'),
+(39, 4, 33, 'completed', '2026-01-06 13:34:58', '2026-01-06 14:34:58', 60, 10.00, 4, TRUE, 1.00, '4089'),
+(16, 18, 24, 'completed', '2026-03-28 13:34:58', '2026-03-28 15:34:58', 120, 20.00, 5, TRUE, 1.00, '9488'),
+(1, 24, 24, 'completed', '2026-02-14 13:34:58', '2026-02-14 14:04:58', 30, 5.00, 4, TRUE, 1.00, '9227'),
+(27, 11, 7, 'completed', '2025-12-23 13:34:58', '2025-12-23 14:34:58', 60, 10.00, 4, TRUE, 1.00, '1758'),
+(48, 24, 19, 'completed', '2026-01-16 13:34:58', '2026-01-16 15:04:58', 90, 15.00, 4, TRUE, 1.00, '3389'),
+(18, 42, 21, 'completed', '2026-01-07 13:34:58', '2026-01-07 14:34:58', 60, 10.00, 4, TRUE, 1.00, '2748'),
+(34, 45, 35, 'completed', '2026-04-13 13:34:58', '2026-04-13 14:34:58', 60, 10.00, 3, TRUE, 1.00, '3840'),
+(15, 24, 19, 'completed', '2026-02-07 13:34:58', '2026-02-07 14:34:58', 60, 10.00, 5, TRUE, 1.00, '4821'),
+(37, 50, 11, 'completed', '2026-04-12 13:34:58', '2026-04-12 15:34:58', 120, 20.00, 4, TRUE, 1.00, '8107'),
+(26, 24, 22, 'completed', '2026-02-26 13:34:58', '2026-02-26 15:04:58', 90, 15.00, 4, TRUE, 1.00, '0342'),
+(33, 15, 20, 'completed', '2025-12-25 13:34:58', '2025-12-25 14:34:58', 60, 10.00, 4, TRUE, 1.00, '7623'),
+(5, 4, 17, 'completed', '2025-12-13 13:34:58', '2025-12-13 14:04:58', 30, 5.00, 5, TRUE, 1.00, '0853'),
+(46, 23, 12, 'completed', '2026-01-29 13:34:58', '2026-01-29 15:04:58', 90, 15.00, 3, TRUE, 1.00, '5818'),
+(49, 24, 3, 'completed', '2026-01-08 13:34:58', '2026-01-08 14:34:58', 60, 10.00, 5, TRUE, 1.00, '4181'),
+(7, 46, 29, 'completed', '2026-06-06 13:34:58', '2026-06-06 15:34:58', 120, 20.00, 3, TRUE, 1.00, '2238'),
+(49, 26, 4, 'completed', '2026-01-06 13:34:58', '2026-01-06 15:34:58', 120, 20.00, 5, TRUE, 1.00, '4979'),
+(10, 13, 25, 'completed', '2026-01-30 13:34:58', '2026-01-30 15:04:58', 90, 15.00, 5, TRUE, 1.00, '8849'),
+(33, 44, 10, 'completed', '2026-04-24 13:34:58', '2026-04-24 14:34:58', 60, 10.00, 5, TRUE, 1.00, '0163'),
+(17, 30, 27, 'completed', '2026-02-11 13:34:58', '2026-02-11 14:34:58', 60, 10.00, 4, TRUE, 1.00, '6821'),
+(12, 13, 32, 'completed', '2026-01-26 13:34:58', '2026-01-26 15:34:58', 120, 20.00, 4, TRUE, 1.00, '7884'),
+(36, 38, 11, 'completed', '2026-03-13 13:34:58', '2026-03-13 15:04:58', 90, 15.00, 4, TRUE, 1.00, '5879'),
+(36, 13, 24, 'completed', '2026-04-11 13:34:58', '2026-04-11 14:34:58', 60, 10.00, 5, TRUE, 1.00, '3951'),
+(9, 49, 35, 'completed', '2026-03-17 13:34:58', '2026-03-17 15:04:58', 90, 15.00, 5, TRUE, 1.00, '6493'),
+(9, 18, 10, 'completed', '2025-12-15 13:34:58', '2025-12-15 14:34:58', 60, 10.00, 4, TRUE, 1.00, '0235'),
+(24, 14, 15, 'completed', '2026-03-20 13:34:58', '2026-03-20 14:34:58', 60, 10.00, 3, TRUE, 1.00, '9694'),
+(31, 26, 24, 'completed', '2026-05-28 13:34:58', '2026-05-28 14:34:58', 60, 10.00, 5, TRUE, 1.00, '8810'),
+(7, 23, 20, 'completed', '2026-01-12 13:34:58', '2026-01-12 14:34:58', 60, 10.00, 4, TRUE, 1.00, '2616'),
+(13, 49, 23, 'completed', '2026-05-22 13:34:58', '2026-05-22 14:34:58', 60, 10.00, 3, TRUE, 1.00, '3338'),
+(36, 23, 20, 'completed', '2025-12-28 13:34:58', '2025-12-28 14:34:58', 60, 10.00, 5, TRUE, 1.00, '5662'),
+(27, 17, 29, 'completed', '2026-01-08 13:34:58', '2026-01-08 14:34:58', 60, 10.00, 4, TRUE, 1.00, '6252'),
+(18, 47, 32, 'completed', '2026-03-18 13:34:58', '2026-03-18 15:04:58', 90, 15.00, 3, TRUE, 1.00, '2062'),
+(48, 24, 2, 'completed', '2026-01-25 13:34:58', '2026-01-25 15:04:58', 90, 15.00, 3, TRUE, 1.00, '1736'),
+(25, 23, 2, 'completed', '2026-01-16 13:34:58', '2026-01-16 15:04:58', 90, 15.00, 5, TRUE, 1.00, '3294'),
+(14, 27, 23, 'completed', '2026-05-22 13:34:58', '2026-05-22 14:34:58', 60, 10.00, 5, TRUE, 1.00, '0230'),
+(6, 9, 23, 'completed', '2026-06-05 13:34:58', '2026-06-05 15:04:58', 90, 15.00, 5, TRUE, 1.00, '2741'),
+(15, 13, 30, 'completed', '2025-12-30 13:34:58', '2025-12-30 14:34:58', 60, 10.00, 5, TRUE, 1.00, '9989'),
+(8, 6, 3, 'completed', '2026-02-04 13:34:58', '2026-02-04 14:34:58', 60, 10.00, 5, TRUE, 1.00, '7743'),
+(50, 26, 8, 'completed', '2026-01-14 13:34:58', '2026-01-14 14:34:58', 60, 10.00, 5, TRUE, 1.00, '6587'),
+(50, 38, 2, 'completed', '2026-02-21 13:34:58', '2026-02-21 14:34:58', 60, 10.00, 5, TRUE, 1.00, '8519'),
+(12, 17, 11, 'completed', '2025-12-16 13:34:58', '2025-12-16 14:34:58', 60, 10.00, 5, TRUE, 1.00, '3625'),
+(30, 4, 15, 'completed', '2026-05-05 13:34:58', '2026-05-05 14:34:58', 60, 10.00, 3, TRUE, 1.00, '9406'),
+(11, 25, 19, 'completed', '2026-02-14 13:34:58', '2026-02-14 15:04:58', 90, 15.00, 5, TRUE, 1.00, '2583'),
+(4, 8, 22, 'completed', '2025-12-27 13:34:58', '2025-12-27 15:04:58', 90, 15.00, 5, TRUE, 1.00, '7662'),
+(8, 45, 17, 'completed', '2026-04-23 13:34:58', '2026-04-23 15:34:58', 120, 20.00, 4, TRUE, 1.00, '4530'),
+(37, 46, 2, 'completed', '2026-02-13 13:34:58', '2026-02-13 14:34:58', 60, 10.00, 5, TRUE, 1.00, '3326'),
+(14, 24, 12, 'completed', '2026-03-25 13:34:58', '2026-03-25 14:34:58', 60, 10.00, 4, TRUE, 1.00, '2973'),
+(49, 28, 22, 'completed', '2026-05-08 13:34:58', '2026-05-08 14:34:58', 60, 10.00, 3, TRUE, 1.00, '8265'),
+(1, 6, 19, 'completed', '2026-03-13 13:34:58', '2026-03-13 14:34:58', 60, 10.00, 5, TRUE, 1.00, '5024'),
+(50, 2, 1, 'completed', '2025-12-19 13:34:58', '2025-12-19 14:34:58', 60, 10.00, 3, TRUE, 1.00, '8538'),
+(44, 17, 25, 'completed', '2026-06-05 13:34:58', '2026-06-05 15:34:58', 120, 20.00, 3, TRUE, 1.00, '0712'),
+(23, 31, 27, 'completed', '2026-02-26 13:34:58', '2026-02-26 15:34:58', 120, 20.00, 3, TRUE, 1.00, '5120'),
+(38, 40, 8, 'completed', '2026-03-10 13:34:58', '2026-03-10 14:04:58', 30, 5.00, 3, TRUE, 1.00, '0360'),
+(17, 9, 3, 'completed', '2026-02-25 13:34:58', '2026-02-25 15:04:58', 90, 15.00, 5, TRUE, 1.00, '4326'),
+(5, 34, 20, 'completed', '2026-03-17 13:34:58', '2026-03-17 15:34:58', 120, 20.00, 3, TRUE, 1.00, '4763'),
+(37, 16, 12, 'completed', '2026-02-15 13:34:58', '2026-02-15 14:34:58', 60, 10.00, 3, TRUE, 1.00, '9833'),
+(47, 45, 18, 'completed', '2026-02-05 13:34:58', '2026-02-05 15:04:58', 90, 15.00, 5, TRUE, 1.00, '7778'),
+(4, 41, 18, 'completed', '2026-04-15 13:34:58', '2026-04-15 14:04:58', 30, 5.00, 5, TRUE, 1.00, '1204'),
+(48, 5, 16, 'completed', '2026-01-26 13:34:58', '2026-01-26 14:34:58', 60, 10.00, 3, TRUE, 1.00, '6533'),
+(45, 17, 24, 'completed', '2025-12-11 13:34:58', '2025-12-11 15:04:58', 90, 15.00, 4, TRUE, 1.00, '3151'),
+(48, 10, 34, 'completed', '2026-02-22 13:34:58', '2026-02-22 15:34:58', 120, 20.00, 4, TRUE, 1.00, '3336'),
+(17, 25, 7, 'completed', '2026-02-12 13:34:58', '2026-02-12 14:34:58', 60, 10.00, 5, TRUE, 1.00, '8580'),
+(39, 5, 11, 'completed', '2026-04-13 13:34:58', '2026-04-13 14:34:58', 60, 10.00, 4, TRUE, 1.00, '8329'),
+(14, 38, 15, 'completed', '2026-01-08 13:34:58', '2026-01-08 14:34:58', 60, 10.00, 5, TRUE, 1.00, '9802'),
+(14, 1, 29, 'completed', '2026-04-29 13:34:58', '2026-04-29 14:34:58', 60, 10.00, 4, TRUE, 1.00, '8670'),
+(47, 38, 13, 'completed', '2026-04-10 13:34:58', '2026-04-10 15:34:58', 120, 20.00, 4, TRUE, 1.00, '8374'),
+(27, 39, 11, 'completed', '2026-02-14 13:34:58', '2026-02-14 15:34:58', 120, 20.00, 3, TRUE, 1.00, '5516'),
+(41, 48, 22, 'completed', '2026-06-03 13:34:58', '2026-06-03 15:34:58', 120, 20.00, 5, TRUE, 1.00, '1075'),
+(18, 46, 32, 'completed', '2026-03-04 13:34:58', '2026-03-04 15:04:58', 90, 15.00, 3, TRUE, 1.00, '1224'),
+(30, 17, 23, 'completed', '2026-01-07 13:34:58', '2026-01-07 14:34:58', 60, 10.00, 4, TRUE, 1.00, '4231'),
+(2, 39, 5, 'completed', '2026-04-14 13:34:58', '2026-04-14 14:04:58', 30, 5.00, 5, TRUE, 1.00, '4705'),
+(50, 46, 19, 'completed', '2026-01-18 13:34:58', '2026-01-18 14:04:58', 30, 5.00, 3, TRUE, 1.00, '7767'),
+(21, 7, 12, 'completed', '2026-01-25 13:34:58', '2026-01-25 14:04:58', 30, 5.00, 3, TRUE, 1.00, '1131'),
+(49, 15, 28, 'completed', '2026-04-20 13:34:58', '2026-04-20 14:04:58', 30, 5.00, 5, TRUE, 1.00, '5887'),
+(25, 39, 2, 'completed', '2026-01-03 13:34:58', '2026-01-03 14:04:58', 30, 5.00, 3, TRUE, 1.00, '8680'),
+(4, 43, 15, 'completed', '2026-02-16 13:34:58', '2026-02-16 14:04:58', 30, 5.00, 4, TRUE, 1.00, '3745'),
+(34, 15, 25, 'completed', '2026-04-14 13:34:58', '2026-04-14 14:34:58', 60, 10.00, 3, TRUE, 1.00, '6079'),
+(31, 24, 18, 'completed', '2026-06-01 13:34:58', '2026-06-01 15:34:58', 120, 20.00, 4, TRUE, 1.00, '2600'),
+(47, 48, 28, 'completed', '2026-04-20 13:34:58', '2026-04-20 14:34:58', 60, 10.00, 5, TRUE, 1.00, '5873'),
+(41, 50, 10, 'completed', '2026-03-07 13:34:58', '2026-03-07 14:34:58', 60, 10.00, 3, TRUE, 1.00, '8338'),
+(25, 31, 15, 'completed', '2026-03-29 13:34:58', '2026-03-29 15:34:58', 120, 20.00, 5, TRUE, 1.00, '3033'),
+(31, 20, 26, 'completed', '2025-12-20 13:34:58', '2025-12-20 14:34:58', 60, 10.00, 5, TRUE, 1.00, '5483'),
+(45, 34, 18, 'completed', '2026-02-24 13:34:58', '2026-02-24 15:34:58', 120, 20.00, 5, TRUE, 1.00, '4336'),
+(50, 23, 29, 'completed', '2026-06-08 13:34:58', '2026-06-08 14:34:58', 60, 10.00, 3, TRUE, 1.00, '0782'),
+(11, 32, 32, 'completed', '2026-04-11 13:34:58', '2026-04-11 14:34:58', 60, 10.00, 4, TRUE, 1.00, '1590'),
+(36, 18, 11, 'completed', '2026-03-12 13:34:58', '2026-03-12 14:34:58', 60, 10.00, 5, TRUE, 1.00, '6659'),
+(11, 12, 32, 'completed', '2026-03-29 13:34:58', '2026-03-29 15:34:58', 120, 20.00, 4, TRUE, 1.00, '2534'),
+(45, 2, 6, 'completed', '2026-05-03 13:34:58', '2026-05-03 15:04:58', 90, 15.00, 3, TRUE, 1.00, '4767'),
+(38, 47, 15, 'completed', '2026-02-14 13:34:58', '2026-02-14 15:04:58', 90, 15.00, 4, TRUE, 1.00, '5663'),
+(6, 37, 7, 'completed', '2025-12-18 13:34:58', '2025-12-18 14:34:58', 60, 10.00, 4, TRUE, 1.00, '0757'),
+(48, 2, 8, 'completed', '2026-03-28 13:34:58', '2026-03-28 14:34:58', 60, 10.00, 4, TRUE, 1.00, '0562'),
+(19, 49, 22, 'completed', '2026-02-05 13:34:58', '2026-02-05 14:34:58', 60, 10.00, 4, TRUE, 1.00, '7089'),
+(24, 11, 17, 'completed', '2026-01-12 13:34:58', '2026-01-12 14:34:58', 60, 10.00, 4, TRUE, 1.00, '7222'),
+(36, 37, 12, 'completed', '2026-01-05 13:34:58', '2026-01-05 15:34:58', 120, 20.00, 5, TRUE, 1.00, '5039'),
+(39, 24, 1, 'completed', '2026-06-02 13:34:58', '2026-06-02 14:04:58', 30, 5.00, 4, TRUE, 1.00, '4960'),
+(1, 28, 14, 'completed', '2026-05-10 13:34:58', '2026-05-10 14:34:58', 60, 10.00, 5, TRUE, 1.00, '1364'),
+(48, 45, 21, 'completed', '2026-04-14 13:34:58', '2026-04-14 14:34:58', 60, 10.00, 5, TRUE, 1.00, '5329'),
+(32, 5, 31, 'completed', '2026-05-13 13:34:58', '2026-05-13 15:34:58', 120, 20.00, 5, TRUE, 1.00, '5371'),
+(50, 9, 12, 'completed', '2026-04-06 13:34:58', '2026-04-06 14:34:58', 60, 10.00, 4, TRUE, 1.00, '5038'),
+(10, 19, 7, 'completed', '2026-01-04 13:34:58', '2026-01-04 15:04:58', 90, 15.00, 3, TRUE, 1.00, '5457'),
+(49, 12, 2, 'completed', '2026-06-05 13:34:58', '2026-06-05 14:34:58', 60, 10.00, 3, TRUE, 1.00, '8292'),
+(30, 23, 15, 'completed', '2026-01-04 13:34:58', '2026-01-04 15:04:58', 90, 15.00, 5, TRUE, 1.00, '6368'),
+(44, 17, 11, 'completed', '2025-12-16 13:34:58', '2025-12-16 14:34:58', 60, 10.00, 4, TRUE, 1.00, '3149'),
+(39, 47, 23, 'completed', '2026-03-11 13:34:58', '2026-03-11 15:34:58', 120, 20.00, 5, TRUE, 1.00, '8464'),
+(21, 2, 7, 'completed', '2026-04-15 13:34:58', '2026-04-15 14:34:58', 60, 10.00, 5, TRUE, 1.00, '6033'),
+(21, 2, 30, 'completed', '2026-01-30 13:34:58', '2026-01-30 14:34:58', 60, 10.00, 3, TRUE, 1.00, '1188');
 
-INSERT INTO community_task (user_id, task_type, description, location, credit_reward, status, submission_note) VALUES
-(NULL, 'Library', 'Organize and label study materials in the community library.', 'Main Campus Library', 10.00, 'pending', NULL),
-(NULL, 'Physical', 'Help set up tables and chairs for the weekend workshop event.', 'Community Center Hall B', 8.00, 'pending', NULL),
-(1, 'Library', 'Sort donated books by category and shelve them.', 'City Public Library', 12.00, 'in-progress', NULL),
-(3, 'Physical', 'Clean and organize shared workspace area.', 'Co-Working Hub Floor 2', 10.00, 'completed', 'Swept floors and wiped down all desks.');
+INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note, timestamp) VALUES
+(1, 32, 1, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-12 14:04:58'),
+(2, 18, 27, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-04-19 15:04:58'),
+(3, 10, 25, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-09 15:04:58'),
+(4, 23, 48, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-01 15:34:58'),
+(5, 45, 18, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-22 14:34:58'),
+(6, 1, 33, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-26 15:04:58'),
+(7, 26, 16, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-22 14:34:58'),
+(8, 11, 27, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-04 14:34:58'),
+(9, 50, 2, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-03-03 14:04:58'),
+(10, 46, 26, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-05-02 15:34:58'),
+(11, 2, 34, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-04 15:34:58'),
+(12, 50, 2, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-05-28 14:04:58'),
+(13, 13, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-30 14:34:58'),
+(14, 39, 31, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-28 14:34:58'),
+(15, 6, 7, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2025-12-21 15:34:58'),
+(16, 30, 1, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-18 14:34:58'),
+(17, 3, 32, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-05-14 15:04:58'),
+(18, 18, 49, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-30 14:34:58'),
+(19, 12, 36, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-08 14:34:58'),
+(20, 30, 49, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-14 14:34:58'),
+(21, 27, 3, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-12 14:34:58'),
+(22, 1, 11, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-08 15:34:58'),
+(23, 32, 9, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-23 14:34:58'),
+(24, 4, 46, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-21 14:34:58'),
+(25, 13, 33, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-27 14:34:58'),
+(26, 47, 40, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-15 15:04:58'),
+(27, 38, 27, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-17 14:34:58'),
+(28, 19, 42, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-08 14:34:58'),
+(29, 13, 18, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-19 14:34:58'),
+(30, 5, 20, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-24 14:04:58'),
+(31, 34, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-09 14:34:58'),
+(32, 36, 29, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-04-13 15:34:58'),
+(33, 44, 34, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-21 14:34:58'),
+(34, 34, 2, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-11 14:34:58'),
+(35, 36, 31, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-04 14:34:58'),
+(36, 17, 50, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-16 14:34:58'),
+(37, 41, 43, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-16 14:34:58'),
+(38, 34, 20, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-01-16 15:34:58'),
+(39, 27, 10, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-07 15:34:58'),
+(40, 48, 40, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-04-08 14:04:58'),
+(41, 42, 2, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-04-04 15:34:58'),
+(42, 36, 13, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-14 14:34:58'),
+(43, 32, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-30 14:34:58'),
+(44, 30, 21, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-06 14:04:58'),
+(45, 20, 13, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-09 14:34:58'),
+(46, 39, 4, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-06 14:34:58'),
+(47, 16, 18, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-28 15:34:58'),
+(48, 1, 24, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-02-14 14:04:58'),
+(49, 27, 11, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-23 14:34:58'),
+(50, 48, 24, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-16 15:04:58'),
+(51, 18, 42, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-07 14:34:58'),
+(52, 34, 45, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-13 14:34:58'),
+(53, 15, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-07 14:34:58'),
+(54, 37, 50, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-04-12 15:34:58'),
+(55, 26, 24, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-26 15:04:58'),
+(56, 33, 15, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-25 14:34:58'),
+(57, 5, 4, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2025-12-13 14:04:58'),
+(58, 46, 23, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-29 15:04:58'),
+(59, 49, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-08 14:34:58'),
+(60, 7, 46, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-06 15:34:58'),
+(61, 49, 26, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-01-06 15:34:58'),
+(62, 10, 13, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-30 15:04:58'),
+(63, 33, 44, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-24 14:34:58'),
+(64, 17, 30, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-11 14:34:58'),
+(65, 12, 13, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-01-26 15:34:58'),
+(66, 36, 38, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-03-13 15:04:58'),
+(67, 36, 13, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-11 14:34:58'),
+(68, 9, 49, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-03-17 15:04:58'),
+(69, 9, 18, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-15 14:34:58'),
+(70, 24, 14, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-20 14:34:58'),
+(71, 31, 26, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-28 14:34:58'),
+(72, 7, 23, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-12 14:34:58'),
+(73, 13, 49, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-22 14:34:58'),
+(74, 36, 23, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-28 14:34:58'),
+(75, 27, 17, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-08 14:34:58'),
+(76, 18, 47, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-03-18 15:04:58'),
+(77, 48, 24, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-25 15:04:58'),
+(78, 25, 23, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-16 15:04:58'),
+(79, 14, 27, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-22 14:34:58'),
+(80, 6, 9, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-06-05 15:04:58'),
+(81, 15, 13, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-30 14:34:58'),
+(82, 8, 6, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-04 14:34:58'),
+(83, 50, 26, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-14 14:34:58'),
+(84, 50, 38, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-21 14:34:58'),
+(85, 12, 17, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-16 14:34:58'),
+(86, 30, 4, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-05 14:34:58'),
+(87, 11, 25, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-14 15:04:58'),
+(88, 4, 8, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2025-12-27 15:04:58'),
+(89, 8, 45, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-04-23 15:34:58'),
+(90, 37, 46, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-13 14:34:58'),
+(91, 14, 24, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-25 14:34:58'),
+(92, 49, 28, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-08 14:34:58'),
+(93, 1, 6, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-13 14:34:58'),
+(94, 50, 2, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-19 14:34:58'),
+(95, 44, 17, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-05 15:34:58'),
+(96, 23, 31, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-02-26 15:34:58'),
+(97, 38, 40, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-03-10 14:04:58'),
+(98, 17, 9, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-25 15:04:58'),
+(99, 5, 34, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-17 15:34:58'),
+(100, 37, 16, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-15 14:34:58'),
+(101, 47, 45, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-05 15:04:58'),
+(102, 4, 41, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-04-15 14:04:58'),
+(103, 48, 5, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-26 14:34:58'),
+(104, 45, 17, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2025-12-11 15:04:58'),
+(105, 48, 10, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-02-22 15:34:58'),
+(106, 17, 25, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-12 14:34:58'),
+(107, 39, 5, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-13 14:34:58'),
+(108, 14, 38, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-08 14:34:58'),
+(109, 14, 1, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-29 14:34:58'),
+(110, 47, 38, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-04-10 15:34:58'),
+(111, 27, 39, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-02-14 15:34:58'),
+(112, 41, 48, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-03 15:34:58'),
+(113, 18, 46, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-03-04 15:04:58'),
+(114, 30, 17, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-07 14:34:58'),
+(115, 2, 39, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-04-14 14:04:58'),
+(116, 50, 46, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-18 14:04:58'),
+(117, 21, 7, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-25 14:04:58'),
+(118, 49, 15, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-04-20 14:04:58'),
+(119, 25, 39, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-01-03 14:04:58'),
+(120, 4, 43, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-02-16 14:04:58'),
+(121, 34, 15, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-14 14:34:58'),
+(122, 31, 24, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-06-01 15:34:58'),
+(123, 47, 48, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-20 14:34:58'),
+(124, 41, 50, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-07 14:34:58'),
+(125, 25, 31, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-29 15:34:58'),
+(126, 31, 20, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-20 14:34:58'),
+(127, 45, 34, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-02-24 15:34:58'),
+(128, 50, 23, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-06-08 14:34:58'),
+(129, 11, 32, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-11 14:34:58'),
+(130, 36, 18, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-12 14:34:58'),
+(131, 11, 12, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-29 15:34:58'),
+(132, 45, 2, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-05-03 15:04:58'),
+(133, 38, 47, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-02-14 15:04:58'),
+(134, 6, 37, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-18 14:34:58'),
+(135, 48, 2, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-03-28 14:34:58'),
+(136, 19, 49, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-02-05 14:34:58'),
+(137, 24, 11, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-12 14:34:58'),
+(138, 36, 37, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-01-05 15:34:58'),
+(139, 39, 24, 'credit_transfer', 5.00, 5.00, 'Time credit transfer for completed session', '2026-06-02 14:04:58'),
+(140, 1, 28, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-05-10 14:34:58'),
+(141, 48, 45, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-14 14:34:58'),
+(142, 32, 5, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-05-13 15:34:58'),
+(143, 50, 9, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-06 14:34:58'),
+(144, 10, 19, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-04 15:04:58'),
+(145, 49, 12, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-06-05 14:34:58'),
+(146, 30, 23, 'credit_transfer', 15.00, 15.00, 'Time credit transfer for completed session', '2026-01-04 15:04:58'),
+(147, 44, 17, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2025-12-16 14:34:58'),
+(148, 39, 47, 'credit_transfer', 20.00, 20.00, 'Time credit transfer for completed session', '2026-03-11 15:34:58'),
+(149, 21, 2, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-04-15 14:34:58'),
+(150, 21, 2, 'credit_transfer', 10.00, 10.00, 'Time credit transfer for completed session', '2026-01-30 14:34:58');
 
-INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status, scheduled_time, session_duration, time_credit_transfer, rating, comment) VALUES
-(1, 3, 6, 'completed', '2026-05-10 14:00:00', 60, 20.00, 5, 'David is a great Math tutor!'),
-(3, 4, 5, 'scheduled', '2026-05-12 09:00:00', 60, 25.00, NULL, NULL),
-(2, 1, 8, 'completed', '2026-05-09 18:00:00', 30, 10.00, 5, 'Bob is a fantastic art teacher, very creative.'),
-(4, 2, 7, 'completed', '2026-05-11 10:00:00', 45, 15.00, 4, 'Charlie made music lessons so fun!'),
-(1, 2, 4, 'under-review', '2026-05-13 10:00:00', 60, 15.00, NULL, 'I have taught this session successfully.');
+INSERT INTO community_task (user_id, task_type, description, location, credit_reward, status, assigned_at, completed_at) VALUES
+(14, 'Bug Report', 'Community task: Bug Report contribution #1', 'Sylhet, Bangladesh', 5.00, 'pending', '2026-03-31 13:34:58', NULL),
+(50, 'Translation', 'Community task: Translation contribution #2', 'Bogra, Bangladesh', 5.00, 'pending', '2026-05-08 13:34:58', NULL),
+(32, 'Translation', 'Community task: Translation contribution #3', 'Rajshahi, Bangladesh', 10.00, 'in-progress', '2026-04-18 13:34:58', NULL),
+(4, 'Skill Review', 'Community task: Skill Review contribution #4', 'Rangpur, Bangladesh', 8.00, 'in-progress', '2026-04-28 13:34:58', NULL),
+(26, 'Content Moderation', 'Community task: Content Moderation contribution #5', 'Chittagong, Bangladesh', 8.00, 'completed', '2026-04-09 13:34:58', '2026-04-12 13:34:58'),
+(42, 'Bug Report', 'Community task: Bug Report contribution #6', 'Rajshahi, Bangladesh', 10.00, 'completed', '2026-05-17 13:34:58', '2026-05-20 13:34:58'),
+(3, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #7', 'Comilla, Bangladesh', 3.00, 'completed', '2026-05-05 13:34:58', '2026-05-06 13:34:58'),
+(8, 'Mentoring Session', 'Community task: Mentoring Session contribution #8', 'Rajshahi, Bangladesh', 5.00, 'completed', '2026-04-30 13:34:58', '2026-05-03 13:34:58'),
+(2, 'Skill Review', 'Community task: Skill Review contribution #9', 'Narayanganj, Bangladesh', 8.00, 'pending', '2026-05-10 13:34:58', NULL),
+(19, 'Skill Review', 'Community task: Skill Review contribution #10', 'Gazipur, Bangladesh', 10.00, 'completed', '2026-05-20 13:34:58', '2026-05-23 13:34:58'),
+(28, 'Bug Report', 'Community task: Bug Report contribution #11', 'Dhaka, Bangladesh', 3.00, 'completed', '2026-04-14 13:34:58', '2026-04-18 13:34:58'),
+(38, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #12', 'Comilla, Bangladesh', 5.00, 'completed', '2026-05-14 13:34:58', '2026-05-17 13:34:58'),
+(34, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #13', 'Dhaka, Bangladesh', 3.00, 'completed', '2026-05-19 13:34:58', '2026-05-22 13:34:58'),
+(47, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #14', 'Comilla, Bangladesh', 8.00, 'completed', '2026-05-11 13:34:58', '2026-05-15 13:34:58'),
+(40, 'Content Moderation', 'Community task: Content Moderation contribution #15', 'Narayanganj, Bangladesh', 3.00, 'pending', '2026-06-04 13:34:58', NULL),
+(44, 'Mentoring Session', 'Community task: Mentoring Session contribution #16', 'Rangpur, Bangladesh', 10.00, 'pending', '2026-04-15 13:34:58', NULL),
+(14, 'Mentoring Session', 'Community task: Mentoring Session contribution #17', 'Barisal, Bangladesh', 10.00, 'in-progress', '2026-05-08 13:34:58', NULL),
+(39, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #18', 'Rajshahi, Bangladesh', 3.00, 'in-progress', '2026-04-04 13:34:58', NULL),
+(25, 'Skill Review', 'Community task: Skill Review contribution #19', 'Chittagong, Bangladesh', 5.00, 'completed', '2026-04-23 13:34:58', '2026-04-24 13:34:58'),
+(19, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #20', 'Mymensingh, Bangladesh', 5.00, 'in-progress', '2026-05-29 13:34:58', NULL),
+(11, 'Skill Review', 'Community task: Skill Review contribution #21', 'Sylhet, Bangladesh', 3.00, 'pending', '2026-04-02 13:34:58', NULL),
+(47, 'Bug Report', 'Community task: Bug Report contribution #22', 'Dhaka, Bangladesh', 8.00, 'completed', '2026-04-17 13:34:58', '2026-04-22 13:34:58'),
+(35, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #23', 'Barisal, Bangladesh', 5.00, 'completed', '2026-03-15 13:34:58', '2026-03-18 13:34:58'),
+(48, 'Tutorial Writing', 'Community task: Tutorial Writing contribution #24', 'Bogra, Bangladesh', 5.00, 'completed', '2026-03-14 13:34:58', '2026-03-18 13:34:58'),
+(30, 'Skill Review', 'Community task: Skill Review contribution #25', 'Dhaka, Bangladesh', 3.00, 'in-progress', '2026-05-18 13:34:58', NULL),
+(14, 'Content Moderation', 'Community task: Content Moderation contribution #26', 'Rangpur, Bangladesh', 8.00, 'completed', '2026-05-13 13:34:58', '2026-05-18 13:34:58'),
+(39, 'Translation', 'Community task: Translation contribution #27', 'Mymensingh, Bangladesh', 3.00, 'completed', '2026-05-19 13:34:58', '2026-05-24 13:34:58'),
+(35, 'Translation', 'Community task: Translation contribution #28', 'Comilla, Bangladesh', 5.00, 'completed', '2026-03-20 13:34:58', '2026-03-21 13:34:58'),
+(17, 'Bug Report', 'Community task: Bug Report contribution #29', 'Barisal, Bangladesh', 3.00, 'pending', '2026-04-03 13:34:58', NULL),
+(34, 'Content Moderation', 'Community task: Content Moderation contribution #30', 'Rangpur, Bangladesh', 3.00, 'completed', '2026-05-19 13:34:58', '2026-05-22 13:34:58');
 
-INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount) VALUES
-(1, 1, 3, 'credit_transfer', 20.00, 20.00),
-(3, 2, 1, 'credit_transfer', 10.00, 10.00),
-(4, 4, 2, 'credit_transfer', 15.00, 15.00);
 
 
 
@@ -458,7 +1375,7 @@ BEGIN
         CASE
             WHEN NEW.completed_sessions >= 50 THEN 'Grandmaster'
             WHEN NEW.completed_sessions >= 25 THEN 'Expert'
-            WHEN NEW.completed_sessions >= 10 THEN 'Mentor'
+            WHEN NEW.completed_sessions >= 10 THEN 'Professional'
             WHEN NEW.completed_sessions >= 5  THEN 'Intermediate'
             ELSE 'Novice'
         END
@@ -789,6 +1706,201 @@ END //
 DELIMITER ;
 
 
+DATE(timestamp) AS full_date,
+    YEAR(timestamp) AS year,
+    QUARTER(timestamp) AS quarter,
+    MONTH(timestamp) AS month,
+    MONTHNAME(timestamp) AS month_name,
+    DAY(timestamp) AS day,
+    WEEK(timestamp) AS week_of_year
+FROM transactions
+UNION
+SELECT DISTINCT
+    scheduled_time AS date_key,
+    DATE(scheduled_time) AS full_date,
+    YEAR(scheduled_time) AS year,
+    QUARTER(scheduled_time) AS quarter,
+    MONTH(scheduled_time) AS month,
+    MONTHNAME(scheduled_time) AS month_name,
+    DAY(scheduled_time) AS day,
+    WEEK(scheduled_time) AS week_of_year
+FROM exchange_sessions;
+
+CREATE OR REPLACE VIEW vw_fact_sessions AS
+SELECT
+    es.session_id,
+    es.requester_id,
+    es.provider_id,
+    es.skill_id,
+    es.scheduled_time AS date_key,
+    es.status,
+    es.session_duration AS minutes,
+    es.time_credit_transfer AS credits,
+    es.rating,
+    es.bonus_multiplier
+FROM exchange_sessions es;
+
+-- =========================
+-- VIEW: vw_user_dashboard
+-- =========================
+CREATE OR REPLACE VIEW vw_user_dashboard AS
+SELECT
+    u.user_id,
+    u.name,
+    u.email,
+    u.location,
+    u.status,
+    u.created_at,
+    COALESCE(w.balance, 0) AS wallet_balance,
+    COALESCE(r.current_score, 5.00) AS reputation_score,
+    COALESCE(r.completed_sessions, 0) AS total_completed_sessions,
+    COALESCE(r.cancelled_sessions, 0) AS cancelled_sessions,
+    r.mentor_level,
+    (SELECT COUNT(*) FROM user_skills_offered WHERE user_id = u.user_id) AS skills_offered_count,
+    (SELECT COUNT(*) FROM user_skills_requested WHERE user_id = u.user_id) AS skills_requested_count,
+    (SELECT COUNT(*) FROM exchange_sessions
+     WHERE (requester_id = u.user_id OR provider_id = u.user_id)
+       AND status = 'scheduled') AS upcoming_sessions
+FROM users u
+LEFT JOIN wallet w ON u.user_id = w.user_id
+LEFT JOIN reputation r ON u.user_id = r.user_id;
+
+
+-- =========================
+-- VIEW: vw_skill_marketplace
+-- =========================
+CREATE OR REPLACE VIEW vw_skill_marketplace AS
+SELECT
+    s.skill_id,
+    s.skill_name,
+    s.catagory,
+    s.description,
+    s.difficulty_level,
+    COUNT(DISTINCT uso.user_id) AS provider_count,
+    COUNT(DISTINCT usr.user_id) AS learner_count,
+    (SELECT COUNT(*) FROM exchange_sessions WHERE skill_id = s.skill_id AND status = 'completed') AS total_sessions,
+    (SELECT ROUND(AVG(rating), 1) FROM exchange_sessions
+     WHERE skill_id = s.skill_id AND rating IS NOT NULL) AS avg_skill_rating
+FROM skills s
+LEFT JOIN user_skills_offered uso ON s.skill_id = uso.skill_id
+LEFT JOIN user_skills_requested usr ON s.skill_id = usr.skill_id
+GROUP BY s.skill_id;
+
+
+-- =========================
+-- VIEW: vw_transaction_ledger
+-- =========================
+CREATE OR REPLACE VIEW vw_transaction_ledger AS
+SELECT
+    t.transcation_id,
+    t.session_id,
+    t.from_user_id,
+    t.to_user_id,
+    t.type,
+    t.base_amount,
+    t.final_amount,
+    t.note,
+    t.timestamp,
+    COALESCE(u_from.name, 'Platform / System') AS sender_name,
+    COALESCE(u_from.email, 'system@skillswap.com') AS sender_email,
+    COALESCE(u_to.name, 'Platform / System') AS receiver_name,
+    COALESCE(u_to.email, 'system@skillswap.com') AS receiver_email,
+    s.skill_name,
+    es.status AS session_status,
+    CASE
+        WHEN t.type = 'credit_transfer' THEN 'Session Payment'
+        WHEN t.type = 'community_reward' THEN 'Community Reward'
+        WHEN t.type = 'full_refund' THEN 'Full Refund'
+        WHEN t.type = 'partial_refund' THEN 'Partial Refund'
+        WHEN t.type = 'loan_disbursement' THEN 'Loan Disbursement'
+        WHEN t.type = 'loan_repayment' THEN 'Loan Repayment'
+        WHEN t.type = 'gift' THEN 'Gift'
+        ELSE 'Other'
+    END AS transaction_category
+FROM transactions t
+LEFT JOIN users u_from ON t.from_user_id = u_from.user_id
+LEFT JOIN users u_to ON t.to_user_id = u_to.user_id
+LEFT JOIN exchange_sessions es ON t.session_id = es.session_id
+LEFT JOIN skills s ON es.skill_id = s.skill_id;
+
+
+-- ============================================================
+-- STORED PROCEDURES
+-- ============================================================
+
+
+-- =========================
+-- PROCEDURE: sp_complete_session
+-- =========================
+DELIMITER //
+CREATE PROCEDURE sp_complete_session(
+    IN p_session_id INT,
+    IN p_provider_id INT,
+    IN p_otp VARCHAR(10),
+    OUT p_status VARCHAR(50),
+    OUT p_message VARCHAR(255)
+)
+BEGIN
+    DECLARE v_actual_provider_id INT;
+    DECLARE v_requester_id INT;
+    DECLARE v_amount DECIMAL(10,2);
+    DECLARE v_stored_otp VARCHAR(10);
+    DECLARE v_session_status VARCHAR(20);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Transaction failed due to a database error.';
+    END;
+
+    -- Fetch session details
+    SELECT provider_id, requester_id, time_credit_transfer, completion_otp, status
+    INTO v_actual_provider_id, v_requester_id, v_amount, v_stored_otp, v_session_status
+    FROM exchange_sessions
+    WHERE session_id = p_session_id;
+
+    IF v_actual_provider_id IS NULL THEN
+        SET p_status = 'error';
+        SET p_message = 'Session not found.';
+    ELSEIF v_actual_provider_id != p_provider_id THEN
+        SET p_status = 'error';
+        SET p_message = 'You are not the provider for this session.';
+    ELSEIF v_session_status != 'scheduled' THEN
+        SET p_status = 'error';
+        SET p_message = 'Session is not in scheduled status.';
+    ELSEIF v_stored_otp != p_otp THEN
+        SET p_status = 'error';
+        SET p_message = 'Invalid OTP.';
+    ELSE
+        START TRANSACTION;
+
+        -- 1. Mark session completed
+        UPDATE exchange_sessions
+        SET status = 'completed', completion_time = NOW()
+        WHERE session_id = p_session_id;
+
+        -- 2. Transfer credits to provider
+        UPDATE wallet SET balance = balance + v_amount
+        WHERE user_id = v_actual_provider_id;
+
+        -- 3. Log transaction
+        INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note)
+        VALUES (p_session_id, v_requester_id, v_actual_provider_id, 'credit_transfer', v_amount, v_amount, 'Time credit transfer for completed session');
+
+        -- 4. Update provider reputation
+        UPDATE reputation
+        SET completed_sessions = completed_sessions + 1
+        WHERE user_id = v_actual_provider_id;
+
+        COMMIT;
+        SET p_status = 'success';
+        SET p_message = CONCAT('Session completed! ', v_amount, ' TC transferred.');
+    END IF;
+END //
+DELIMITER ;
+
+
 -- =========================
 -- PROCEDURE: sp_book_session
 -- =========================
@@ -811,77 +1923,10 @@ BEGIN
     DECLARE v_otp VARCHAR(10);
     DECLARE v_has_defaulted_loan BOOLEAN;
     DECLARE v_has_conflict BOOLEAN;
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        SET p_status = 'error';
-        SET p_message = 'Booking failed due to a database error.';
-    END;
-
-    SET v_credit_cost = (p_duration / 60.0) * 10;
-    SET v_otp = LPAD(FLOOR(RAND() * 10000), 4, '0');
-
-    START TRANSACTION;
-
-    -- Check balance using subquery with row lock
-    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id FOR UPDATE;
-
-    -- [Flaw 7] Check for defaulted loans
-    SELECT EXISTS (
-        SELECT 1 FROM loans
-        WHERE user_id = p_requester_id AND status = 'defaulted'
-    ) INTO v_has_defaulted_loan;
-
-    -- Check for overlapping active sessions (double-booking protection)
-    SELECT EXISTS (
-        SELECT 1 FROM exchange_sessions
-        WHERE status = 'scheduled'
-          AND (
-             requester_id = p_requester_id 
-             OR provider_id = p_requester_id
-             OR requester_id = p_provider_id
-             OR provider_id = p_provider_id
-          )
-          AND p_scheduled_time < DATE_ADD(scheduled_time, INTERVAL session_duration MINUTE)
-          AND DATE_ADD(p_scheduled_time, INTERVAL p_duration MINUTE) > scheduled_time
-    ) INTO v_has_conflict;
-
-    IF v_has_defaulted_loan THEN
-        ROLLBACK;
-        -- [Flaw 7] Block session booking for defaulted users
-        SET p_status = 'error';
-        SET p_message = 'Your account has a defaulted loan. Please repay it before booking new sessions.';
-    ELSEIF v_has_conflict THEN
-        ROLLBACK;
-        SET p_status = 'error';
-        SET p_message = 'Schedule conflict detected. Either you or the provider has an overlapping active session scheduled at this time.';
-    ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
-        ROLLBACK;
-        SET p_status = 'error';
-        SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC, have ', COALESCE(v_balance, 0), ' TC.');
-    ELSEIF p_scheduled_time <= NOW() THEN
-        ROLLBACK;
-        SET p_status = 'error';
-        SET p_message = 'Cannot book a session in the past.';
-    ELSE
-        -- Deduct escrow
-        UPDATE wallet SET balance = balance - v_credit_cost WHERE user_id = p_requester_id;
-
-        -- Create session
-        INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status,
-            scheduled_time, session_duration, time_credit_transfer, completion_otp)
-        VALUES (p_requester_id, p_provider_id, p_skill_id, 'scheduled',
-            p_scheduled_time, p_duration, v_credit_cost, v_otp);
-
-        COMMIT;
-        SET p_status = 'success';
-        SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow. OTP: ', v_otp);
-    END IF;
-END //
-DELIMITER ;
-
-
+    
+    -- Surge pricing variables
+    DECLARE v_provider_sessions_7d INT;
+    DECLARE v_platform_avg_7d DECIMAL(10,2);
 -- =========================
 -- PROCEDURE: sp_issue_refund
 -- =========================
@@ -1005,7 +2050,7 @@ BEGIN
         SET p_user_id = LAST_INSERT_ID();
 
         -- Wallet with welcome bonus (also triggered by TR-1, but explicit here)
-        INSERT INTO wallet (user_id, balance) VALUES (p_user_id, 10.00)
+        REPLACE INTO wallet (user_id, balance) VALUES (p_user_id, 10.00)
         ON DUPLICATE KEY UPDATE balance = balance;
 
         -- Reputation init (also triggered by TR-1, but explicit here)

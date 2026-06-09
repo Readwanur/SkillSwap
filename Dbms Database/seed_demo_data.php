@@ -105,7 +105,7 @@ try {
         $mentor = 'Novice';
         if ($comp_sessions >= 20) $mentor = 'Master';
         elseif ($comp_sessions >= 10) $mentor = 'Expert';
-        elseif ($comp_sessions >= 5) $mentor = 'Mentor';
+        elseif ($comp_sessions >= 5) $mentor = 'Professional';
         $conn->query("INSERT INTO reputation (user_id, current_score, completed_sessions, cancelled_sessions, mentor_level) VALUES ($uid, $score, $comp_sessions, $cancel_sessions, '$mentor')");
     }
     $conn->commit();

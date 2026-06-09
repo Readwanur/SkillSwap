@@ -11,6 +11,33 @@ $page_title = 'Conversations';
 
 $start_with_user_id = isset($_GET['start_with_user_id']) ? intval($_GET['start_with_user_id']) : 0;
 $active_conversation_id = 0;
+$prefill_msg = isset($_GET['prefill_msg']) ? $_GET['prefill_msg'] : '';
+$offer_skill_id = isset($_GET['offer_skill_id']) ? intval($_GET['offer_skill_id']) : 0;
+$offer_skill_name = isset($_GET['offer_skill_name']) ? $_GET['offer_skill_name'] : '';
+
+$success = '';
+$error = '';
+
+// Handle session booking
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'book_session') {
+    $provider_id = intval($_POST['provider_id'] ?? 0);
+    $skill_id = intval($_POST['skill_id'] ?? 0);
+    $scheduled_time = $_POST['scheduled_time'] ?? '';
+    $duration = intval($_POST['duration'] ?? 60);
+
+    if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
+        $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
+        $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);
+        $stmt->execute();
+        $stmt->close();
+        $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
+        if ($result['status'] === 'success') {
+            $success = $result['message'];
+        } else {
+            $error = $result['message'];
+        }
+    }
+}
 
 if ($start_with_user_id > 0 && $start_with_user_id !== $user_id) {
     // Check if recipient exists
@@ -412,6 +439,12 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page-wrapper" style="padding-top: 20px; padding-bottom: 20px;">
     <div class="container">
+        <?php if ($success): ?>
+            <div class="alert alert-success" style="margin-bottom: 15px;"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-danger" style="margin-bottom: 15px;"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
         
         <div class="chat-container <?php echo $active_conversation_id > 0 ? 'thread-active' : ''; ?>" id="chatContainer">
             <!-- Sidebar -->
@@ -496,12 +529,30 @@ let activeRecipientId = 0;
 let pollingInterval = null;
 let lastMessageIdSeen = 0;
 let lastConversationsJSON = '';
+let prefillMessage = <?php echo json_encode($prefill_msg); ?>;
+let offerSkillId = <?php echo $offer_skill_id; ?>;
+let offerSkillName = <?php echo json_encode($offer_skill_name); ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initial fetch of conversations list
     fetchConversations().then(() => {
         if (activeConversationId > 0) {
-            openConversation(activeConversationId);
+            openConversation(activeConversationId).then(() => {
+                if (prefillMessage && prefillMessage.trim() !== '') {
+                    document.getElementById('chatInput').value = prefillMessage;
+                    // Clear it so it doesn't keep filling if they refresh or poll
+                    prefillMessage = ''; 
+                    
+                    // Clean URL to prevent prefill from reappearing on refresh
+                    const url = new URL(window.location);
+                    if (url.searchParams.has('prefill_msg')) {
+                        url.searchParams.delete('prefill_msg');
+                        url.searchParams.delete('offer_skill_id');
+                        url.searchParams.delete('offer_skill_name');
+                        window.history.replaceState({}, '', url);
+                    }
+                }
+            });
         }
     });
 
@@ -582,7 +633,7 @@ function renderConversationsList(conversations) {
             ? `<img src="../api/user_photo.php?user_id=${conv.other_user_id}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;" alt="${conv.other_user_name}">` 
             : `<div class="avatar" style="width: 45px; height: 45px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold;">${initials}</div>`;
 
-        let onlineDot = conv.is_online ? `<div style="position:absolute; bottom:2px; right:2px; width:12px; height:12px; background-color:#22c55e; border-radius:50%; border:2px solid var(--bg-card);"></div>` : '';
+        let onlineDot = conv.is_online ? `<div style="position:absolute; bottom:2px; right:2px; width:12px; height:12px; background-color:#22c55e; border-radius:50%; border:2px solid var(--bg-card); pointer-events:none;"></div>` : '';
         let avatarContainer = `<div style="position:relative; width:45px; height:45px; flex-shrink:0;">${avatarHtml}${onlineDot}</div>`;
 
         html += `
@@ -640,14 +691,17 @@ async function loadMessages(conversationId) {
         if (data.status === 'success') {
             // Update header with partner name and photo
             if (data.partner_name) {
-                document.getElementById('headerName').textContent = data.partner_name;
+                document.getElementById('headerName').innerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none; color:inherit;">${data.partner_name}</a>`;
                 let avatarElem = document.getElementById('headerAvatar');
                 if (data.partner_has_photo) {
-                    avatarElem.outerHTML = `<img id="headerAvatar" src="../api/user_photo.php?user_id=${data.partner_id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${data.partner_name}">`;
+                    avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}"><img id="headerAvatar" src="../api/user_photo.php?user_id=${data.partner_id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${data.partner_name}"></a>`;
                 } else {
                     let initials = data.partner_name.substring(0, 1).toUpperCase();
-                    avatarElem.outerHTML = `<div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">${initials}</div>`;
+                    avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none;"><div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">${initials}</div></a>`;
                 }
+                
+                // Update activeRecipientId for booking modal
+                activeRecipientId = data.partner_id;
                 
                 // Update status
                 const statusElem = document.querySelector('.chat-main-status');
@@ -698,7 +752,46 @@ function renderMessages(messages) {
         const date = new Date(msg.sent_at.replace(/-/g, '/'));
         const timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        let messageContent = msg.message_text;
+        // Escape HTML to prevent XSS
+        const escapeHtml = (unsafe) => {
+            return (unsafe || '').replace(/[&<"'>]/g, function (m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        };
+
+        let messageContent = escapeHtml(msg.message_text);
+        
+        let hasSmartLink = false;
+        
+        // Parse Smart Links for Booking [BOOK_SKILL:id:name]
+        const smartLinkRegex = /\[BOOK_SKILL:(\d+):([^\]]+)\]/g;
+        messageContent = messageContent.replace(smartLinkRegex, function(match, skillId, skillName) {
+            hasSmartLink = true;
+            // Re-escape skillName just in case, though it's already escaped by escapeHtml
+            const cleanSkillName = escapeHtml(skillName).replace(/'/g, "\\'");
+            
+            if (isSent) {
+                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Sent</div></div>`;
+            } else {
+                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button onclick="openBooking(activeRecipientId, '${cleanSkillName}', ${skillId})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: var(--primary); color: #fff; border: none; font-weight: 700; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Accept & Book</button>
+                            <button onclick="sendNotInterested()" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Not Interested</button>
+                        </div>`;
+            }
+        });
+        
+        // Convert newlines to <br>
+        messageContent = messageContent.replace(/\n/g, '<br>');
+        
+        // Parse bold **text** to <b>text</b>
+        messageContent = messageContent.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
         if (msg.message_type === 'audio' && msg.media_url) {
             const bubbleColor = isSent ? 'var(--primary)' : 'var(--bg-secondary)';
             const textColor = isSent ? '#fff' : 'var(--text-primary)';
@@ -739,9 +832,18 @@ function renderMessages(messages) {
             `;
         }
 
+        let extraStyle = '';
+        if (msg.message_type === 'audio' && msg.media_url) {
+            extraStyle = 'background:transparent; padding:0; box-shadow:none; border:none;';
+        } else if (hasSmartLink) {
+            extraStyle = isSent 
+                ? 'background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25); border: none;'
+                : 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #3730a3; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); border: 1px solid #c7d2fe;';
+        }
+
         html += `
             <div class="message-group ${groupClass}" data-id="${msg.message_id}">
-                <div class="message-bubble ${bubbleClass}" style="${msg.message_type === 'audio' ? 'background:transparent; padding:0; box-shadow:none; border:none;' : ''}">
+                <div class="message-bubble ${bubbleClass}" style="${extraStyle}">
                     ${messageContent}
                 </div>
                 <span class="message-time">${timeStr}</span>
@@ -804,12 +906,43 @@ async function handleSend(event) {
 
 async function sendMessage() {
     const chatInput = document.getElementById('chatInput');
-    const text = chatInput.value.trim();
-    if (text === '') return;
+    let text = chatInput.value.trim();
+    if (text === '' && !(offerSkillId > 0 && offerSkillName)) return;
+    
+    if (offerSkillId > 0 && offerSkillName) {
+        text += `\n\n[BOOK_SKILL:${offerSkillId}:${offerSkillName}]`;
+        offerSkillId = 0; // Only send the button once
+        offerSkillName = '';
+    }
 
     chatInput.value = '';
     chatInput.focus();
 
+    const formData = new FormData();
+    formData.append('conversation_id', activeConversationId);
+    formData.append('message_text', text);
+    formData.append('csrf_token', window.csrfToken);
+
+    try {
+        const response = await fetch('../api/messages.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            loadMessages(activeConversationId);
+            fetchConversations();
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+    }
+}
+
+async function sendNotInterested() {
+    if (!confirm("Are you sure you want to decline this offer?")) return;
+    
+    const text = "Thank you for the offer, but I'm not interested at the moment.";
     const formData = new FormData();
     formData.append('conversation_id', activeConversationId);
     formData.append('message_text', text);
@@ -1105,6 +1238,118 @@ function seekAudio(event, waveformContainer) {
     
     audio.currentTime = percent * duration;
 }
+
+let currentSurgeMultiplier = 1.0;
+
+function updateSurgeCost() {
+    var duration = document.getElementById('duration').value;
+    var baseCost = 0;
+    if (duration == '30') baseCost = 5;
+    if (duration == '60') baseCost = 10;
+    if (duration == '90') baseCost = 15;
+    if (duration == '120') baseCost = 20;
+    
+    var costEl = document.getElementById('modal_cost');
+    if (currentSurgeMultiplier > 1) {
+        var newCost = (baseCost * currentSurgeMultiplier).toFixed(2);
+        costEl.innerHTML = `<span style="text-decoration: line-through; color: var(--text-muted); font-size:0.9em;">${baseCost} TC</span> <strong style="color: var(--danger);">${newCost} TC</strong> <span style="font-size:0.8em; color:var(--danger);">(${currentSurgeMultiplier}× Surge)</span>`;
+    } else {
+        costEl.textContent = baseCost.toFixed(2) + ' TC';
+    }
+}
+
+// Booking Modal Logic
+function setMinDateTime() {
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = String(now.getMonth() + 1).padStart(2, '0');
+    var d = String(now.getDate()).padStart(2, '0');
+    var h = String(now.getHours()).padStart(2, '0');
+    var min = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+}
+
+function openBooking(providerId, skillName, skillId) {
+    document.getElementById('modal_provider_id').value = providerId;
+    document.getElementById('modal_skill_id').value = skillId;
+    document.getElementById('modal_skill_name').textContent = skillName;
+    setMinDateTime();
+
+    // Fetch surge pricing for this provider
+    fetch('../api/surge_pricing.php?provider_id=' + providerId)
+        .then(r => r.json())
+        .then(data => {
+            currentSurgeMultiplier = data.surge_multiplier || 1.0;
+            var infoEl = document.getElementById('surge-info');
+            if (data.surge_multiplier > 1) {
+                var level = data.demand_level;
+                var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
+                var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
+                infoEl.style.display = 'block';
+                infoEl.style.background = bgColor;
+                infoEl.style.border = '1px solid ' + borderColor;
+                infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
+            } else {
+                infoEl.style.display = 'none';
+            }
+            updateSurgeCost();
+        })
+        .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
+    document.getElementById('bookingModal').classList.add('active');
+}
+
+function closeBooking() {
+    document.getElementById('bookingModal').classList.remove('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('bookingModal');
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === this) closeBooking();
+        });
+    }
+});
+
 </script>
+
+<!-- Booking Modal -->
+<div class="modal-overlay" id="bookingModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Book a Session</h3>
+            <button class="modal-close" onclick="closeBooking()">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="book_session">
+            <input type="hidden" name="provider_id" id="modal_provider_id" value="">
+            <input type="hidden" name="skill_id" id="modal_skill_id" value="">
+            
+            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong></p>
+            
+            <div id="surge-info" style="display:none; padding:12px; margin-bottom:16px; border-radius:6px; font-size:0.85rem; color:var(--text-primary);"></div>
+            
+            <div class="form-group">
+                <label for="scheduled_time">Preferred Date & Time</label>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="duration">Duration (minutes)</label>
+                <select name="duration" id="duration" class="form-control" onchange="updateSurgeCost()">
+                    <option value="30">30 minutes (5 TC base)</option>
+                    <option value="60" selected>60 minutes (10 TC base)</option>
+                    <option value="90">90 minutes (15 TC base)</option>
+                    <option value="120">120 minutes (20 TC base)</option>
+                </select>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:12px; background:var(--bg-secondary); border-radius:6px;">
+                <span style="font-weight:600; color:var(--text-secondary);">Total Cost:</span>
+                <span id="modal_cost" style="font-weight:bold; font-size:1.1rem; color:var(--primary);">10.00 TC</span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
+        </form>
+    </div>
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

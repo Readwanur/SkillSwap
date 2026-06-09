@@ -136,6 +136,14 @@ if (!$res) {
 $user = $res->fetch_assoc();
 $rep = $conn->query("SELECT * FROM reputation WHERE user_id = $user_id")->fetch_assoc();
 
+$guided_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_sessions WHERE provider_id = $user_id AND status = 'completed'");
+$guided_sessions = $guided_sessions_query->fetch_assoc()['total'] ?? 0;
+
+$learned_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_sessions WHERE requester_id = $user_id AND status = 'completed'");
+$learned_sessions = $learned_sessions_query->fetch_assoc()['total'] ?? 0;
+
+$total_completed = $guided_sessions + $learned_sessions;
+
 // Fetch skills offered & requested
 $offered = $conn->query("SELECT s.skill_id, s.skill_name FROM user_skills_offered uso JOIN skills s ON uso.skill_id = s.skill_id WHERE uso.user_id = $user_id");
 $requested = $conn->query("SELECT s.skill_id, s.skill_name FROM user_skills_requested usr JOIN skills s ON usr.skill_id = s.skill_id WHERE usr.user_id = $user_id");
@@ -242,14 +250,22 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                     </div>
-                    <div class="grid-2 mt-2" style="text-align:center;">
+                    <div style="display: flex; justify-content: space-around; text-align:center; margin-top: 15px;">
                         <div>
-                            <strong><?php echo $rep ? $rep['completed_sessions'] : 0; ?></strong>
-                            <br><span style="color:var(--text-muted); font-size:0.8rem;">Completed</span>
+                            <strong><?php echo $guided_sessions; ?></strong>
+                            <br><strong style="color:var(--text-muted); font-size:0.8rem;">Guided</strong>
+                        </div>
+                        <div>
+                            <strong><?php echo $learned_sessions; ?></strong>
+                            <br><strong style="color:var(--text-muted); font-size:0.8rem;">Learned</strong>
                         </div>
                         <div>
                             <strong><?php echo $rep ? $rep['cancelled_sessions'] : 0; ?></strong>
-                            <br><span style="color:var(--text-muted); font-size:0.8rem;">Cancelled</span>
+                            <br><strong style="color:var(--text-muted); font-size:0.8rem;">Cancelled</strong>
+                        </div>
+                        <div>
+                            <strong><?php echo $total_completed; ?></strong>
+                            <br><strong style="color:var(--text-muted); font-size:0.8rem;">Total</strong>
                         </div>
                     </div>
                     <div class="text-center mt-2">

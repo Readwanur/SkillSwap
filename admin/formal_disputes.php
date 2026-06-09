@@ -119,17 +119,17 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <td style="text-align: right;">
                                     <?php if ($d['dispute_status'] === 'open'): ?>
                                         <div style="display:flex; justify-content: flex-end; gap:8px;">
-                                            <form method="POST" onsubmit="return confirm('Refund this session? The learner will get their credits back, and the provider reliability will be penalized.');">
+                                            <form method="POST" onsubmit="return confirm('Refund <?php echo htmlspecialchars(addslashes($d['requester_name'])); ?>? They will get their credits back, and <?php echo htmlspecialchars(addslashes($d['provider_name'])); ?>\'s reliability will be penalized.');">
                                                 <input type="hidden" name="action" value="resolve">
                                                 <input type="hidden" name="dispute_id" value="<?php echo $d['dispute_id']; ?>">
                                                 <input type="hidden" name="verdict" value="refund">
-                                                <button type="submit" class="btn btn-sm btn-danger">Refund Requester</button>
+                                                <button type="submit" class="btn btn-sm btn-danger">Refund Learner (<?php echo htmlspecialchars($d['requester_name']); ?>)</button>
                                             </form>
-                                            <form method="POST" onsubmit="return confirm('Pay out this session? The provider will receive the escrowed credits.');">
+                                            <form method="POST" onsubmit="return confirm('Pay out <?php echo htmlspecialchars(addslashes($d['provider_name'])); ?>? They will receive the escrowed credits.');">
                                                 <input type="hidden" name="action" value="resolve">
                                                 <input type="hidden" name="dispute_id" value="<?php echo $d['dispute_id']; ?>">
                                                 <input type="hidden" name="verdict" value="payout">
-                                                <button type="submit" class="btn btn-sm btn-success">Payout Provider</button>
+                                                <button type="submit" class="btn btn-sm btn-success">Payout Teacher (<?php echo htmlspecialchars($d['provider_name']); ?>)</button>
                                             </form>
                                         </div>
                                     <?php else: ?>

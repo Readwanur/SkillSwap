@@ -20,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $amount = floatval($_POST['amount'] ?? 0);
         
         $check_bal = $conn->query("SELECT balance FROM wallet WHERE user_id = $user_id")->fetch_assoc();
-        if ($check_bal && $check_bal['balance'] > 0) {
-            $error_msg = 'You can only request a loan when your balance is 0.';
+        if ($check_bal && $check_bal['balance'] >= 10) {
+            $error_msg = 'You can only request a loan when your balance is less than 10 TC.';
         } else {
             $stmt = $conn->prepare("CALL sp_request_loan(?, ?, @status, @msg)");
             $stmt->bind_param("id", $user_id, $amount);
@@ -306,7 +306,7 @@ include __DIR__ . '/../includes/header.php';
                 <!-- Tab Content: Request Loan -->
                 <div class="wallet-tab-panel active" id="borrow-tab">
                     <div class="wallet-section-title">Borrow Time Credits</div>
-                    <?php if ($completed_sess >= 2 && $balance <= 0): ?>
+                    <?php if ($completed_sess >= 2 && $balance < 10): ?>
                         <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px; line-height: 1.4;">
                             You qualify for a platform loan. Your borrow limit based on your reliability score is <strong><?php echo number_format($max_borrow_limit, 2); ?> TC</strong>.
                         </p>
@@ -334,8 +334,8 @@ include __DIR__ . '/../includes/header.php';
                                 Borrowing Option Locked
                             </p>
                             <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; max-width: 320px; margin: 0 auto;">
-                                <?php if ($balance > 0): ?>
-                                    You can only request a loan when your balance is 0 TC.<br>
+                                <?php if ($balance >= 10): ?>
+                                    You can only request a loan when your balance is less than 10 TC.<br>
                                     <span style="display:inline-block; margin-top: 6px; font-weight: 600; color: var(--primary);">Current balance: <?php echo number_format($balance, 2); ?> TC</span>
                                 <?php else: ?>
                                     Complete at least 2 exchange sessions to unlock credit borrowing.<br>
