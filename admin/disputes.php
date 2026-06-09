@@ -264,6 +264,22 @@ function buildTabUrl($status, $sort, $order)
     </div>
 </div>
 
+<!-- Alert: Sessions Under Review -->
+<?php if ($count_under_review > 0 && $status_filter !== 'under-review'): ?>
+    <div class="card mb-3" style="border: 1px solid var(--primary); background: rgba(0, 56, 108, 0.02);">
+        <div class="card-header" style="border-bottom: 1px solid rgba(0, 56, 108, 0.15); margin-bottom: 15px;">
+            <h3 style="color: var(--primary); margin:0;"><i data-lucide="bell" class="lucide-sm"></i> Pending Approval Alert</h3>
+            <span class="badge badge-primary" style="background: rgba(0, 56, 108, 0.15); color: var(--primary);"><?php echo $count_under_review; ?> Report(s)</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 15px;">
+            There are session completion reports waiting for your review and approval.
+        </p>
+        <div style="margin-bottom: 15px;">
+            <a href="?status=under-review" class="btn btn-sm btn-primary">Review Reports Now</a>
+        </div>
+    </div>
+<?php endif; ?>
+
 <!-- #6 — Recent Refund Log (Notification Panel) -->
 <?php if ($recent_refunds->num_rows > 0): ?>
     <div class="card mb-3" style="border-left: 4px solid #9c27b0;">
