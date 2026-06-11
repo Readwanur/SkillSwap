@@ -18,6 +18,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $scheduled_time = $_POST['scheduled_time'] ?? '';
     $duration = intval($_POST['duration'] ?? 60);
 
+    if ($scheduled_time !== '') {
+        $timestamp = strtotime($scheduled_time);
+        if ($timestamp !== false) {
+            $scheduled_time = date('Y-m-d H:i:s', $timestamp);
+        } else {
+            $scheduled_time = '';
+        }
+    }
+
     if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
         $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
         $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);

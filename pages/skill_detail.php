@@ -23,6 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $scheduled_time = $_POST['scheduled_time'] ?? '';
     $duration = intval($_POST['duration'] ?? 60);
 
+    if ($scheduled_time !== '') {
+        $timestamp = strtotime($scheduled_time);
+        if ($timestamp !== false) {
+            $scheduled_time = date('Y-m-d H:i:s', $timestamp);
+        } else {
+            $scheduled_time = '';
+        }
+    }
+
     if ($provider_id > 0 && $scheduled_time !== '') {
         // --- STORED PROCEDURE: sp_book_session ---
         // Atomically validates balance, deducts escrow, generates OTP,

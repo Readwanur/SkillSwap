@@ -25,6 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $scheduled_time = $_POST['scheduled_time'] ?? '';
     $duration = intval($_POST['duration'] ?? 60);
 
+    if ($scheduled_time !== '') {
+        $timestamp = strtotime($scheduled_time);
+        if ($timestamp !== false) {
+            $scheduled_time = date('Y-m-d H:i:s', $timestamp);
+        } else {
+            $scheduled_time = '';
+        }
+    }
+
     if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
         $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
         $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);
@@ -1028,16 +1037,20 @@ async function startRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        const options = {
-            mimeType: 'audio/webm;codecs=opus',
-            audioBitsPerSecond: 16000
-        };
-        
-        if (MediaRecorder.isTypeSupported(options.mimeType)) {
-            mediaRecorder = new MediaRecorder(stream, options);
-        } else {
-            mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 16000 });
+        let mimeType = 'audio/webm;codecs=opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/mp4';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = ''; // Let browser decide
+            }
         }
+        
+        const options = { audioBitsPerSecond: 16000 };
+        if (mimeType) {
+            options.mimeType = mimeType;
+        }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
         
         audioChunks = [];
         isRecordingCanceled = false;
@@ -1050,8 +1063,10 @@ async function startRecording() {
 
         mediaRecorder.onstop = () => {
             if (!isRecordingCanceled) {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                sendAudioMessage(audioBlob);
+                const actualMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: actualMimeType });
+                const ext = actualMimeType.includes('mp4') ? 'm4a' : 'webm';
+                sendAudioMessage(audioBlob, 'voice_message.' + ext);
             }
             
             // Stop all tracks to release microphone
@@ -1105,12 +1120,12 @@ function resetMicUI() {
     document.getElementById('chatInput').focus();
 }
 
-async function sendAudioMessage(blob) {
+async function sendAudioMessage(blob, filename = 'voice_message.webm') {
     if (activeConversationId <= 0) return;
 
     const formData = new FormData();
     formData.append('conversation_id', activeConversationId);
-    formData.append('audio_file', blob, 'voice_message.webm');
+    formData.append('audio_file', blob, filename);
     formData.append('csrf_token', window.csrfToken);
 
     try {
