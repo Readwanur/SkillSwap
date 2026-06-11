@@ -14,7 +14,8 @@ $page_title = 'Dashboard';
 // using LEFT JOINs, COALESCE, and correlated scalar subqueries.
 $user = $conn->query("SELECT * FROM vw_user_dashboard WHERE user_id = $user_id")->fetch_assoc();
 $balance = $user ? number_format($user['wallet_balance'], 2) : '0.00';
-$rep_score = $user ? $user['reputation_score'] : '5.00';
+$rep_score_raw = $user ? $user['reputation_score'] : null;
+$rep_display = $rep_score_raw !== null ? number_format((float)$rep_score_raw, 2) . '/5' : '<span style="font-size: 1.2rem; font-weight: normal; color: var(--text-muted);">No Ratings Yet</span>';
 $mentor_level = $user ? $user['mentor_level'] : 'Novice';
 $guided_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_sessions WHERE provider_id = $user_id AND status = 'completed'");
 $guided_sessions = $guided_sessions_query->fetch_assoc()['total'] ?? 0;
@@ -189,18 +190,27 @@ $recommendations = $conn->query("
 // --- Leaderboard badges for current user ---
 $my_badges = $conn->query("
     WITH provider_scores AS (
-        SELECT es.provider_id, s.catagory AS category,
-            DENSE_RANK() OVER (PARTITION BY s.catagory ORDER BY 
-                (COUNT(*) * 0.4) + (COALESCE(AVG(es.rating),0)*6*0.3) + (COALESCE(r.current_score,5)*4*0.2) + (COALESCE(SUM(es.session_duration),0)/60.0*0.1) DESC
-            ) AS rank_pos
+        SELECT 
+            es.provider_id,
+            s.catagory AS category,
+            ROUND(
+                (COUNT(*) * 0.4) + 
+                (COALESCE(AVG(es.rating), 0) * 6 * 0.3) + 
+                (COALESCE(r.current_score, 5) * 4 * 0.2) + 
+                (COALESCE(SUM(es.session_duration), 0) / 60.0 * 0.1)
+            , 2) AS composite_score
         FROM exchange_sessions es
         JOIN skills s ON es.skill_id = s.skill_id
         LEFT JOIN reputation r ON es.provider_id = r.user_id
         WHERE es.status = 'completed' AND s.catagory IS NOT NULL
         GROUP BY es.provider_id, s.catagory
+    ),
+    ranked AS (
+        SELECT *, DENSE_RANK() OVER (PARTITION BY category ORDER BY composite_score DESC) AS rank_pos
+        FROM provider_scores
     )
-    SELECT category, rank_pos FROM provider_scores 
-    WHERE provider_id = $user_id AND rank_pos <= 3
+    SELECT category, rank_pos FROM ranked 
+    WHERE provider_id = $user_id AND rank_pos <= 10
 ");
 $badge_list = [];
 if ($my_badges) {
@@ -221,7 +231,7 @@ include __DIR__ . '/../includes/header.php'; ?>
                 <span class="stat-label">Time Credits</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value"><?php echo $rep_score; ?>/5</span>
+                <span class="stat-value"><?php echo $rep_display; ?></span>
                 <span class="stat-label">Reputation Score</span>
             </div>
             <div class="stat-card" style="padding: 0; display: flex; flex-direction: row;">
@@ -322,7 +332,7 @@ include __DIR__ . '/../includes/header.php'; ?>
             <div class="card">
                 <div class="card-header">
                     <h3><i data-lucide="lightbulb" class="lucide-sm"></i> Recommended For You</h3>
-                    <span style="font-size:0.75rem; color:var(--text-muted);">Collaborative Filtering via CTEs</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Based on similar learners</span>
                 </div>
                 <?php if ($recommendations && $recommendations->num_rows > 0): ?>
                     <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">Users who learned the same
@@ -356,14 +366,18 @@ include __DIR__ . '/../includes/header.php'; ?>
             <!-- Leaderboard Badges -->
             <div class="card">
                 <div class="card-header">
-                    <h3><i data-lucide="award" class="lucide-sm"></i> Your Badges</h3>
+                    <div>
+                        <h3 style="margin-bottom: 0;"><i data-lucide="award" class="lucide-sm"></i> Your Badges</h3>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Top 10 rankings</span>
+                    </div>
                     <a href="../pages/leaderboard.php" class="btn btn-sm btn-secondary">Full Leaderboard</a>
                 </div>
                 <?php if (!empty($badge_list)): ?>
                     <div style="display:flex; flex-wrap:wrap; gap:10px;">
                         <?php foreach ($badge_list as $badge):
                             $icon = '<i data-lucide="medal" class="lucide-sm"></i>';
-                            $color = 'var(--info)';
+                            $color = 'var(--text-muted)';
+                            $label = '#' . $badge['rank_pos'];
                             if ($badge['rank_pos'] == 1) {
                                 $icon = '<i data-lucide="medal" style="color: gold;" class="lucide-sm"></i>';
                                 $color = 'var(--warning)';
@@ -373,13 +387,15 @@ include __DIR__ . '/../includes/header.php'; ?>
                             } elseif ($badge['rank_pos'] == 3) {
                                 $icon = '<i data-lucide="medal" style="color: #cd7f32;" class="lucide-sm"></i>';
                                 $color = 'var(--primary)';
+                            } else {
+                                $label = 'Top 10';
                             }
                             ?>
                             <div
                                 style="text-align:center; padding:12px 16px; background:var(--bg-hover); border-radius:var(--radius-sm); border:1px solid var(--border-light); min-width:100px;">
                                 <span style="font-size:1.6rem;"><?php echo $icon; ?></span>
                                 <div style="font-weight:700; color:<?php echo $color; ?>; font-size:0.9rem;">
-                                    #<?php echo $badge['rank_pos']; ?></div>
+                                    <?php echo $label; ?></div>
                                 <div
                                     style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">
                                     <?php echo htmlspecialchars($badge['category']); ?></div>
@@ -389,10 +405,10 @@ include __DIR__ . '/../includes/header.php'; ?>
                 <?php else: ?>
                     <div class="empty-state" style="padding:20px;">
                         <p>Complete teaching sessions to earn category badges!</p>
-                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 3 in any skill category
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">Top 10 in any skill category
                             earns <i data-lucide="medal" style="color: gold;" class="lucide-sm"></i><i data-lucide="medal"
                                 style="color: silver;" class="lucide-sm"></i><i data-lucide="medal" style="color: #cd7f32;"
-                                class="lucide-sm"></i></p>
+                                class="lucide-sm"></i><i data-lucide="medal" class="lucide-sm"></i></p>
                     </div>
                 <?php endif; ?>
             </div>

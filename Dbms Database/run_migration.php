@@ -81,6 +81,11 @@ BEGIN
             VALUES (NEW.provider_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
+        ELSEIF NEW.status = 'under-review' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'One of your sessions is currently under review by an admin.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, 'One of your sessions is currently under review by an admin.', 'session_update');
         END IF;
     END IF;
 END";
@@ -191,10 +196,12 @@ SELECT
     es.bonus_multiplier
 FROM exchange_sessions es";
 if ($conn->query($q10)) {
-    if ($verbose) echo "✓ View vw_fact_sessions created/updated.<br>";
+    if ($verbose)
+        echo "✓ View vw_fact_sessions created/updated.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating view vw_fact_sessions: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating view vw_fact_sessions: " . $conn->error . "<br>";
 }
 
 // 5. Update sp_book_session stored procedure
@@ -318,9 +325,11 @@ BEGIN
     END IF;
 END";
 if ($conn->query($q_proc)) {
-    if ($verbose) echo "✓ Stored procedure sp_book_session recreated/updated.<br>";
+    if ($verbose)
+        echo "✓ Stored procedure sp_book_session recreated/updated.<br>";
 } else {
-    if ($verbose) echo "✗ Error creating stored procedure sp_book_session: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating stored procedure sp_book_session: " . $conn->error . "<br>";
 }
 
 // 5b. Update sp_complete_session stored procedure (fix: v_provider_id -> v_actual_provider_id)
@@ -386,9 +395,11 @@ BEGIN
     END IF;
 END";
 if ($conn->query($q_complete)) {
-    if ($verbose) echo "✓ Stored procedure sp_complete_session recreated/updated.<br>";
+    if ($verbose)
+        echo "✓ Stored procedure sp_complete_session recreated/updated.<br>";
 } else {
-    if ($verbose) echo "✗ Error creating stored procedure sp_complete_session: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating stored procedure sp_complete_session: " . $conn->error . "<br>";
 }
 
 // 6. Create conversations table
@@ -397,10 +408,12 @@ $q_conv = "CREATE TABLE IF NOT EXISTS conversations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )";
 if ($conn->query($q_conv)) {
-    if ($verbose) echo "✓ Table conversations created/verified.<br>";
+    if ($verbose)
+        echo "✓ Table conversations created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating conversations: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating conversations: " . $conn->error . "<br>";
 }
 
 // 7. Create conversation_members table
@@ -413,10 +426,12 @@ $q_members = "CREATE TABLE IF NOT EXISTS conversation_members (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 )";
 if ($conn->query($q_members)) {
-    if ($verbose) echo "✓ Table conversation_members created/verified.<br>";
+    if ($verbose)
+        echo "✓ Table conversation_members created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating conversation_members: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating conversation_members: " . $conn->error . "<br>";
 }
 
 // 8. Create messages table
@@ -433,20 +448,24 @@ $q_msg = "CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
 )";
 if ($conn->query($q_msg)) {
-    if ($verbose) echo "✓ Table messages created/verified.<br>";
+    if ($verbose)
+        echo "✓ Table messages created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating messages: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating messages: " . $conn->error . "<br>";
 }
 
 // 9. Create messages index (safely)
 $check_index = $conn->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = '$dbname' AND table_name = 'messages' AND index_name = 'idx_messages_thread' LIMIT 1");
 if ($check_index && $check_index->num_rows == 0) {
     if ($conn->query("CREATE INDEX idx_messages_thread ON messages(conversation_id, sent_at DESC)")) {
-        if ($verbose) echo "✓ Index idx_messages_thread created.<br>";
+        if ($verbose)
+            echo "✓ Index idx_messages_thread created.<br>";
     } else {
         $success = false;
-        if ($verbose) echo "✗ Error creating index: " . $conn->error . "<br>";
+        if ($verbose)
+            echo "✗ Error creating index: " . $conn->error . "<br>";
     }
 }
 
@@ -465,21 +484,25 @@ $q_disp = "CREATE TABLE IF NOT EXISTS disputes (
     FOREIGN KEY (filed_by_user_id) REFERENCES users(user_id) ON DELETE CASCADE
 )";
 if ($conn->query($q_disp)) {
-    if ($verbose) echo "✓ Table disputes created/verified.<br>";
+    if ($verbose)
+        echo "✓ Table disputes created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating disputes: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating disputes: " . $conn->error . "<br>";
 }
 
 // 11. Create vw_public_users view
 $q_pub_u = "CREATE OR REPLACE VIEW vw_public_users AS
-SELECT user_id, name, location, bio, reliability_score, status, created_at, last_active_at
+SELECT user_id, name, location, bio, profile_photo, reliability_score, status, created_at, last_active_at
 FROM users";
 if ($conn->query($q_pub_u)) {
-    if ($verbose) echo "✓ View vw_public_users created/verified.<br>";
+    if ($verbose)
+        echo "✓ View vw_public_users created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating view vw_public_users: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating view vw_public_users: " . $conn->error . "<br>";
 }
 
 // 12. Create vw_smart_matches view
@@ -507,10 +530,12 @@ JOIN skills s1 ON my_req.skill_id = s1.skill_id
 JOIN skills s2 ON their_req.skill_id = s2.skill_id
 WHERE u.status = 'active'";
 if ($conn->query($q_smart)) {
-    if ($verbose) echo "✓ View vw_smart_matches created/verified.<br>";
+    if ($verbose)
+        echo "✓ View vw_smart_matches created/verified.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating view vw_smart_matches: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating view vw_smart_matches: " . $conn->error . "<br>";
 }
 
 // 13. Create sp_resolve_dispute stored procedure
@@ -607,10 +632,12 @@ BEGIN
     END IF;
 END";
 if ($conn->query($q_proc_disp)) {
-    if ($verbose) echo "✓ Stored procedure sp_resolve_dispute created.<br>";
+    if ($verbose)
+        echo "✓ Stored procedure sp_resolve_dispute created.<br>";
 } else {
     $success = false;
-    if ($verbose) echo "✗ Error creating stored procedure sp_resolve_dispute: " . $conn->error . "<br>";
+    if ($verbose)
+        echo "✗ Error creating stored procedure sp_resolve_dispute: " . $conn->error . "<br>";
 }
 
 if ($verbose) {

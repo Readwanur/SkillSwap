@@ -118,7 +118,13 @@ include __DIR__ . '/../includes/header.php';
                             <p style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">
                                 <?php echo htmlspecialchars($p['bio'] ?? ''); ?></p>
                             <div class="flex gap-2 mt-1" style="font-size: 0.85rem;">
-                                <span>&#11088; <?php echo $p['current_score'] ?? '5.00'; ?>/5</span>
+                                <span>
+                                    <?php if ($p['current_score'] !== null): ?>
+                                        &#11088; <?php echo number_format((float)$p['current_score'], 2); ?>/5
+                                    <?php else: ?>
+                                        <span style="color:var(--text-muted);font-size:0.9rem;">No Ratings Yet</span>
+                                    <?php endif; ?>
+                                </span>
                                 <span style="color:var(--text-muted);"><?php echo $p['completed_sessions'] ?? 0; ?>
                                     sessions</span>
                                 <span
@@ -168,9 +174,26 @@ include __DIR__ . '/../includes/header.php';
             <p style="color:var(--text-secondary); margin-bottom:8px;">Provider: <strong
                     id="modal_provider_name"></strong></p>
             <div id="surge-info" style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;"></div>
-            <div class="form-group">
-                <label for="scheduled_time">Preferred Date & Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            
+            <!-- Lock availability message -->
+            <div id="availability-lock-info" style="display:none; background:rgba(220,20,60,0.06); border:1px solid rgba(220,20,60,0.25); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:0.82rem; color:crimson;">
+                <i data-lucide="lock" class="lucide-sm"></i>
+                The teacher is not available outside of the preferred time slots. Please select one of the available slots provided by the teacher.
+            </div>
+
+            <!-- Free-form datetime (shown when unlocked) -->
+            <div class="form-group" id="datetime-free-group">
+                <label for="scheduled_time">Preferred Date &amp; Time</label>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control">
+            </div>
+
+            <!-- Slot picker (shown when locked) -->
+            <div class="form-group" id="slot-picker-group" style="display:none;">
+                <label for="slot_select">Select Available Slot</label>
+                <select id="slot_select" class="form-control" onchange="onSlotSelected(this.value)">
+                    <option value="">Choose a time slot...</option>
+                </select>
+                <input type="hidden" id="scheduled_time_locked" name="">
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -189,6 +212,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
     var currentSurgeMultiplier = 1.0;
+    var providerAvailabilityLocked = false;
 
     // Set min datetime to the user's local "now"
     function setMinDateTime() {
@@ -211,6 +235,58 @@ include __DIR__ . '/../includes/header.php';
         } else {
             costEl.textContent = baseCost.toFixed(2) + ' TC';
         }
+    }
+
+    function generateSlotOptions(slots) {
+        var select = document.getElementById('slot_select');
+        select.innerHTML = '<option value="">Choose a time slot...</option>';
+        var dayMap = {'Sunday':0,'Monday':1,'Tuesday':2,'Wednesday':3,'Thursday':4,'Friday':5,'Saturday':6};
+        var today = new Date();
+        today.setHours(0,0,0,0);
+
+        for (var i = 0; i < 14; i++) {
+            var d = new Date(today);
+            d.setDate(d.getDate() + i);
+            var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+            slots.forEach(function(slot) {
+                if (slot.day_of_week === dayName) {
+                    var parts = slot.start_time.split(':');
+                    var slotDate = new Date(d);
+                    slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+
+                    // Skip slots in the past
+                    if (slotDate <= new Date()) return;
+
+                    var y = slotDate.getFullYear();
+                    var mo = String(slotDate.getMonth() + 1).padStart(2, '0');
+                    var da = String(slotDate.getDate()).padStart(2, '0');
+                    var dateStr = y + '-' + mo + '-' + da;
+
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    var label = dayName + ', ' + months[slotDate.getMonth()] + ' ' + slotDate.getDate() + ' — ' + formatTime12(slot.start_time) + ' to ' + formatTime12(slot.end_time);
+                    var value = dateStr + 'T' + slot.start_time;
+
+                    var opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    function formatTime12(t) {
+        var parts = t.split(':');
+        var h = parseInt(parts[0]);
+        var m = parts[1];
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + m + ' ' + ampm;
+    }
+
+    function onSlotSelected(val) {
+        document.getElementById('scheduled_time_locked').value = val;
     }
 
     function openBooking(providerId, providerName) {
@@ -237,6 +313,37 @@ include __DIR__ . '/../includes/header.php';
                 updateSurgeCost();
             })
             .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
+        // Fetch availability lock status
+        fetch('../api/provider_availability.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                providerAvailabilityLocked = data.locked == 1;
+                var lockInfo = document.getElementById('availability-lock-info');
+                var freeGroup = document.getElementById('datetime-free-group');
+                var slotGroup = document.getElementById('slot-picker-group');
+                var freeInput = document.getElementById('scheduled_time');
+                var lockedInput = document.getElementById('scheduled_time_locked');
+
+                if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
+                    lockInfo.style.display = 'block';
+                    freeGroup.style.display = 'none';
+                    slotGroup.style.display = 'block';
+                    freeInput.removeAttribute('name');
+                    freeInput.removeAttribute('required');
+                    lockedInput.setAttribute('name', 'scheduled_time');
+                    generateSlotOptions(data.slots);
+                } else {
+                    lockInfo.style.display = 'none';
+                    freeGroup.style.display = 'block';
+                    slotGroup.style.display = 'none';
+                    freeInput.setAttribute('name', 'scheduled_time');
+                    freeInput.setAttribute('required', 'required');
+                    lockedInput.removeAttribute('name');
+                }
+            })
+            .catch(() => {});
+
         document.getElementById('bookingModal').classList.add('active');
     }
 
