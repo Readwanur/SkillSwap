@@ -224,6 +224,15 @@ if ($method === 'GET') {
     $recipient_id = isset($input['recipient_id']) ? intval($input['recipient_id']) : (isset($_POST['recipient_id']) ? intval($_POST['recipient_id']) : 0);
     $message_text = trim($input['message_text'] ?? ($_POST['message_text'] ?? ''));
     
+    $decline_offer_msg_id = isset($input['decline_offer_msg_id']) ? intval($input['decline_offer_msg_id']) : (isset($_POST['decline_offer_msg_id']) ? intval($_POST['decline_offer_msg_id']) : 0);
+    
+    if ($decline_offer_msg_id > 0) {
+        $update_stmt = $conn->prepare("UPDATE messages SET message_text = REPLACE(message_text, '[BOOK_SKILL:', '[OFFER_DECLINED:') WHERE message_id = ?");
+        $update_stmt->bind_param("i", $decline_offer_msg_id);
+        $update_stmt->execute();
+        $update_stmt->close();
+    }
+    
     $message_type = 'text';
     $media_url = null;
     
@@ -232,8 +241,11 @@ if ($method === 'GET') {
         $message_text = 'Voice message';
         
         $tmp_name = $_FILES['audio_file']['tmp_name'];
-        $ext = pathinfo($_FILES['audio_file']['name'], PATHINFO_EXTENSION);
-        if (empty($ext)) $ext = 'webm';
+        $ext = strtolower(pathinfo($_FILES['audio_file']['name'], PATHINFO_EXTENSION));
+        $allowed_exts = ['webm', 'mp3', 'wav', 'ogg'];
+        if (!in_array($ext, $allowed_exts)) {
+            $ext = 'webm';
+        }
         $new_name = 'audio_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
         $upload_dir = __DIR__ . '/../uploads/voice_messages/';
         

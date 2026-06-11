@@ -33,9 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $result = $conn->query("SELECT @sp_status AS status, @sp_message AS message")->fetch_assoc();
         if ($result['status'] === 'success') {
             $success = $result['message'];
+            if (!empty($_POST['offer_msg_id'])) {
+                $offer_msg_id = intval($_POST['offer_msg_id']);
+                $conn->query("UPDATE messages SET message_text = REPLACE(message_text, '[BOOK_SKILL:', '[OFFER_ACCEPTED:') WHERE message_id = $offer_msg_id");
+            }
         } else {
             $error = $result['message'];
         }
+    } else {
+        $error = 'Please select a valid date and time for the session.';
     }
 }
 
@@ -769,19 +775,41 @@ function renderMessages(messages) {
         
         let hasSmartLink = false;
         
-        // Parse Smart Links for Booking [BOOK_SKILL:id:name]
         const smartLinkRegex = /\[BOOK_SKILL:(\d+):([^\]]+)\]/g;
         messageContent = messageContent.replace(smartLinkRegex, function(match, skillId, skillName) {
             hasSmartLink = true;
-            // Re-escape skillName just in case, though it's already escaped by escapeHtml
             const cleanSkillName = escapeHtml(skillName).replace(/'/g, "\\'");
             
             if (isSent) {
                 return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Sent</div></div>`;
             } else {
                 return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button onclick="openBooking(activeRecipientId, '${cleanSkillName}', ${skillId})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: var(--primary); color: #fff; border: none; font-weight: 700; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Accept & Book</button>
-                            <button onclick="sendNotInterested()" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Not Interested</button>
+                            <button onclick="openBooking(activeRecipientId, '${cleanSkillName}', ${skillId}, ${msg.message_id})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: var(--primary); color: #fff; border: none; font-weight: 700; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Accept & Book</button>
+                            <button onclick="sendNotInterested(${msg.message_id})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Not Interested</button>
+                        </div>`;
+            }
+        });
+        
+        const declinedRegex = /\[OFFER_DECLINED:(\d+):([^\]]+)\]/g;
+        messageContent = messageContent.replace(declinedRegex, function(match, skillId, skillName) {
+            hasSmartLink = true;
+            if (isSent) {
+                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Offer Declined</div></div>`;
+            } else {
+                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; background: rgba(0,0,0,0.1); color: var(--text-muted); padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Offer Declined</div>
+                        </div>`;
+            }
+        });
+
+        const acceptedRegex = /\[OFFER_ACCEPTED:(\d+):([^\]]+)\]/g;
+        messageContent = messageContent.replace(acceptedRegex, function(match, skillId, skillName) {
+            hasSmartLink = true;
+            if (isSent) {
+                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(34, 197, 94, 0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Accepted</div></div>`;
+            } else {
+                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; background: rgba(34, 197, 94, 0.1); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Accepted</div>
                         </div>`;
             }
         });
@@ -939,13 +967,14 @@ async function sendMessage() {
     }
 }
 
-async function sendNotInterested() {
+async function sendNotInterested(offerMsgId) {
     if (!confirm("Are you sure you want to decline this offer?")) return;
     
     const text = "Thank you for the offer, but I'm not interested at the moment.";
     const formData = new FormData();
     formData.append('conversation_id', activeConversationId);
     formData.append('message_text', text);
+    formData.append('decline_offer_msg_id', offerMsgId);
     formData.append('csrf_token', window.csrfToken);
 
     try {
@@ -1269,9 +1298,64 @@ function setMinDateTime() {
     document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
 }
 
-function openBooking(providerId, skillName, skillId) {
+var providerAvailabilityLocked = false;
+
+function generateSlotOptions(slots) {
+    var select = document.getElementById('slot_select');
+    select.innerHTML = '<option value="">Choose a time slot...</option>';
+    var dayMap = {'Sunday':0,'Monday':1,'Tuesday':2,'Wednesday':3,'Thursday':4,'Friday':5,'Saturday':6};
+    var today = new Date();
+    today.setHours(0,0,0,0);
+
+    for (var i = 0; i < 14; i++) {
+        var d = new Date(today);
+        d.setDate(d.getDate() + i);
+        var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+        slots.forEach(function(slot) {
+            if (slot.day_of_week === dayName) {
+                var parts = slot.start_time.split(':');
+                var slotDate = new Date(d);
+                slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+
+                // Skip slots in the past
+                if (slotDate <= new Date()) return;
+
+                var y = slotDate.getFullYear();
+                var mo = String(slotDate.getMonth() + 1).padStart(2, '0');
+                var da = String(slotDate.getDate()).padStart(2, '0');
+                var dateStr = y + '-' + mo + '-' + da;
+
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                var label = dayName + ', ' + months[slotDate.getMonth()] + ' ' + slotDate.getDate() + ' — ' + formatTime12(slot.start_time) + ' to ' + formatTime12(slot.end_time);
+                var value = dateStr + 'T' + slot.start_time;
+
+                var opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = label;
+                select.appendChild(opt);
+            }
+        });
+    }
+}
+
+function formatTime12(t) {
+    var parts = t.split(':');
+    var h = parseInt(parts[0]);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+}
+
+function onSlotSelected(val) {
+    document.getElementById('scheduled_time_locked').value = val;
+}
+
+function openBooking(providerId, skillName, skillId, offerMsgId) {
     document.getElementById('modal_provider_id').value = providerId;
     document.getElementById('modal_skill_id').value = skillId;
+    document.getElementById('modal_offer_msg_id').value = offerMsgId || '';
     document.getElementById('modal_skill_name').textContent = skillName;
     setMinDateTime();
 
@@ -1295,6 +1379,38 @@ function openBooking(providerId, skillName, skillId) {
             updateSurgeCost();
         })
         .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
+    // Fetch availability lock status
+    fetch('../api/provider_availability.php?provider_id=' + providerId)
+        .then(r => r.json())
+        .then(data => {
+            providerAvailabilityLocked = data.locked == 1;
+            var lockInfo = document.getElementById('availability-lock-info');
+            var freeGroup = document.getElementById('datetime-free-group');
+            var slotGroup = document.getElementById('slot-picker-group');
+            var freeInput = document.getElementById('scheduled_time');
+            var lockedInput = document.getElementById('scheduled_time_locked');
+
+            if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
+                lockInfo.style.display = 'block';
+                freeGroup.style.display = 'none';
+                slotGroup.style.display = 'block';
+                freeInput.removeAttribute('name');
+                freeInput.removeAttribute('required');
+                lockedInput.setAttribute('name', 'scheduled_time');
+                document.getElementById('slot_select').setAttribute('required', 'required');
+                generateSlotOptions(data.slots);
+            } else {
+                lockInfo.style.display = 'none';
+                freeGroup.style.display = 'block';
+                slotGroup.style.display = 'none';
+                freeInput.setAttribute('name', 'scheduled_time');
+                freeInput.setAttribute('required', 'required');
+                lockedInput.removeAttribute('name');
+                document.getElementById('slot_select').removeAttribute('required');
+            }
+        })
+        .catch(() => {});
 
     document.getElementById('bookingModal').classList.add('active');
 }
@@ -1325,14 +1441,31 @@ document.addEventListener('DOMContentLoaded', function() {
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" id="modal_provider_id" value="">
             <input type="hidden" name="skill_id" id="modal_skill_id" value="">
+            <input type="hidden" name="offer_msg_id" id="modal_offer_msg_id" value="">
             
             <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong></p>
             
             <div id="surge-info" style="display:none; padding:12px; margin-bottom:16px; border-radius:6px; font-size:0.85rem; color:var(--text-primary);"></div>
             
-            <div class="form-group">
-                <label for="scheduled_time">Preferred Date & Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            <!-- Lock availability message -->
+            <div id="availability-lock-info" style="display:none; background:rgba(220,20,60,0.06); border:1px solid rgba(220,20,60,0.25); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:0.82rem; color:crimson;">
+                <i data-lucide="lock" class="lucide-sm"></i>
+                The teacher is not available outside of the preferred time slots. Please select one of the available slots provided by the teacher.
+            </div>
+
+            <!-- Free-form datetime (shown when unlocked) -->
+            <div class="form-group" id="datetime-free-group">
+                <label for="scheduled_time">Preferred Date &amp; Time</label>
+                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control">
+            </div>
+
+            <!-- Slot picker (shown when locked) -->
+            <div class="form-group" id="slot-picker-group" style="display:none;">
+                <label for="slot_select">Select Available Slot</label>
+                <select id="slot_select" class="form-control" onchange="onSlotSelected(this.value)">
+                    <option value="">Choose a time slot...</option>
+                </select>
+                <input type="hidden" id="scheduled_time_locked" name="">
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>

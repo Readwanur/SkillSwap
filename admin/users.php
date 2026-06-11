@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Search
 $search = trim($_GET['search'] ?? '');
+$filter_status = $_GET['status'] ?? 'all';
 
 // Sorting parameters
 $sort = trim($_GET['sort'] ?? 'joined');
@@ -84,7 +85,7 @@ $sort_col = $allowed_sorts[$sort] ?? 'u.created_at';
 $order = (strtolower($order) === 'asc') ? 'ASC' : 'DESC';
 
 // Sort URL generator
-function getSortUrl($col, $dir, $search) {
+function getSortUrl($col, $dir, $search, $filter_status) {
     $query = [
         'sort' => $col,
         'order' => $dir
@@ -92,22 +93,25 @@ function getSortUrl($col, $dir, $search) {
     if ($search !== '') {
         $query['search'] = $search;
     }
+    if ($filter_status !== 'all') {
+        $query['status'] = $filter_status;
+    }
     return 'users.php?' . http_build_query($query);
 }
 
 // Sort Buttons generator (single toggle button beside column header)
-function renderSortButtons($col, $current_sort, $current_order, $search) {
+function renderSortButtons($col, $current_sort, $current_order, $search, $filter_status) {
     if ($current_sort === $col) {
         if (strtolower($current_order) === 'asc') {
             // Currently sorted ascending. Click to sort descending.
-            $url = getSortUrl($col, 'desc', $search);
+            $url = getSortUrl($col, 'desc', $search, $filter_status);
             return '
             <span class="sort-arrows">
                 <a href="' . $url . '" class="sort-arrow active" title="Sorted Ascending. Click to sort Descending">&#x25B4;</a>
             </span>';
         } else {
             // Currently sorted descending. Click to sort ascending.
-            $url = getSortUrl($col, 'asc', $search);
+            $url = getSortUrl($col, 'asc', $search, $filter_status);
             return '
             <span class="sort-arrows">
                 <a href="' . $url . '" class="sort-arrow active" title="Sorted Descending. Click to sort Ascending">&#x25BE;</a>
@@ -115,7 +119,7 @@ function renderSortButtons($col, $current_sort, $current_order, $search) {
         }
     } else {
         // Not currently sorted. Click to sort ascending.
-        $url = getSortUrl($col, 'asc', $search);
+        $url = getSortUrl($col, 'asc', $search, $filter_status);
         return '
         <span class="sort-arrows">
             <a href="' . $url . '" class="sort-arrow" title="Click to sort Ascending">&#x25B4;</a>
@@ -134,6 +138,12 @@ if ($search !== '') {
     $params[] = &$search_param;
     $params[] = &$search_param;
     $types .= 'sss';
+}
+
+if ($filter_status === 'suspended') {
+    $where .= " AND u.status = 'suspended'";
+} elseif ($filter_status === 'active') {
+    $where .= " AND u.status = 'active'";
 }
 
 $sql = "
@@ -200,8 +210,15 @@ include __DIR__ . '/../includes/admin_header.php';
             <div id="searchSuggestions">
             </div>
         </div>
+        
+        <select name="status" class="form-control" style="width: auto; border-radius: 99px; padding: 8px 36px 8px 16px;">
+            <option value="all" <?php echo $filter_status === 'all' ? 'selected' : ''; ?>>All</option>
+            <option value="active" <?php echo $filter_status === 'active' ? 'selected' : ''; ?>>Active</option>
+            <option value="suspended" <?php echo $filter_status === 'suspended' ? 'selected' : ''; ?>>Suspended</option>
+        </select>
+
         <button type="submit" class="btn btn-primary" style="border-radius: 99px; padding: 10px 24px;">Search</button>
-        <?php if ($search || $sort !== 'joined' || $order !== 'DESC'): ?>
+        <?php if ($search || $sort !== 'joined' || $order !== 'DESC' || $filter_status !== 'all'): ?>
             <a href="users.php" class="btn btn-secondary" style="border-radius: 99px; padding: 10px 24px;">Clear Filters</a>
         <?php endif; ?>
     </form>
@@ -309,13 +326,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     <th>
                         <span class="th-content">
                             <span>ID</span>
-                            <?php echo renderSortButtons('id', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('id', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>
                         <span class="th-content">
                             <span>User</span>
-                            <?php echo renderSortButtons('name', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('name', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>Email</th>
@@ -323,26 +340,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     <th>
                         <span class="th-content">
                             <span>Rep Score</span>
-                            <?php echo renderSortButtons('rep', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('rep', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>
                         <span class="th-content">
                             <span>Sessions</span>
-                            <?php echo renderSortButtons('sessions', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('sessions', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>
                         <span class="th-content">
                             <span>Balance</span>
-                            <?php echo renderSortButtons('balance', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('balance', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>Status</th>
                     <th>
                         <span class="th-content">
                             <span>Joined</span>
-                            <?php echo renderSortButtons('joined', $sort, $order, $search); ?>
+                            <?php echo renderSortButtons('joined', $sort, $order, $search, $filter_status); ?>
                         </span>
                     </th>
                     <th>Actions</th>
@@ -351,9 +368,11 @@ document.addEventListener('DOMContentLoaded', function() {
             <tbody>
                 <?php while ($u = $users->fetch_assoc()):
                     $rep_color = 'var(--text-primary)';
-                    if (($u['current_score'] ?? 5) < 2.5)
+                    if ($u['current_score'] === null)
+                        $rep_color = 'var(--text-muted)';
+                    elseif ($u['current_score'] < 2.5)
                         $rep_color = 'var(--danger)';
-                    elseif (($u['current_score'] ?? 5) >= 4.5)
+                    elseif ($u['current_score'] >= 4.5)
                         $rep_color = 'var(--success)';
                     ?>
                     <tr>
@@ -372,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td><?php echo htmlspecialchars($u['email']); ?></td>
                         <td><?php echo htmlspecialchars($u['location'] ?? 'N/A'); ?></td>
                         <td style="color:<?php echo $rep_color; ?>; font-weight:600;">
-                            <?php echo $u['current_score'] ?? 'N/A'; ?></td>
+                            <?php echo $u['current_score'] !== null ? number_format((float)$u['current_score'], 2) : '<span style="font-size:0.85rem;">No Ratings</span>'; ?></td>
                         <td>
                             <span style="color:var(--success);" title="Completed"><?php echo $u['completed_sessions'] ?? 0; ?></span> /
                             <span style="color:var(--danger);" title="Cancelled"><?php echo $u['cancelled_sessions'] ?? 0; ?></span>
@@ -392,16 +411,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         </td>
                         <td style="font-size:0.82rem; color:var(--text-muted);"><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
                         <td>
-                            <div class="flex gap-1" style="flex-wrap:nowrap;">
+                            <div class="flex gap-1" style="flex-wrap:nowrap; align-items:center;">
                                 <?php if ($u['status'] === 'active'): ?>
-                                    <form method="POST" style="display:inline;">
+                                    <form method="POST" style="margin:0; display:flex;">
                                         <input type="hidden" name="action" value="suspend_user">
                                         <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-warning" title="Suspend User"
                                             onclick="return confirm('Suspend User #<?php echo $u['user_id']; ?>? They will not be able to log in.')"><i data-lucide="ban" class="lucide-sm"></i> Suspend</button>
                                     </form>
                                 <?php else: ?>
-                                    <form method="POST" style="display:inline;">
+                                    <form method="POST" style="margin:0; display:flex;">
                                         <input type="hidden" name="action" value="activate_user">
                                         <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-success" title="Activate User"
@@ -409,11 +428,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </form>
                                 <?php endif; ?>
 
-                                <form method="POST" style="display:inline;">
+                                <form method="POST" style="margin:0; display:flex;">
                                     <input type="hidden" name="action" value="delete_user">
                                     <input type="hidden" name="user_id" value="<?php echo $u['user_id']; ?>">
                                     <button type="submit" class="btn btn-sm btn-danger" title="Hard Delete"
-                                        onclick="return confirm('Permanently delete User #<?php echo $u['user_id']; ?>? (Will fail if they have transaction history)')"><i data-lucide="trash-2" class="lucide-sm"></i></button>
+                                        onclick="return confirm('Permanently delete User #<?php echo $u['user_id']; ?>? (Will fail if they have transaction history)')"><i data-lucide="trash-2" class="lucide-sm"></i> Delete</button>
                                 </form>
                             </div>
                         </td>

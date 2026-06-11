@@ -82,7 +82,7 @@ include __DIR__ . '/../includes/header.php';
             <h3 class="mb-2">Results for "<?php echo htmlspecialchars($query); ?>"</h3>
             <?php if ($users && $users->num_rows > 0): ?>
                 <div class="grid-3">
-                    <?php while ($u = $users->fetch_assoc()): ?>
+                    <?php while (($u = $users->fetch_assoc())): ?>
                         <div class="card">
                             <div class="flex gap-2 items-center mb-1">
                                 <?php if (!empty($u['has_photo'])): ?>
@@ -97,7 +97,11 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:8px;"><?php echo htmlspecialchars($u['location'] ?? 'Unknown location'); ?></p>
                             <div class="mt-2" style="font-size:0.85rem;">
-                                &#11088; <?php echo $u['current_score'] ?? '5.00'; ?>/5
+                                <?php if ($u['current_score'] !== null): ?>
+                                    &#11088; <?php echo number_format((float)$u['current_score'], 2); ?>/5
+                                <?php else: ?>
+                                    <span style="color:var(--text-muted);">No Ratings Yet</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endwhile; ?>
@@ -120,7 +124,7 @@ include __DIR__ . '/../includes/header.php';
                 <h3 class="mb-2" style="color: var(--secondary);"><i data-lucide="sparkles" class="lucide-sm"></i> Mutual Exchange Partners</h3>
                 <?php if ($mutual_exchanges && $mutual_exchanges->num_rows > 0): ?>
                     <div class="grid-3 mb-3">
-                        <?php while ($me = $mutual_exchanges->fetch_assoc()): ?>
+                        <?php while (($me = $mutual_exchanges->fetch_assoc())): ?>
                             <div class="card" style="border: 1.5px solid var(--secondary); background: rgba(115,92,0,0.02);">
                                 <div class="flex gap-2 items-center mb-1">
                                     <?php if (!empty($me['has_photo'])): ?>
@@ -140,7 +144,11 @@ include __DIR__ . '/../includes/header.php';
                                     <div style="color: var(--primary); font-weight: 500; margin-top:3px;"><i data-lucide="graduation-cap" class="lucide-sm"></i> Learns: <?php echo htmlspecialchars($me['i_teach_them']); ?></div>
                                 </div>
                                 <div class="mt-2" style="font-size:0.85rem;">
-                                    &#11088; <?php echo $me['current_score'] ?? '5.00'; ?>/5
+                                    <?php if ($me['current_score'] !== null): ?>
+                                        &#11088; <?php echo number_format((float)$me['current_score'], 2); ?>/5
+                                    <?php else: ?>
+                                        <span style="color:var(--text-muted);">No Ratings Yet</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         <?php endwhile; ?>
@@ -155,7 +163,7 @@ include __DIR__ . '/../includes/header.php';
                 <h3 class="mb-2 mt-3" style="color: var(--primary);"><i data-lucide="target" class="lucide-sm"></i> Recommended for You</h3>
                 <?php if ($recommended_providers && $recommended_providers->num_rows > 0): ?>
                     <div class="grid-3">
-                        <?php while ($rp = $recommended_providers->fetch_assoc()): ?>
+                        <?php while (($rp = $recommended_providers->fetch_assoc())): ?>
                             <div class="card">
                                 <div class="flex gap-2 items-center mb-1">
                                     <?php if (!empty($rp['has_photo'])): ?>
@@ -173,7 +181,11 @@ include __DIR__ . '/../includes/header.php';
                                     Offers skill you want: <strong><?php echo htmlspecialchars($rp['skill_name']); ?></strong>
                                 </p>
                                 <div class="mt-2" style="font-size:0.85rem;">
-                                    &#11088; <?php echo $rp['current_score'] ?? '5.00'; ?>/5
+                                    <?php if ($rp['current_score'] !== null): ?>
+                                        &#11088; <?php echo number_format((float)$rp['current_score'], 2); ?>/5
+                                    <?php else: ?>
+                                        <span style="color:var(--text-muted);">No Ratings Yet</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         <?php endwhile; ?>

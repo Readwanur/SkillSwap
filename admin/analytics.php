@@ -909,8 +909,7 @@ include __DIR__ . '/../includes/admin_header.php';
                 style="color: var(--info); font-family: var(--font-headline); font-weight: 700; margin: 0; font-size: 1.3rem;">
                 <i data-lucide="brain" class="lucide-sm"></i> Business Intelligence Analytics
             </h2>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Advanced market metrics using
-                NTILE(), LAG(), correlated subqueries, and demand-supply ratio analysis.</p>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;">Comprehensive insights on market trends and platform performance.</p>
         </div>
     </div>
 
@@ -1355,7 +1354,8 @@ include __DIR__ . '/../includes/admin_header.php';
                                             lineWidth: 2,
                                             pointStyle: 'circle',
                                             hidden: false,
-                                            index: i
+                                            index: i,
+                                            fontColor: textColor
                                         };
                                     });
                                 }
