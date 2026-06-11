@@ -270,7 +270,13 @@ include __DIR__ . '/../includes/header.php';
                                         <td style="font-weight:600;"><?php echo $p['session_count']; ?></td>
                                         <td><i data-lucide="star" class="lucide-sm"></i> <?php echo $p['avg_rating'] ?? 'N/A'; ?></td>
                                         <td><?php echo $p['hours_taught']; ?>h</td>
-                                        <td style="color:var(--success); font-weight:600;"><?php echo $p['reliability']; ?>/5</td>
+                                        <td style="color:var(--success); font-weight:600;">
+                                            <?php if ($p['reliability'] !== null): ?>
+                                                <?php echo number_format((float)$p['reliability'], 2); ?>/5
+                                            <?php else: ?>
+                                                <span style="color:var(--text-muted); font-weight:normal; font-size: 0.9rem;">No Ratings Yet</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td style="font-weight:700; color:var(--primary);"><?php echo $p['composite_score']; ?></td>
                                         <td><span class="badge <?php echo $badge_class; ?>"><?php echo $badge_label; ?></span></td>
                                     </tr>

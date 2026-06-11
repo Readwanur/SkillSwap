@@ -8,6 +8,19 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 $page_title = 'Fraud Detection';
 
+$success = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'suspend_user') {
+        $uid = intval($_POST['user_id'] ?? 0);
+        if ($uid > 0) {
+            $conn->query("UPDATE users SET status = 'suspended' WHERE user_id = $uid");
+            $success = "User #$uid suspended successfully.";
+        }
+    }
+}
+
 // ============================================================
 // FEATURE 5: AUTOMATED WASH TRADING & FRAUD DETECTION
 // ============================================================
@@ -118,11 +131,61 @@ $mutual_trading = $conn->query("
     LIMIT 20
 ");
 
-// Summary stats
-$total_flagged_rings = ($circular_rings && $circular_rings->num_rows > 0) ? $circular_rings->num_rows : 0;
-$total_velocity_flags = ($suspicious_velocity && $suspicious_velocity->num_rows > 0) ? $suspicious_velocity->num_rows : 0;
-$total_rating_flags = ($rating_anomaly && $rating_anomaly->num_rows > 0) ? $rating_anomaly->num_rows : 0;
-$total_mutual_flags = ($mutual_trading && $mutual_trading->num_rows > 0) ? $mutual_trading->num_rows : 0;
+// Summary stats and suspects list
+$circular_rings_data = [];
+if ($circular_rings && $circular_rings->num_rows > 0) {
+    while($row = $circular_rings->fetch_assoc()) $circular_rings_data[] = $row;
+}
+$total_flagged_rings = count($circular_rings_data);
+
+$suspicious_velocity_data = [];
+if ($suspicious_velocity && $suspicious_velocity->num_rows > 0) {
+    while($row = $suspicious_velocity->fetch_assoc()) $suspicious_velocity_data[] = $row;
+}
+$total_velocity_flags = count($suspicious_velocity_data);
+
+$rating_anomaly_data = [];
+if ($rating_anomaly && $rating_anomaly->num_rows > 0) {
+    while($row = $rating_anomaly->fetch_assoc()) $rating_anomaly_data[] = $row;
+}
+$total_rating_flags = count($rating_anomaly_data);
+
+$mutual_trading_data = [];
+if ($mutual_trading && $mutual_trading->num_rows > 0) {
+    while($row = $mutual_trading->fetch_assoc()) $mutual_trading_data[] = $row;
+}
+$total_mutual_flags = count($mutual_trading_data);
+
+$suspects = [];
+foreach($circular_rings_data as $r) {
+    $suspects[$r['user_a_id']] = ['name' => $r['name_a'], 'reason' => 'Circular Ring'];
+    $suspects[$r['user_b_id']] = ['name' => $r['name_b'], 'reason' => 'Circular Ring'];
+    $suspects[$r['user_c_id']] = ['name' => $r['name_c'], 'reason' => 'Circular Ring'];
+}
+foreach($suspicious_velocity_data as $r) {
+    if (!isset($suspects[$r['user_id']])) $suspects[$r['user_id']] = ['name' => $r['name'], 'reason' => 'Velocity Alert'];
+    else if (strpos($suspects[$r['user_id']]['reason'], 'Velocity Alert') === false) $suspects[$r['user_id']]['reason'] .= ', Velocity Alert';
+}
+foreach($rating_anomaly_data as $r) {
+    if (!isset($suspects[$r['user_id']])) $suspects[$r['user_id']] = ['name' => $r['name'], 'reason' => 'Rating Anomaly'];
+    else if (strpos($suspects[$r['user_id']]['reason'], 'Rating Anomaly') === false) $suspects[$r['user_id']]['reason'] .= ', Rating Anomaly';
+}
+foreach($mutual_trading_data as $r) {
+    foreach (['a','b'] as $u) {
+        $id = $r['user_'.$u.'_id'];
+        $name = $r['name_'.$u];
+        if (!isset($suspects[$id])) $suspects[$id] = ['name' => $name, 'reason' => 'Mutual Trading'];
+        else if (strpos($suspects[$id]['reason'], 'Mutual Trading') === false) $suspects[$id]['reason'] .= ', Mutual Trading';
+    }
+}
+
+if (!empty($suspects)) {
+    $ids = implode(',', array_keys($suspects));
+    $status_q = $conn->query("SELECT user_id, status FROM users WHERE user_id IN ($ids)");
+    while($row = $status_q->fetch_assoc()) {
+        $suspects[$row['user_id']]['status'] = $row['status'];
+    }
+}
 
 include __DIR__ . '/../includes/admin_header.php';
 ?>
@@ -138,6 +201,63 @@ include __DIR__ . '/../includes/admin_header.php';
         </span>
     </div>
 </div>
+
+<?php if ($success): ?>
+    <div class="alert alert-success mt-2 mb-2"><?php echo htmlspecialchars($success); ?></div>
+<?php endif; ?>
+<?php if ($error): ?>
+    <div class="alert alert-danger mt-2 mb-2"><?php echo htmlspecialchars($error); ?></div>
+<?php endif; ?>
+
+<?php if (!empty($suspects)): ?>
+<div class="card mb-3" style="border-left:4px solid var(--danger);">
+    <div class="card-header">
+        <h3><i data-lucide="users" class="lucide-sm"></i> Suspected Users Overview</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Name</th>
+                    <th>Reasons Flagged</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($suspects as $uid => $s): ?>
+                    <tr>
+                        <td><strong>#<?php echo $uid; ?></strong></td>
+                        <td><a href="../pages/user_profile.php?id=<?php echo $uid; ?>" target="_blank" style="color:var(--primary); text-decoration:none; font-weight:600;"><?php echo htmlspecialchars($s['name']); ?></a></td>
+                        <td style="color:var(--danger);"><?php echo $s['reason']; ?></td>
+                        <td>
+                            <?php if ($s['status'] === 'active'): ?>
+                                <span class="badge badge-success">Active</span>
+                            <?php elseif ($s['status'] === 'suspended'): ?>
+                                <span class="badge badge-danger">Suspended</span>
+                            <?php else: ?>
+                                <span class="badge badge-secondary"><?php echo ucfirst($s['status'] ?? 'unknown'); ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($s['status'] === 'active'): ?>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="suspend_user">
+                                    <input type="hidden" name="user_id" value="<?php echo $uid; ?>">
+                                    <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Suspend User #<?php echo $uid; ?>? They will not be able to log in.')"><i data-lucide="ban" class="lucide-sm"></i> Suspend</button>
+                                </form>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-secondary" disabled>Suspended</button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Alert Summary -->
 <div class="stats-grid mb-3">
@@ -184,7 +304,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($r = $circular_rings->fetch_assoc()): ?>
+                    <?php foreach ($circular_rings_data as $r): ?>
                         <tr>
                             <td>
                                 <strong style="color:var(--danger);">
@@ -207,7 +327,7 @@ include __DIR__ . '/../includes/admin_header.php';
                             </td>
                             <td><span class="badge badge-danger"><?php echo $r['ring_hours']; ?>h</span></td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
@@ -239,7 +359,7 @@ include __DIR__ . '/../includes/admin_header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php while ($sv = $suspicious_velocity->fetch_assoc()): ?>
+                        <?php foreach ($suspicious_velocity_data as $sv): ?>
                             <tr>
                                 <td>
                                     <strong><?php echo htmlspecialchars($sv['name']); ?></strong>
@@ -249,7 +369,7 @@ include __DIR__ . '/../includes/admin_header.php';
                                 <td style="font-weight:700; color:var(--warning);"><?php echo $sv['sessions_in_day']; ?></td>
                                 <td style="font-weight:600;"><?php echo number_format($sv['total_credits_earned'], 2); ?> TC</td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -280,14 +400,14 @@ include __DIR__ . '/../includes/admin_header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php while ($ra = $rating_anomaly->fetch_assoc()): ?>
+                        <?php foreach ($rating_anomaly_data as $ra): ?>
                             <tr>
                                 <td><strong><?php echo htmlspecialchars($ra['name']); ?></strong></td>
                                 <td style="font-weight:600;"><?php echo $ra['rated_sessions']; ?></td>
                                 <td style="font-weight:700; color:var(--warning);"><i data-lucide="star" class="lucide-sm"></i> <?php echo $ra['avg_rating']; ?> (all 5★)</td>
                                 <td style="font-size:0.8rem; color:var(--text-muted);"><?php echo htmlspecialchars($ra['raters']); ?></td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -322,7 +442,7 @@ include __DIR__ . '/../includes/admin_header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($mt = $mutual_trading->fetch_assoc()): ?>
+                    <?php foreach ($mutual_trading_data as $mt): ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($mt['name_a']); ?></strong></td>
                             <td><strong><?php echo htmlspecialchars($mt['name_b']); ?></strong></td>
@@ -332,7 +452,7 @@ include __DIR__ . '/../includes/admin_header.php';
                             <td style="font-size:0.8rem;"><?php echo date('M d', strtotime($mt['last_session'])); ?></td>
                             <td><span class="badge badge-warning"><?php echo $mt['span_days']; ?> days</span></td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>

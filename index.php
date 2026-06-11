@@ -947,8 +947,7 @@ header("Pragma: no-cache");
     <!-- Footer copyright info -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; <?php echo date('Y'); ?> SkillSwap Platform. All rights reserved.</p>
-            <p style="font-size:0.75rem;">Created for Database Management Systems coursework.</p>
+            <p>&copy; <?php echo date('Y'); ?> SkillSwap Platform. </p>
         </div>
     </footer>
 

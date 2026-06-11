@@ -106,6 +106,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .auth-logo-img:hover {
             transform: scale(1.05);
         }
+        .forgot-pwd-link {
+            font-size: 0.8rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            opacity: 0.85;
+        }
+        .forgot-pwd-link:hover {
+            opacity: 1;
+            color: #0056b3; /* Slightly darker shade or secondary */
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
     </style>
 </head>
 
@@ -129,7 +143,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label for="password" style="display:flex; justify-content:space-between; width:100%;">
+                        Password
+                        <a href="#" class="forgot-pwd-link">Forgot password?</a>
+                    </label>
                     <input type="password" id="password" name="password" class="form-control"
                         placeholder="Enter your password" required>
                 </div>
