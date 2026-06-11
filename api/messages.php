@@ -242,7 +242,7 @@ if ($method === 'GET') {
         
         $tmp_name = $_FILES['audio_file']['tmp_name'];
         $ext = strtolower(pathinfo($_FILES['audio_file']['name'], PATHINFO_EXTENSION));
-        $allowed_exts = ['webm', 'mp3', 'wav', 'ogg'];
+        $allowed_exts = ['webm', 'mp3', 'wav', 'ogg', 'm4a', 'mp4'];
         if (!in_array($ext, $allowed_exts)) {
             $ext = 'webm';
         }
