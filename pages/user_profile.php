@@ -42,6 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             $error = $result['message'];
         }
+    } else {
+        $error = 'Please select a valid date and time for the session.';
     }
 }
 
@@ -91,6 +93,9 @@ if ($user_badges) {
 // Fetch availability
 $availability = $conn->query("SELECT day_of_week, start_time, end_time FROM user_availability WHERE user_id = $profile_id ORDER BY FIELD(day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), start_time ASC");
 
+// Fetch availability lock status
+$lock_res = $conn->query("SELECT availability_locked FROM users WHERE user_id = $profile_id");
+$is_locked = ($lock_res && $lock_res->fetch_assoc()['availability_locked'] == 1);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -113,22 +118,32 @@ include __DIR__ . '/../includes/header.php';
                         alt="Profile Photo" onclick="openLightbox(this.src)" style="width: 120px; height: 120px;">
                 <?php else: ?>
                     <div class="avatar avatar-lg" style="width: 120px; height: 120px; font-size: 3rem; line-height: 120px;">
-                        <?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                        <?php echo strtoupper(substr($user['name'], 0, 1)); ?>
+                    </div>
                 <?php endif; ?>
                 <div style="flex:1;">
                     <h1 style="margin:0; font-size:1.8rem;"><?php echo htmlspecialchars($user['name']); ?></h1>
                     <p style="color:var(--text-secondary); margin-bottom: 8px;">
-                        <?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?></p>
+                        <?php echo htmlspecialchars($user['location'] ?? 'Unknown location'); ?>
+                    </p>
                     <a href="messages.php?start_with_user_id=<?php echo $profile_id; ?>"
                         class="btn btn-secondary btn-sm" style="display:inline-block; text-decoration:none;">
                         <i data-lucide="message-square" class="lucide-sm"></i> Message User
                     </a>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">&#11088;
-                        <?php echo $user['current_score'] ?? '5.00'; ?></div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning);">
+                        <?php 
+                        if ($user['current_score'] !== null) {
+                            echo '&#11088; ' . number_format((float)$user['current_score'], 2);
+                        } else {
+                            echo '<span style="font-size:1.2rem;color:var(--text-muted);font-weight:normal;">No Ratings Yet</span>';
+                        }
+                        ?>
+                    </div>
                     <div style="color: var(--text-muted); font-size: 0.9rem;">
-                        <?php echo $user['completed_sessions'] ?? 0; ?> Sessions</div>
+                        <?php echo $user['completed_sessions'] ?? 0; ?> Sessions
+                    </div>
                     <span class="badge badge-orange mt-1"
                         style="display:inline-block;"><?php echo htmlspecialchars($user['mentor_level'] ?? 'Novice'); ?></span>
                 </div>
@@ -138,7 +153,8 @@ include __DIR__ . '/../includes/header.php';
 
             <h3>About</h3>
             <p style="color:var(--text-secondary); margin-top:8px;">
-                <?php echo htmlspecialchars($user['bio'] ?? 'No bio provided.'); ?></p>
+                <?php echo htmlspecialchars($user['bio'] ?? 'No bio provided.'); ?>
+            </p>
 
             <div class="mt-2" style="font-size:0.85rem; color:var(--text-muted);">
                 Member since: <?php echo date('F j, Y', strtotime($user['created_at'])); ?> &middot;
@@ -220,6 +236,13 @@ include __DIR__ . '/../includes/header.php';
         <!-- Availability -->
         <div class="card mt-3">
             <h3 class="section-title">Availability</h3>
+            <?php if ($is_locked): ?>
+                <div style="background:rgba(47,95,156,0.08); border:1px solid rgba(47,95,156,0.2); padding:10px; border-radius:var(--radius-sm); margin-bottom:12px;">
+                    <span class="badge badge-info" style="margin-bottom:6px; display:inline-block;"><i data-lucide="lock" class="lucide-sm"></i> Locked</span>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin:0;">This teacher requires bookings to be made strictly within their predefined time slots below.</p>
+                </div>
+            <?php endif; ?>
+            
             <?php if ($availability && $availability->num_rows > 0): ?>
                 <div class="flex flex-wrap gap-1 mt-1">
                     <?php while ($a = $availability->fetch_assoc()): ?>
@@ -245,20 +268,39 @@ include __DIR__ . '/../includes/header.php';
             <h3>Book a Session</h3>
             <button class="modal-close" onclick="closeBooking()">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="bookingForm" onsubmit="return prepareBookingSubmit()">
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" value="<?php echo $profile_id; ?>">
             <input type="hidden" name="skill_id" id="modal_skill_id">
+            <input type="hidden" name="scheduled_time" id="final_scheduled_time" value="">
 
             <p style="color:var(--text-secondary); margin-bottom:8px;">Provider:
-                <strong><?php echo htmlspecialchars($user['name']); ?></strong></p>
+                <strong><?php echo htmlspecialchars($user['name']); ?></strong>
+            </p>
             <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong>
             </p>
-            <div id="surge-info" style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;"></div>
+            <div id="surge-info"
+                style="display:none; margin-bottom:16px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.85rem;">
+            </div>
 
-            <div class="form-group">
-                <label for="scheduled_time">Preferred Date & Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control" required>
+            <!-- Lock availability message -->
+            <div id="availability-lock-info" style="display:none; background:rgba(220,20,60,0.06); border:1px solid rgba(220,20,60,0.25); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:0.82rem; color:crimson;">
+                <i data-lucide="lock" class="lucide-sm"></i>
+                The teacher is not available outside of the preferred time slots. Please select one of the available slots provided by the teacher.
+            </div>
+
+            <div class="form-group" id="datetime-free-group">
+                <label for="scheduled_time">Preferred Date &amp; Time</label>
+                <input type="datetime-local" id="scheduled_time" class="form-control">
+            </div>
+
+            <!-- Slot picker (shown when locked) -->
+            <div class="form-group" id="slot-picker-group" style="display:none;">
+                <label for="slot_select">Select Available Slot</label>
+                <select id="slot_select" class="form-control" onchange="onSlotSelected(this.value)">
+                    <option value="">Choose a time slot...</option>
+                </select>
+                <input type="hidden" id="scheduled_time_locked">
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -269,7 +311,9 @@ include __DIR__ . '/../includes/header.php';
                     <option value="120">120 minutes</option>
                 </select>
             </div>
-            <div id="cost-display" style="text-align:center; margin-bottom:12px; font-size:0.9rem; color:var(--text-secondary);">Estimated cost: <strong id="cost-value">10.00 TC</strong></div>
+            <div id="cost-display"
+                style="text-align:center; margin-bottom:12px; font-size:0.9rem; color:var(--text-secondary);">Estimated
+                cost: <strong id="cost-value">10.00 TC</strong></div>
             <button type="submit" class="btn btn-primary btn-block">Confirm Booking</button>
         </form>
     </div>
@@ -277,6 +321,28 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
     var currentSurgeMultiplier = 1.0;
+    var providerAvailabilityLocked = false;
+
+    function prepareBookingSubmit() {
+        var freeInput = document.getElementById('scheduled_time').value;
+        var lockedInput = document.getElementById('scheduled_time_locked').value;
+        var finalInput = document.getElementById('final_scheduled_time');
+        
+        if (providerAvailabilityLocked && document.getElementById('slot-picker-group').style.display !== 'none') {
+            if (!lockedInput) {
+                alert('Please select an available slot.');
+                return false;
+            }
+            finalInput.value = lockedInput;
+        } else {
+            if (!freeInput) {
+                alert('Please select a preferred date and time.');
+                return false;
+            }
+            finalInput.value = freeInput;
+        }
+        return true;
+    }
 
     // Set min datetime to the user's local "now"
     function setMinDateTime() {
@@ -301,13 +367,65 @@ include __DIR__ . '/../includes/header.php';
         }
     }
 
+    function generateSlotOptions(slots) {
+        var select = document.getElementById('slot_select');
+        select.innerHTML = '<option value="">Choose a time slot...</option>';
+        var dayMap = {'Sunday':0,'Monday':1,'Tuesday':2,'Wednesday':3,'Thursday':4,'Friday':5,'Saturday':6};
+        var today = new Date();
+        today.setHours(0,0,0,0);
+
+        for (var i = 0; i < 14; i++) {
+            var d = new Date(today);
+            d.setDate(d.getDate() + i);
+            var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+            slots.forEach(function(slot) {
+                if (slot.day_of_week === dayName) {
+                    var parts = slot.start_time.split(':');
+                    var slotDate = new Date(d);
+                    slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+
+                    // Skip slots in the past
+                    if (slotDate <= new Date()) return;
+
+                    var y = slotDate.getFullYear();
+                    var mo = String(slotDate.getMonth() + 1).padStart(2, '0');
+                    var da = String(slotDate.getDate()).padStart(2, '0');
+                    var dateStr = y + '-' + mo + '-' + da;
+
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    var label = dayName + ', ' + months[slotDate.getMonth()] + ' ' + slotDate.getDate() + ' — ' + formatTime12(slot.start_time) + ' to ' + formatTime12(slot.end_time);
+                    var value = dateStr + 'T' + slot.start_time;
+
+                    var opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    function formatTime12(t) {
+        var parts = t.split(':');
+        var h = parseInt(parts[0]);
+        var m = parts[1];
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + m + ' ' + ampm;
+    }
+
+    function onSlotSelected(val) {
+        document.getElementById('scheduled_time_locked').value = val;
+    }
+
     function openBooking(skillId, skillName) {
         document.getElementById('modal_skill_id').value = skillId;
         document.getElementById('modal_skill_name').textContent = skillName;
         setMinDateTime();
-        
+
         var providerId = <?php echo $profile_id; ?>;
-        
+
         // Fetch surge pricing for this provider
         fetch('../api/surge_pricing.php?provider_id=' + providerId)
             .then(r => r.json())
@@ -328,6 +446,32 @@ include __DIR__ . '/../includes/header.php';
                 updateSurgeCost();
             })
             .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
+        // Fetch availability lock status
+        fetch('../api/provider_availability.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                providerAvailabilityLocked = data.locked == 1;
+                var lockInfo = document.getElementById('availability-lock-info');
+                var freeGroup = document.getElementById('datetime-free-group');
+                var slotGroup = document.getElementById('slot-picker-group');
+
+                if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
+                    lockInfo.style.display = 'block';
+                    freeGroup.style.display = 'none';
+                    slotGroup.style.display = 'block';
+                    document.getElementById('slot_select').setAttribute('required', 'required');
+                    document.getElementById('scheduled_time').removeAttribute('required');
+                    generateSlotOptions(data.slots);
+                } else {
+                    lockInfo.style.display = 'none';
+                    freeGroup.style.display = 'block';
+                    slotGroup.style.display = 'none';
+                    document.getElementById('scheduled_time').setAttribute('required', 'required');
+                    document.getElementById('slot_select').removeAttribute('required');
+                }
+            })
+            .catch(() => {});
 
         document.getElementById('bookingModal').classList.add('active');
     }

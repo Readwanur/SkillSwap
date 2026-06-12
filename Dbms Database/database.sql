@@ -55,11 +55,12 @@ CREATE TABLE IF NOT EXISTS users (
     bio TEXT,
     profile_photo MEDIUMBLOB,
     profile_photo_mime VARCHAR(50),
-    reliability_score DECIMAL(5, 2) DEFAULT 5.00,
+    reliability_score DECIMAL(5, 2) DEFAULT NULL,
     status ENUM('active', 'suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    availability_schedule TEXT
+    availability_schedule TEXT,
+    availability_locked TINYINT(1) DEFAULT 0
 );
 
 -- email already has a UNIQUE index
@@ -129,7 +130,7 @@ CREATE INDEX idx_usr_skill ON user_skills_requested(skill_id);
 -- =========================
 CREATE TABLE IF NOT EXISTS reputation (
     user_id INT PRIMARY KEY,
-    current_score DECIMAL(5, 2) DEFAULT 5.00,
+    current_score DECIMAL(5, 2) DEFAULT NULL,
     completed_sessions INT DEFAULT 0,
     cancelled_sessions INT DEFAULT 0,
     no_show_decay DECIMAL(5, 2) DEFAULT 0.00,
@@ -355,7 +356,8 @@ INSERT INTO users (name, email, password_hash, location, bio, reliability_score,
 ('Hossain Shil', 'hossain.shil@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gazipur, Bangladesh', 'Fitness trainer specializing in home workouts and nutrition.', 4.99, 'active', '2025-12-04 13:34:58'),
 ('Rahman Banik', 'rahman.banik@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Bogra, Bangladesh', 'Amateur photographer who loves capturing urban landscapes.', 3.58, 'active', '2025-08-14 13:34:58'),
 ('Siddique Bhowmik', 'siddique.bhowmik@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Marketing specialist with expertise in digital growth strategies.', 3.68, 'active', '2025-10-05 13:34:58'),
-('Hoque Sen', 'hoque.sen@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'College student eager to learn everything from cooking to coding.', 3.53, 'active', '2026-02-14 13:34:58');
+('Hoque Sen', 'hoque.sen@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Chittagong, Bangladesh', 'College student eager to learn everything from cooking to coding.', 3.53, 'active', '2026-02-14 13:34:58'),
+('Newbie User', 'newbie@skillswap-bd.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhaka, Bangladesh', 'Just joined and ready to learn.', NULL, 'active', '2026-06-10 10:00:00');
 
 REPLACE INTO wallet (user_id, balance) VALUES
 (1, 192.84),
@@ -407,7 +409,8 @@ REPLACE INTO wallet (user_id, balance) VALUES
 (47, 199.65),
 (48, 131.78),
 (49, 22.85),
-(50, 105.57);
+(50, 105.57),
+(51, 10.00);
 
 REPLACE INTO reputation (user_id, current_score, completed_sessions, cancelled_sessions, mentor_level) VALUES
 (1, 3.65, 1, 3, 'Novice'),
@@ -459,7 +462,8 @@ REPLACE INTO reputation (user_id, current_score, completed_sessions, cancelled_s
 (47, 3.75, 20, 2, 'Master'),
 (48, 3.08, 15, 3, 'Expert'),
 (49, 4.13, 16, 0, 'Expert'),
-(50, 3.46, 10, 1, 'Expert');
+(50, 3.46, 10, 1, 'Expert'),
+(51, NULL, 0, 0, 'Novice');
 
 INSERT INTO user_skills_offered (user_id, skill_id) VALUES
 (1, 27),
@@ -1335,7 +1339,7 @@ FOR EACH ROW
 BEGIN
     INSERT IGNORE INTO wallet (user_id, balance) VALUES (NEW.user_id, 10.00);
     INSERT IGNORE INTO reputation (user_id, current_score, completed_sessions, mentor_level)
-        VALUES (NEW.user_id, 5.00, 0, 'Novice');
+        VALUES (NEW.user_id, NULL, 0, 'Novice');
 END //
 DELIMITER ;
 
@@ -1465,6 +1469,11 @@ BEGIN
             VALUES (NEW.provider_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, '⚠️ A formal dispute has been filed on one of your sessions. Admin will review shortly.', 'session_update');
+        ELSEIF NEW.status = 'under-review' THEN
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.provider_id, 'One of your sessions is currently under review by an admin.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (NEW.requester_id, 'One of your sessions is currently under review by an admin.', 'session_update');
         ELSEIF NEW.status = 'refunded' THEN
             INSERT INTO notifications (user_id, message, type)
             VALUES (NEW.requester_id, 'Admin has resolved a dispute and your credits have been refunded.', 'session_update');
@@ -1557,7 +1566,7 @@ SELECT
     u.status,
     u.created_at,
     COALESCE(w.balance, 0) AS wallet_balance,
-    COALESCE(r.current_score, 5.00) AS reputation_score,
+    r.current_score AS reputation_score,
     COALESCE(r.completed_sessions, 0) AS total_completed_sessions,
     COALESCE(r.cancelled_sessions, 0) AS cancelled_sessions,
     r.mentor_level,
@@ -1637,6 +1646,7 @@ LEFT JOIN skills s ON es.skill_id = s.skill_id;
 -- =========================
 -- PROCEDURE: sp_complete_session
 -- =========================
+DROP PROCEDURE IF EXISTS sp_complete_session;
 DELIMITER //
 CREATE PROCEDURE sp_complete_session(
     IN p_session_id INT,
@@ -1706,7 +1716,10 @@ END //
 DELIMITER ;
 
 
-DATE(timestamp) AS full_date,
+CREATE OR REPLACE VIEW vw_dim_time AS
+SELECT DISTINCT
+    timestamp AS date_key,
+    DATE(timestamp) AS full_date,
     YEAR(timestamp) AS year,
     QUARTER(timestamp) AS quarter,
     MONTH(timestamp) AS month,
@@ -1752,7 +1765,7 @@ SELECT
     u.status,
     u.created_at,
     COALESCE(w.balance, 0) AS wallet_balance,
-    COALESCE(r.current_score, 5.00) AS reputation_score,
+    r.current_score AS reputation_score,
     COALESCE(r.completed_sessions, 0) AS total_completed_sessions,
     COALESCE(r.cancelled_sessions, 0) AS cancelled_sessions,
     r.mentor_level,
@@ -1832,6 +1845,7 @@ LEFT JOIN skills s ON es.skill_id = s.skill_id;
 -- =========================
 -- PROCEDURE: sp_complete_session
 -- =========================
+DROP PROCEDURE IF EXISTS sp_complete_session;
 DELIMITER //
 CREATE PROCEDURE sp_complete_session(
     IN p_session_id INT,
@@ -1920,13 +1934,113 @@ CREATE PROCEDURE sp_book_session(
 BEGIN
     DECLARE v_balance DECIMAL(15,2);
     DECLARE v_credit_cost DECIMAL(10,2);
+    DECLARE v_base_cost DECIMAL(10,2);
     DECLARE v_otp VARCHAR(10);
     DECLARE v_has_defaulted_loan BOOLEAN;
     DECLARE v_has_conflict BOOLEAN;
-    
-    -- Surge pricing variables
-    DECLARE v_provider_sessions_7d INT;
-    DECLARE v_platform_avg_7d DECIMAL(10,2);
+    DECLARE v_surge_multiplier DECIMAL(4,2) DEFAULT 1.00;
+    DECLARE v_prov_sessions INT DEFAULT 0;
+    DECLARE v_platform_avg DECIMAL(10,2) DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Booking failed due to a database error.';
+    END;
+
+    -- FEATURE 6: Dynamic Surge Pricing ---
+    -- Calculate provider's 7-day booking count via subquery
+    SELECT COUNT(*) INTO v_prov_sessions
+    FROM exchange_sessions
+    WHERE provider_id = p_provider_id
+      AND scheduled_time > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      AND status IN ('scheduled', 'completed');
+
+    -- Calculate platform-wide average bookings per provider (derived table)
+    SELECT COALESCE(AVG(cnt), 0) INTO v_platform_avg
+    FROM (
+        SELECT COUNT(*) AS cnt
+        FROM exchange_sessions
+        WHERE scheduled_time > DATE_SUB(NOW(), INTERVAL 7 DAY)
+          AND status IN ('scheduled', 'completed')
+        GROUP BY provider_id
+    ) t;
+
+    -- Assign surge tier using CASE expression
+    SET v_surge_multiplier = CASE
+        WHEN v_platform_avg = 0 THEN 1.00
+        WHEN v_prov_sessions > v_platform_avg * 3 THEN 1.50
+        WHEN v_prov_sessions > v_platform_avg * 2 THEN 1.25
+        WHEN v_prov_sessions > v_platform_avg * 1.5 THEN 1.10
+        ELSE 1.00
+    END;
+
+    SET v_base_cost = (p_duration / 60.0) * 10;
+    SET v_credit_cost = ROUND(v_base_cost * v_surge_multiplier, 2);
+    SET v_otp = LPAD(FLOOR(RAND() * 10000), 4, '0');
+
+    START TRANSACTION;
+
+    -- Check balance using subquery with row lock
+    SELECT balance INTO v_balance FROM wallet WHERE user_id = p_requester_id FOR UPDATE;
+
+    -- Check for defaulted loans
+    SELECT EXISTS (
+        SELECT 1 FROM loans
+        WHERE user_id = p_requester_id AND status = 'defaulted'
+    ) INTO v_has_defaulted_loan;
+
+    -- Check for overlapping active sessions (double-booking protection)
+    SELECT EXISTS (
+        SELECT 1 FROM exchange_sessions
+        WHERE status = 'scheduled'
+          AND (
+             requester_id = p_requester_id 
+             OR provider_id = p_requester_id
+             OR requester_id = p_provider_id
+             OR provider_id = p_provider_id
+          )
+          AND p_scheduled_time < DATE_ADD(scheduled_time, INTERVAL session_duration MINUTE)
+          AND DATE_ADD(p_scheduled_time, INTERVAL p_duration MINUTE) > scheduled_time
+    ) INTO v_has_conflict;
+
+    IF v_has_defaulted_loan THEN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Your account has a defaulted loan. Please repay it before booking new sessions.';
+    ELSEIF v_has_conflict THEN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Schedule conflict detected. Either you or the provider has an overlapping active session scheduled at this time.';
+    ELSEIF v_balance IS NULL OR v_balance < v_credit_cost THEN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = CONCAT('Insufficient balance. Need ', v_credit_cost, ' TC (', v_surge_multiplier, 'x surge), have ', COALESCE(v_balance, 0), ' TC.');
+    ELSEIF p_scheduled_time <= NOW() THEN
+        ROLLBACK;
+        SET p_status = 'error';
+        SET p_message = 'Cannot book a session in the past.';
+    ELSE
+        -- Deduct escrow (surge-adjusted amount)
+        UPDATE wallet SET balance = balance - v_credit_cost WHERE user_id = p_requester_id;
+
+        -- Create session with surge multiplier stored in bonus_multiplier
+        INSERT INTO exchange_sessions (requester_id, provider_id, skill_id, status,
+            scheduled_time, session_duration, time_credit_transfer, bonus_multiplier, completion_otp)
+        VALUES (p_requester_id, p_provider_id, p_skill_id, 'scheduled',
+            p_scheduled_time, p_duration, v_credit_cost, v_surge_multiplier, v_otp);
+
+        COMMIT;
+        SET p_status = 'success';
+        IF v_surge_multiplier > 1 THEN
+            SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow (', v_surge_multiplier, 'x surge). OTP: ', v_otp);
+        ELSE
+            SET p_message = CONCAT('Session booked! ', v_credit_cost, ' TC held in escrow. OTP: ', v_otp);
+        END IF;
+    END IF;
+END //
+DELIMITER ;
 -- =========================
 -- PROCEDURE: sp_issue_refund
 -- =========================
@@ -2050,12 +2164,12 @@ BEGIN
         SET p_user_id = LAST_INSERT_ID();
 
         -- Wallet with welcome bonus (also triggered by TR-1, but explicit here)
-        REPLACE INTO wallet (user_id, balance) VALUES (p_user_id, 10.00)
+        INSERT INTO wallet (user_id, balance) VALUES (p_user_id, 10.00)
         ON DUPLICATE KEY UPDATE balance = balance;
 
         -- Reputation init (also triggered by TR-1, but explicit here)
         INSERT INTO reputation (user_id, current_score, completed_sessions, mentor_level)
-        VALUES (p_user_id, 5.00, 0, 'Novice')
+        VALUES (p_user_id, NULL, 0, 'Novice')
         ON DUPLICATE KEY UPDATE current_score = current_score;
 
         COMMIT;
@@ -2130,7 +2244,8 @@ BEGIN
     
     -- Fetch reliability and completed session counts
     SELECT reliability_score INTO v_reliability FROM users WHERE user_id = p_user_id;
-    SELECT completed_sessions INTO v_completed_sessions FROM reputation WHERE user_id = p_user_id;
+    -- Fix: Count total sessions (requester or provider) matching the UI logic
+    SELECT COUNT(*) INTO v_completed_sessions FROM exchange_sessions WHERE (requester_id = p_user_id OR provider_id = p_user_id) AND status = 'completed';
     
     -- Credit limit is dynamically set: reliability_score * 5.00
     SET v_max_limit = COALESCE(v_reliability, 5.00) * 5.00;
@@ -2165,20 +2280,26 @@ BEGIN
         WHERE user_id = p_user_id
         FOR UPDATE;
 
-        -- 1. Insert loan record
-        INSERT INTO loans (user_id, amount, due_date) 
-        VALUES (p_user_id, p_amount, DATE_ADD(NOW(), INTERVAL 30 DAY));
-        
-        -- 2. Update wallet balance
-        UPDATE wallet SET balance = balance + p_amount WHERE user_id = p_user_id;
-        
-        -- 3. Log transaction (from_user_id NULL representing platform)
-        INSERT INTO transactions (from_user_id, to_user_id, type, base_amount, final_amount, note)
-        VALUES (NULL, p_user_id, 'loan_disbursement', p_amount, p_amount, 'Platform credit loan disbursement');
+        IF v_wallet_balance >= 10.00 THEN
+            ROLLBACK;
+            SET p_status = 'error';
+            SET p_message = 'You can only request a loan when your balance is less than 10 TC.';
+        ELSE
+            -- 1. Insert loan record
+            INSERT INTO loans (user_id, amount, due_date) 
+            VALUES (p_user_id, p_amount, DATE_ADD(NOW(), INTERVAL 30 DAY));
+            
+            -- 2. Update wallet balance
+            UPDATE wallet SET balance = balance + p_amount WHERE user_id = p_user_id;
+            
+            -- 3. Log transaction (from_user_id NULL representing platform)
+            INSERT INTO transactions (from_user_id, to_user_id, type, base_amount, final_amount, note)
+            VALUES (NULL, p_user_id, 'loan_disbursement', p_amount, p_amount, 'Platform credit loan disbursement');
 
-        COMMIT;
-        SET p_status = 'success';
-        SET p_message = CONCAT('Loan of ', p_amount, ' TC successfully disbursed to your wallet.');
+            COMMIT;
+            SET p_status = 'success';
+            SET p_message = CONCAT('Loan of ', p_amount, ' TC successfully disbursed to your wallet.');
+        END IF;
     END IF;
 END //
 DELIMITER ;
@@ -2297,10 +2418,10 @@ BEGIN
     ELSEIF p_amount <= 0 THEN
         SET p_status = 'error';
         SET p_message = 'Gift amount must be greater than zero.';
-    ELSEIF p_amount > 25 THEN
+    ELSEIF p_amount > 5 THEN
         -- [Flaw 5] Per-transaction cap
         SET p_status = 'error';
-        SET p_message = 'Maximum gift amount per transaction is 25 TC.';
+        SET p_message = 'Maximum gift amount per transaction is 5 TC.';
     ELSE
         -- Check if user has completed at least one community task or session
         SELECT (
@@ -2335,13 +2456,10 @@ BEGIN
         WHERE user_id = p_from_user_id 
         FOR UPDATE;
 
-        -- [Flaw 1] Calculate outstanding loan debt
+        -- [Flaw 1] Calculate outstanding loan debt (including defaulted)
         SELECT COALESCE(SUM(amount), 0) INTO v_loan_debt
         FROM loans
-        WHERE user_id = p_from_user_id AND status = 'active';
-
-        -- Giftable balance = actual balance minus reserved loan debt
-        SET v_giftable_balance = v_from_balance - v_loan_debt;
+        WHERE user_id = p_from_user_id AND status IN ('active', 'defaulted');
 
         -- [Flaw 5] Check daily gift total
         SELECT COALESCE(SUM(final_amount), 0) INTO v_daily_gifted
@@ -2358,11 +2476,11 @@ BEGIN
                 OR (requester_id = v_to_user_id AND provider_id = p_from_user_id))
         ) INTO v_has_mutual_session;
 
-        -- Complex Subquery 2: Both must be established (3+ completed sessions globally)
-        SELECT EXISTS (
-            SELECT 1 FROM reputation WHERE user_id = p_from_user_id AND completed_sessions >= 3
-        ) AND EXISTS (
-            SELECT 1 FROM reputation WHERE user_id = v_to_user_id AND completed_sessions >= 3
+        -- Complex Subquery 2: Both must be established (3+ completed sessions globally across both roles)
+        SELECT (
+            (SELECT COUNT(*) FROM exchange_sessions WHERE (requester_id = p_from_user_id OR provider_id = p_from_user_id) AND status = 'completed') >= 3
+        ) AND (
+            (SELECT COUNT(*) FROM exchange_sessions WHERE (requester_id = v_to_user_id OR provider_id = v_to_user_id) AND status = 'completed') >= 3
         ) INTO v_both_established;
 
         -- === Validation inside transaction ===
@@ -2370,8 +2488,8 @@ BEGIN
             ROLLBACK;
             SET p_status = 'error';
             SET p_message = 'Gifting blocked. You cannot gift time credits while you have an active loan debt.';
-        ELSEIF v_giftable_balance < p_amount THEN
-            -- [Flaw 1] Insufficient giftable balance (accounts for loan reservation)
+        ELSEIF v_from_balance < p_amount THEN
+            -- Insufficient balance
             ROLLBACK;
             SET p_status = 'error';
             SET p_message = CONCAT('Insufficient balance. You have ', v_from_balance, ' TC.');
@@ -2551,6 +2669,7 @@ CREATE TABLE IF NOT EXISTS conversation_members (
     conversation_id INT,
     user_id INT,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_hidden TINYINT(1) DEFAULT 0,
     PRIMARY KEY (conversation_id, user_id),
     FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -2663,7 +2782,7 @@ BEGIN
             UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_requester_id;
             
             -- Log system refund transaction
-            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note)
             VALUES (v_session_id, NULL, v_requester_id, 'full_refund', v_amount, v_amount, 'Refund via dispute resolution.');
             
             -- Update dispute status
@@ -2674,6 +2793,12 @@ BEGIN
             SET current_score = GREATEST(current_score - 0.50, 1.00),
                 cancelled_sessions = cancelled_sessions + 1
             WHERE user_id = v_provider_id;
+
+            -- Notify both users
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (v_requester_id, 'Admin has resolved a dispute in your favor. Your credits have been refunded.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (v_provider_id, 'Admin has resolved a dispute in the requester''s favor. The session was cancelled and credits refunded.', 'session_update');
 
             COMMIT;
             SET p_status = 'success';
@@ -2687,7 +2812,7 @@ BEGIN
             UPDATE wallet SET balance = balance + v_amount WHERE user_id = v_provider_id;
             
             -- Log credit transfer transaction
-            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, details)
+            INSERT INTO transactions (session_id, from_user_id, to_user_id, type, base_amount, final_amount, note)
             VALUES (v_session_id, v_requester_id, v_provider_id, 'credit_transfer', v_amount, v_amount, 'Payout via dispute resolution.');
             
             -- Update dispute status
@@ -2697,6 +2822,12 @@ BEGIN
             UPDATE reputation 
             SET completed_sessions = completed_sessions + 1 
             WHERE user_id = v_provider_id;
+
+            -- Notify both users
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (v_requester_id, 'Admin has resolved a dispute in the provider''s favor. The session is marked completed and credits transferred.', 'session_update');
+            INSERT INTO notifications (user_id, message, type)
+            VALUES (v_provider_id, 'Admin has resolved a dispute in your favor. The session is marked completed and credits transferred.', 'session_update');
 
             COMMIT;
             SET p_status = 'success';

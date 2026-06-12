@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $check_stmt->bind_param("isss", $user_id, $day, $end, $start);
                 $check_stmt->execute();
                 $result = $check_stmt->get_result();
-                
+
                 if ($result->num_rows > 0) {
                     $error = 'This time slot overlaps with an existing availability.';
                 } else {
@@ -126,6 +126,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->close();
         $success = 'Availability removed.';
     }
+
+    if ($_POST['action'] === 'toggle_availability_lock') {
+        $locked = isset($_POST['availability_locked']) ? 1 : 0;
+        
+        // Prevent locking if no slots exist
+        $check_slots = $conn->query("SELECT COUNT(*) AS count FROM user_availability WHERE user_id = $user_id")->fetch_assoc()['count'];
+        
+        if ($locked && $check_slots == 0) {
+            $error = 'You must add at least one availability slot before enabling the lock.';
+        } else {
+            $stmt = $conn->prepare("UPDATE users SET availability_locked = ? WHERE user_id = ?");
+            $stmt->bind_param("ii", $locked, $user_id);
+            $stmt->execute();
+            $stmt->close();
+            $success = 'Availability lock setting updated.';
+        }
+    }
 }
 
 // Fetch user data
@@ -143,6 +160,11 @@ $learned_sessions_query = $conn->query("SELECT COUNT(*) AS total FROM exchange_s
 $learned_sessions = $learned_sessions_query->fetch_assoc()['total'] ?? 0;
 
 $total_completed = $guided_sessions + $learned_sessions;
+
+// Fetch lock status
+$lock_status_res = $conn->query("SELECT availability_locked FROM users WHERE user_id = $user_id");
+$is_locked = ($lock_status_res && $lock_status_res->fetch_assoc()['availability_locked'] == 1);
+$slots_count = $conn->query("SELECT COUNT(*) AS count FROM user_availability WHERE user_id = $user_id")->fetch_assoc()['count'];
 
 // Fetch skills offered & requested
 $offered = $conn->query("SELECT s.skill_id, s.skill_name FROM user_skills_offered uso JOIN skills s ON uso.skill_id = s.skill_id WHERE uso.user_id = $user_id");
@@ -195,7 +217,8 @@ include __DIR__ . '/../includes/header.php';
                                     class="avatar-img avatar-lg" alt="Profile Photo">
                             <?php else: ?>
                                 <div class="avatar avatar-lg" style="margin: 0;">
-                                    <?php echo strtoupper(substr($user['name'], 0, 1)); ?></div>
+                                    <?php echo strtoupper(substr($user['name'], 0, 1)); ?>
+                                </div>
                             <?php endif; ?>
                         </div>
                         <div style="flex:1;">
@@ -239,13 +262,19 @@ include __DIR__ . '/../includes/header.php';
                 <div class="card mb-2">
                     <h3 class="section-title">Reputation</h3>
                     <div style="text-align:center; padding: 10px 0;">
-                        <span
-                            style="font-size: 2rem; font-weight: 700; color: var(--orange-primary);"><?php echo $rep ? $rep['current_score'] : '5.00'; ?></span>
+                        <span style="font-size: 2rem; font-weight: 700; color: var(--orange-primary);">
+                            <?php 
+                            $raw_score = $rep ? $rep['current_score'] : null;
+                            echo $raw_score !== null ? number_format((float)$raw_score, 2) : '<span style="font-size:1.2rem;color:var(--text-muted);">No Ratings Yet</span>'; 
+                            ?>
+                        </span>
+                        <?php if ($raw_score !== null): ?>
                         <span style="color: var(--text-secondary); font-size: 1.1rem;">/5.00</span>
+                        <?php endif; ?>
                         <div style="margin-top: 8px;">
                             <div class="progress-bar">
                                 <div class="fill"
-                                    style="width: <?php echo ($rep ? ($rep['current_score'] / 5) * 100 : 100); ?>%">
+                                    style="width: <?php echo ($raw_score !== null ? ($raw_score / 5) * 100 : 0); ?>%">
                                 </div>
                             </div>
                         </div>
@@ -356,8 +385,23 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Availability -->
         <div class="card mt-2">
-            <div class="card-header">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>My Availability</h3>
+                
+                <form method="POST" style="display:flex; align-items:center; gap:10px; background:var(--bg-secondary); padding:8px 12px; border-radius:var(--radius-sm);">
+                    <input type="hidden" name="action" value="toggle_availability_lock">
+                    <label for="availability_locked" style="font-size:0.9rem; font-weight:600; cursor:pointer; color:var(--text-secondary);">Lock</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="availability_locked" name="availability_locked" value="1" 
+                            <?php echo $is_locked ? 'checked' : ''; ?>
+                            <?php echo $slots_count == 0 ? 'disabled' : ''; ?>
+                            onchange="this.form.submit()">
+                        <label for="availability_locked" class="toggle-label"></label>
+                    </div>
+                    <?php if ($slots_count == 0): ?>
+                        <small style="color:var(--text-muted); font-size:0.75rem;">(Add slots first)</small>
+                    <?php endif; ?>
+                </form>
             </div>
 
             <?php if ($availability && $availability->num_rows > 0): ?>
