@@ -197,7 +197,7 @@ $categories_engagement = $conn->query("
 ");
 
 // --- COMPLEX QUERY: CQ-6 ---
-// Monthly financial trend (CTE + Window function SUM OVER)
+// Monthly credit circulation trend (CTE + Window function SUM OVER)
 $revenue_trends = $conn->query("
     WITH monthly_revenue AS (
         SELECT
@@ -583,7 +583,7 @@ include __DIR__ . '/../includes/admin_header.php';
     <!-- Monthly Revenue Trends Chart (CQ-6) -->
     <div class="card">
         <div class="card-header">
-            <h3>Financial & Revenue Trends</h3>
+            <h3>Credit Circulation & Exchange Trends</h3>
             <span class="badge badge-info">In Time Credits</span>
         </div>
         <div style="padding: 16px; height: 380px;">
@@ -1204,7 +1204,7 @@ include __DIR__ . '/../includes/admin_header.php';
             });
         }
 
-        // ========== 2. Financial & Revenue Trends (Area Chart) ==========
+        // ========== 2. Credit Circulation & Exchange Trends (Area Chart) ==========
         var revMonths = <?php echo json_encode($rev_chart_months); ?>;
         var revSession = <?php echo json_encode($rev_chart_session); ?>;
         var revRefunds = <?php echo json_encode($rev_chart_refunds); ?>;
