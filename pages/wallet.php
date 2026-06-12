@@ -209,7 +209,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="balance-label">Current Balance (Time Credits)</div>
                 <div style="margin-top: 10px;">
                     <?php if ($above_avg): ?>
-                        <span class="badge badge-success">&#10003; Above Platform Average</span>
+                        <span class="badge badge-success"><i data-lucide="trending-up" class="lucide-sm" style="vertical-align: middle; margin-right: 4px;"></i> Above Platform Average</span>
                     <?php else: ?>
                         <span class="badge badge-warning">Below Platform Average</span>
                     <?php endif; ?>
@@ -363,6 +363,7 @@ include __DIR__ . '/../includes/header.php';
                                    placeholder="collaborator@example.com" 
                                    style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
                                    required>
+                            <div id="gift-validation-message" style="margin-top: 6px; font-size: 0.8rem; font-weight: 500; display: none;"></div>
                         </div>
                         <div class="form-group" style="margin-bottom: 18px;">
                             <label for="gift_amount" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-primary);">Amount to Gift (TC)</label>
@@ -371,7 +372,7 @@ include __DIR__ . '/../includes/header.php';
                                    style="width: 100%; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); outline:none; background:var(--bg-secondary); color:var(--text-primary); font-size: 0.9rem;" 
                                    required>
                         </div>
-                        <button type="submit" class="btn btn-secondary" style="width:100%; padding: 12px; border-radius:var(--radius-md); border: 1px solid var(--border-color); font-weight:600; cursor:pointer; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">
+                        <button type="submit" id="gift-submit-btn" class="btn btn-secondary" style="width:100%; padding: 12px; border-radius:var(--radius-md); border: 1px solid var(--border-color); font-weight:600; cursor:pointer; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">
                             Send Gift
                         </button>
                     </form>
@@ -578,6 +579,69 @@ document.addEventListener('DOMContentLoaded', function() {
             textSpan.textContent = expanded ? 'Show Less Transactions' : 'Show More Transactions';
             iconSpan.style.transform = expanded ? 'rotate(180deg)' : 'rotate(0deg)';
             toggleBtn.style.color = expanded ? 'var(--info)' : 'var(--primary)';
+        });
+    }
+
+    // Gift credits recipient real-time validation
+    const recipientEmailInput = document.getElementById('recipient_email');
+    const giftValidationMsg = document.getElementById('gift-validation-message');
+    const giftSubmitBtn = document.getElementById('gift-submit-btn');
+
+    if (recipientEmailInput && giftValidationMsg && giftSubmitBtn) {
+        let debounceTimer;
+
+        recipientEmailInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const email = this.value.trim();
+
+            if (email === '') {
+                giftValidationMsg.style.display = 'none';
+                giftValidationMsg.innerHTML = '';
+                giftSubmitBtn.disabled = false;
+                return;
+            }
+
+            // Simple basic client-side format check before checking with API
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                giftValidationMsg.style.display = 'block';
+                giftValidationMsg.style.color = 'var(--danger, #ba1a1a)';
+                giftValidationMsg.innerHTML = '<i data-lucide="alert-circle" class="lucide-sm" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i> Invalid email format.';
+                giftSubmitBtn.disabled = true;
+                lucide.createIcons();
+                return;
+            }
+
+            // Show checking state
+            giftValidationMsg.style.display = 'block';
+            giftValidationMsg.style.color = 'var(--text-muted, #737781)';
+            giftValidationMsg.innerHTML = '<i data-lucide="search" class="lucide-sm" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i> Checking recipient eligibility...';
+            giftSubmitBtn.disabled = true;
+            lucide.createIcons();
+
+            debounceTimer = setTimeout(function() {
+                fetch(`../api/check_gift_recipient.php?email=${encodeURIComponent(email)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.valid) {
+                            giftValidationMsg.style.color = 'var(--success, #1a7a42)';
+                            giftValidationMsg.innerHTML = '<i data-lucide="check-circle" class="lucide-sm" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i> ' + data.message;
+                            giftSubmitBtn.disabled = false;
+                        } else {
+                            giftValidationMsg.style.color = 'var(--danger, #ba1a1a)';
+                            giftValidationMsg.innerHTML = '<i data-lucide="alert-circle" class="lucide-sm" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i> ' + data.message;
+                            giftSubmitBtn.disabled = true;
+                        }
+                        lucide.createIcons();
+                    })
+                    .catch(error => {
+                        console.error('Error validating recipient:', error);
+                        giftValidationMsg.style.color = 'var(--danger, #ba1a1a)';
+                        giftValidationMsg.innerHTML = '<i data-lucide="alert-circle" class="lucide-sm" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i> Error verifying recipient. Please try again.';
+                        giftSubmitBtn.disabled = false; // Allow submission as backup if network fails
+                        lucide.createIcons();
+                    });
+            }, 300);
         });
     }
 });

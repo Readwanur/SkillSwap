@@ -25,6 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $scheduled_time = $_POST['scheduled_time'] ?? '';
     $duration = intval($_POST['duration'] ?? 60);
 
+    if ($scheduled_time !== '') {
+        $timestamp = strtotime($scheduled_time);
+        if ($timestamp !== false) {
+            $scheduled_time = date('Y-m-d H:i:s', $timestamp);
+        } else {
+            $scheduled_time = '';
+        }
+    }
+
     if ($provider_id > 0 && $skill_id > 0 && $scheduled_time !== '') {
         $stmt = $conn->prepare("CALL sp_book_session(?, ?, ?, ?, ?, @sp_status, @sp_message)");
         $stmt->bind_param("iiisi", $user_id, $provider_id, $skill_id, $scheduled_time, $duration);
@@ -67,10 +76,10 @@ if ($start_with_user_id > 0 && $start_with_user_id !== $user_id) {
             try {
                 $conn->query("INSERT INTO conversations () VALUES ()");
                 $active_conversation_id = $conn->insert_id;
-                
+
                 $conn->query("INSERT INTO conversation_members (conversation_id, user_id) VALUES ($active_conversation_id, $user_id)");
                 $conn->query("INSERT INTO conversation_members (conversation_id, user_id) VALUES ($active_conversation_id, $start_with_user_id)");
-                
+
                 $conn->commit();
             } catch (Exception $e) {
                 $conn->rollback();
@@ -84,363 +93,404 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-/* Chat Portal Styles */
-.chat-container {
-    display: flex;
-    height: 70vh;
-    min-height: 550px;
-    max-height: 800px;
-    background: var(--bg-card);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-light);
-    overflow: hidden;
-    margin-top: 15px;
-    margin-bottom: 30px;
-}
-
-.chat-sidebar {
-    width: 350px;
-    border-right: 1px solid var(--border-light);
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-secondary);
-    transition: transform 0.3s ease;
-}
-
-.chat-sidebar-header {
-    padding: 16px;
-    border-bottom: 1px solid var(--border-light);
-    background: var(--bg-primary);
-}
-
-.chat-sidebar-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--primary);
-}
-
-.chat-list {
-    flex: 1;
-    overflow-y: auto;
-}
-
-.chat-item {
-    display: flex;
-    align-items: center;
-    padding: 16px;
-    border-bottom: 1px solid var(--border-light);
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    gap: 12px;
-    animation: fadeInItem 0.5s ease backwards;
-}
-
-.chat-item:nth-child(1) { animation-delay: 0.05s; }
-.chat-item:nth-child(2) { animation-delay: 0.1s; }
-.chat-item:nth-child(3) { animation-delay: 0.15s; }
-.chat-item:nth-child(4) { animation-delay: 0.2s; }
-.chat-item:nth-child(5) { animation-delay: 0.25s; }
-.chat-item:nth-child(n+6) { animation-delay: 0.3s; }
-
-@keyframes fadeInItem {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.chat-item:hover {
-    background: var(--bg-hover);
-    padding-left: 20px;
-}
-
-.chat-item.active {
-    background: var(--surface-container-low);
-    border-left: 4px solid var(--primary);
-    padding-left: 20px;
-}
-
-.chat-item-details {
-    flex: 1;
-    min-width: 0; /* for truncation */
-}
-
-.chat-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 4px;
-}
-
-.chat-item-name {
-    font-family: var(--font-headline);
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.chat-item-time {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.chat-item-preview {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.chat-item.active .chat-item-preview {
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-.chat-item-unread {
-    background: var(--danger);
-    color: #ffffff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    border-radius: 12px;
-    padding: 2px 6px;
-    min-width: 18px;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-.chat-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-primary);
-}
-
-.chat-main-header {
-    padding: 16px;
-    border-bottom: 1px solid var(--border-light);
-    background: var(--bg-secondary);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.chat-main-back {
-    display: none;
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: var(--primary);
-    padding: 5px;
-}
-
-.chat-main-user {
-    flex: 1;
-    min-width: 0;
-}
-
-.chat-main-name {
-    font-family: var(--font-headline);
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--primary);
-    margin: 0;
-}
-
-.chat-main-status {
-    font-size: 0.75rem;
-    color: var(--success);
-    font-weight: 600;
-}
-
-.chat-body {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    background: var(--surface-container-low);
-}
-
-.message-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    max-width: 75%;
-    animation: messagePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
-}
-
-@keyframes messagePop {
-    from { opacity: 0; transform: translateY(15px) scale(0.95); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.message-group.sent {
-    align-self: flex-end;
-    align-items: flex-end;
-    transform-origin: bottom right;
-}
-
-.message-group.received {
-    align-self: flex-start;
-    align-items: flex-start;
-    transform-origin: bottom left;
-}
-
-.message-bubble {
-    padding: 12px 16px;
-    border-radius: var(--radius-md);
-    font-size: 0.95rem;
-    line-height: 1.4;
-    word-break: break-word;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.message-bubble:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-}
-
-.message-bubble.sent {
-    background: var(--primary);
-    color: #ffffff;
-    border-bottom-right-radius: 2px;
-}
-
-.message-bubble.received {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border-bottom-left-radius: 2px;
-    border: 1px solid var(--border-light);
-}
-
-.message-time {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-    padding: 0 4px;
-}
-
-.chat-footer {
-    padding: 16px;
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border-light);
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.chat-input {
-    flex: 1;
-    border: 1px solid var(--border-color);
-    border-radius: 24px;
-    padding: 12px 20px;
-    font-size: 0.95rem;
-    outline: none;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    transition: var(--transition);
-}
-
-.chat-input:focus {
-    border-color: var(--primary);
-    background: var(--bg-secondary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
-}
-
-.chat-send-btn {
-    background: var(--primary);
-    color: #ffffff;
-    border: none;
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-    flex-shrink: 0;
-    box-shadow: var(--shadow-sm);
-}
-
-.chat-send-btn:hover {
-    background: var(--primary-light);
-    transform: scale(1.05);
-}
-
-.chat-send-btn svg {
-    margin-left: 2px;
-}
-
-.chat-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    padding: 40px;
-    text-align: center;
-}
-
-.chat-empty-icon {
-    font-size: 3rem;
-    margin-bottom: 15px;
-    opacity: 0.6;
-}
-
-/* Responsive Styles */
-@media (max-width: 768px) {
+    /* Chat Portal Styles */
     .chat-container {
-        height: calc(100vh - 120px);
-        margin-top: 0;
-        margin-bottom: 0;
-        border-radius: 0;
-        border: none;
-    }
-    
-    .chat-sidebar {
-        width: 100%;
-        flex-shrink: 0;
-    }
-    
-    .chat-main {
-        width: 100%;
-        flex-shrink: 0;
-        display: none;
-    }
-    
-    .chat-container.thread-active .chat-sidebar {
-        display: none;
-    }
-    
-    .chat-container.thread-active .chat-main {
         display: flex;
+        height: 70vh;
+        min-height: 550px;
+        max-height: 800px;
+        background: var(--bg-card);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border-light);
+        overflow: hidden;
+        margin-top: 15px;
+        margin-bottom: 30px;
     }
-    
-    .chat-main-back {
-        display: block;
-    }
-}
 
-/* Mic Recording Animation */
-.recording-active {
-    color: var(--danger) !important;
-    animation: pulseMic 1.5s infinite;
-}
-@keyframes pulseMic {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-}
+    .chat-sidebar {
+        width: 350px;
+        border-right: 1px solid var(--border-light);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary);
+        transition: transform 0.3s ease;
+    }
+
+    .chat-sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-light);
+        background: var(--bg-primary);
+    }
+
+    .chat-sidebar-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--primary);
+    }
+
+    .chat-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .chat-item {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid var(--border-light);
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        gap: 12px;
+        animation: fadeInItem 0.5s ease backwards;
+    }
+
+    .chat-item:nth-child(1) {
+        animation-delay: 0.05s;
+    }
+
+    .chat-item:nth-child(2) {
+        animation-delay: 0.1s;
+    }
+
+    .chat-item:nth-child(3) {
+        animation-delay: 0.15s;
+    }
+
+    .chat-item:nth-child(4) {
+        animation-delay: 0.2s;
+    }
+
+    .chat-item:nth-child(5) {
+        animation-delay: 0.25s;
+    }
+
+    .chat-item:nth-child(n+6) {
+        animation-delay: 0.3s;
+    }
+
+    @keyframes fadeInItem {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .chat-item:hover {
+        background: var(--bg-hover);
+        padding-left: 20px;
+    }
+
+    .chat-item.active {
+        background: var(--surface-container-low);
+        border-left: 4px solid var(--primary);
+        padding-left: 20px;
+    }
+
+    .chat-item-details {
+        flex: 1;
+        min-width: 0;
+        /* for truncation */
+    }
+
+    .chat-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 4px;
+    }
+
+    .chat-item-name {
+        font-family: var(--font-headline);
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-item-time {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+
+    .chat-item-preview {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-item.active .chat-item-preview {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+
+    .chat-item-unread {
+        background: var(--danger);
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 2px 6px;
+        min-width: 18px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-primary);
+    }
+
+    .chat-main-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-light);
+        background: var(--bg-secondary);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .chat-main-back {
+        display: none;
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: var(--primary);
+        padding: 5px;
+    }
+
+    .chat-main-user {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chat-main-name {
+        font-family: var(--font-headline);
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: var(--primary);
+        margin: 0;
+    }
+
+    .chat-main-status {
+        font-size: 0.75rem;
+        color: var(--success);
+        font-weight: 600;
+    }
+
+    .chat-body {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: var(--surface-container-low);
+    }
+
+    .message-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-width: 75%;
+        animation: messagePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+    }
+
+    @keyframes messagePop {
+        from {
+            opacity: 0;
+            transform: translateY(15px) scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .message-group.sent {
+        align-self: flex-end;
+        align-items: flex-end;
+        transform-origin: bottom right;
+    }
+
+    .message-group.received {
+        align-self: flex-start;
+        align-items: flex-start;
+        transform-origin: bottom left;
+    }
+
+    .message-bubble {
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        font-size: 0.95rem;
+        line-height: 1.4;
+        word-break: break-word;
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .message-bubble:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .message-bubble.sent {
+        background: var(--primary);
+        color: #ffffff;
+        border-bottom-right-radius: 2px;
+    }
+
+    .message-bubble.received {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-bottom-left-radius: 2px;
+        border: 1px solid var(--border-light);
+    }
+
+    .message-time {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+        padding: 0 4px;
+    }
+
+    .chat-footer {
+        padding: 16px;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .chat-input {
+        flex: 1;
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        outline: none;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        transition: var(--transition);
+    }
+
+    .chat-input:focus {
+        border-color: var(--primary);
+        background: var(--bg-secondary);
+        box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    .chat-send-btn {
+        background: var(--primary);
+        color: #ffffff;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        flex-shrink: 0;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .chat-send-btn:hover {
+        background: var(--primary-light);
+        transform: scale(1.05);
+    }
+
+    .chat-send-btn svg {
+        margin-left: 2px;
+    }
+
+    .chat-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        padding: 40px;
+        text-align: center;
+    }
+
+    .chat-empty-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        opacity: 0.6;
+    }
+
+    /* Responsive Styles */
+    @media (max-width: 768px) {
+        .chat-container {
+            height: calc(100vh - 120px);
+            margin-top: 0;
+            margin-bottom: 0;
+            border-radius: 0;
+            border: none;
+        }
+
+        .chat-sidebar {
+            width: 100%;
+            flex-shrink: 0;
+        }
+
+        .chat-main {
+            width: 100%;
+            flex-shrink: 0;
+            display: none;
+        }
+
+        .chat-container.thread-active .chat-sidebar {
+            display: none;
+        }
+
+        .chat-container.thread-active .chat-main {
+            display: flex;
+        }
+
+        .chat-main-back {
+            display: block;
+        }
+    }
+
+    /* Mic Recording Animation */
+    .recording-active {
+        color: var(--danger) !important;
+        animation: pulseMic 1.5s infinite;
+    }
+
+    @keyframes pulseMic {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.2);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
 </style>
 
 <div class="page-wrapper" style="padding-top: 20px; padding-bottom: 20px;">
@@ -451,8 +501,9 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($error): ?>
             <div class="alert alert-danger" style="margin-bottom: 15px;"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
-        
-        <div class="chat-container <?php echo $active_conversation_id > 0 ? 'thread-active' : ''; ?>" id="chatContainer">
+
+        <div class="chat-container <?php echo $active_conversation_id > 0 ? 'thread-active' : ''; ?>"
+            id="chatContainer">
             <!-- Sidebar -->
             <div class="chat-sidebar">
                 <div class="chat-sidebar-header">
@@ -472,7 +523,8 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Chat Header -->
                     <div class="chat-main-header">
                         <button class="chat-main-back" onclick="backToInbox()">&larr;</button>
-                        <div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1rem;">U</div>
+                        <div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1rem;">U
+                        </div>
                         <div class="chat-main-user">
                             <h4 class="chat-main-name" id="headerName">Loading...</h4>
                             <span class="chat-main-status">Active Partner</span>
@@ -487,28 +539,36 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Chat Footer / Input -->
                     <form class="chat-footer" id="chatForm" onsubmit="handleSend(event)">
                         <!-- Cancel Button (Hidden initially) -->
-                        <button type="button" class="chat-cancel-btn" id="cancelBtn" onclick="cancelRecording()" style="display: none; background: none; border: none; color: var(--danger); cursor: pointer; padding: 0 10px; transition: color 0.3s;" title="Cancel Recording">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" class="chat-cancel-btn" id="cancelBtn" onclick="cancelRecording()"
+                            style="display: none; background: none; border: none; color: var(--danger); cursor: pointer; padding: 0 10px; transition: color 0.3s;"
+                            title="Cancel Recording">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="15" y1="9" x2="9" y2="15"></line>
                                 <line x1="9" y1="9" x2="15" y2="15"></line>
                             </svg>
                         </button>
 
-                        <input type="text" class="chat-input" id="chatInput" placeholder="Write a message..." autocomplete="off">
-                        
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Write a message..."
+                            autocomplete="off">
+
                         <!-- Mic Button (Toggles Start/Pause/Resume) -->
-                        <button type="button" class="chat-mic-btn" id="micBtn" onclick="toggleRecording()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 10px; transition: color 0.3s;" title="Record Voice Message">
-                            <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" class="chat-mic-btn" id="micBtn" onclick="toggleRecording()"
+                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 10px; transition: color 0.3s;"
+                            title="Record Voice Message">
+                            <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
                                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                                 <line x1="12" y1="19" x2="12" y2="23"></line>
                                 <line x1="8" y1="23" x2="16" y2="23"></line>
                             </svg>
                         </button>
-                        
+
                         <button type="submit" class="chat-send-btn" id="sendBtn" title="Send Message">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                             </svg>
@@ -520,7 +580,8 @@ include __DIR__ . '/../includes/header.php';
                 <div class="chat-empty" id="chatEmptyState">
                     <div class="chat-empty-icon"><i data-lucide="message-square" class="lucide-sm"></i></div>
                     <h3>Select a conversation</h3>
-                    <p>Pick someone from your inbox or visit their profile to start coordinating your next skill swap.</p>
+                    <p>Pick someone from your inbox or visit their profile to start coordinating your next skill swap.
+                    </p>
                 </div>
             </div>
         </div>
@@ -529,120 +590,120 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-let currentUserId = <?php echo $user_id; ?>;
-let activeConversationId = <?php echo $active_conversation_id; ?>;
-let activeRecipientId = 0;
-let pollingInterval = null;
-let lastMessageIdSeen = 0;
-let lastConversationsJSON = '';
-let prefillMessage = <?php echo json_encode($prefill_msg); ?>;
-let offerSkillId = <?php echo $offer_skill_id; ?>;
-let offerSkillName = <?php echo json_encode($offer_skill_name); ?>;
+    let currentUserId = <?php echo $user_id; ?>;
+    let activeConversationId = <?php echo $active_conversation_id; ?>;
+    let activeRecipientId = 0;
+    let pollingInterval = null;
+    let lastMessageIdSeen = 0;
+    let lastConversationsJSON = '';
+    let prefillMessage = <?php echo json_encode($prefill_msg); ?>;
+    let offerSkillId = <?php echo $offer_skill_id; ?>;
+    let offerSkillName = <?php echo json_encode($offer_skill_name); ?>;
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initial fetch of conversations list
-    fetchConversations().then(() => {
-        if (activeConversationId > 0) {
-            openConversation(activeConversationId).then(() => {
-                if (prefillMessage && prefillMessage.trim() !== '') {
-                    document.getElementById('chatInput').value = prefillMessage;
-                    // Clear it so it doesn't keep filling if they refresh or poll
-                    prefillMessage = ''; 
-                    
-                    // Clean URL to prevent prefill from reappearing on refresh
-                    const url = new URL(window.location);
-                    if (url.searchParams.has('prefill_msg')) {
-                        url.searchParams.delete('prefill_msg');
-                        url.searchParams.delete('offer_skill_id');
-                        url.searchParams.delete('offer_skill_name');
-                        window.history.replaceState({}, '', url);
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initial fetch of conversations list
+        fetchConversations().then(() => {
+            if (activeConversationId > 0) {
+                openConversation(activeConversationId).then(() => {
+                    if (prefillMessage && prefillMessage.trim() !== '') {
+                        document.getElementById('chatInput').value = prefillMessage;
+                        // Clear it so it doesn't keep filling if they refresh or poll
+                        prefillMessage = '';
+
+                        // Clean URL to prevent prefill from reappearing on refresh
+                        const url = new URL(window.location);
+                        if (url.searchParams.has('prefill_msg')) {
+                            url.searchParams.delete('prefill_msg');
+                            url.searchParams.delete('offer_skill_id');
+                            url.searchParams.delete('offer_skill_name');
+                            window.history.replaceState({}, '', url);
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
+        });
+
+        // Start background polling for conversation list
+        setInterval(fetchConversations, 4000);
+
+        // Setup active thread polling
+        setInterval(pollActiveThread, 3000);
     });
 
-    // Start background polling for conversation list
-    setInterval(fetchConversations, 4000);
+    function formatLastSeen(dateStr) {
+        const date = new Date(dateStr.replace(/-/g, '/'));
+        const today = new Date();
 
-    // Setup active thread polling
-    setInterval(pollActiveThread, 3000);
-});
+        const isToday = date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
 
-function formatLastSeen(dateStr) {
-    const date = new Date(dateStr.replace(/-/g, '/'));
-    const today = new Date();
-    
-    const isToday = date.getDate() === today.getDate() &&
-                    date.getMonth() === today.getMonth() &&
-                    date.getFullYear() === today.getFullYear();
-    
-    const timeFormat = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    if (isToday) {
-        return 'Last seen today at ' + timeFormat;
-    } else {
-        const dateFormat = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        const yearFormat = date.getFullYear() !== today.getFullYear() ? `, ${date.getFullYear()}` : '';
-        return 'Last seen ' + dateFormat + yearFormat + ' at ' + timeFormat;
-    }
-}
+        const timeFormat = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-async function fetchConversations() {
-    try {
-        const response = await fetch('../api/messages.php');
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            const currentJSON = JSON.stringify(data.conversations);
-            // Only re-render if the conversations data has changed to prevent animation loop
-            if (currentJSON !== lastConversationsJSON) {
-                lastConversationsJSON = currentJSON;
-                renderConversationsList(data.conversations);
-            }
+        if (isToday) {
+            return 'Last seen today at ' + timeFormat;
+        } else {
+            const dateFormat = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            const yearFormat = date.getFullYear() !== today.getFullYear() ? `, ${date.getFullYear()}` : '';
+            return 'Last seen ' + dateFormat + yearFormat + ' at ' + timeFormat;
         }
-    } catch (error) {
-        console.error('Error fetching conversations:', error);
     }
-}
 
-function renderConversationsList(conversations) {
-    const chatList = document.getElementById('chatList');
-    if (conversations.length === 0) {
-        chatList.innerHTML = `
+    async function fetchConversations() {
+        try {
+            const response = await fetch('../api/messages.php');
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                const currentJSON = JSON.stringify(data.conversations);
+                // Only re-render if the conversations data has changed to prevent animation loop
+                if (currentJSON !== lastConversationsJSON) {
+                    lastConversationsJSON = currentJSON;
+                    renderConversationsList(data.conversations);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+        }
+    }
+
+    function renderConversationsList(conversations) {
+        const chatList = document.getElementById('chatList');
+        if (conversations.length === 0) {
+            chatList.innerHTML = `
             <div style="padding: 30px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
                 No active conversations yet.
             </div>
         `;
-        return;
-    }
-
-    let html = '';
-    conversations.forEach(conv => {
-        const isActive = conv.conversation_id === activeConversationId ? 'active' : '';
-        const unreadBadge = conv.unread_count > 0 ? `<span class="chat-item-unread">${conv.unread_count}</span>` : '';
-        const initials = conv.other_user_name.substring(0, 1).toUpperCase();
-        
-        // Formulate last message display
-        let lastMsg = conv.last_message_text || 'No messages yet';
-        if (conv.last_message_sender_id === currentUserId) {
-            lastMsg = 'You: ' + lastMsg;
+            return;
         }
 
-        let timeStr = '';
-        if (conv.last_message_time) {
-            const date = new Date(conv.last_message_time.replace(/-/g, '/'));
-            timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
+        let html = '';
+        conversations.forEach(conv => {
+            const isActive = conv.conversation_id === activeConversationId ? 'active' : '';
+            const unreadBadge = conv.unread_count > 0 ? `<span class="chat-item-unread">${conv.unread_count}</span>` : '';
+            const initials = conv.other_user_name.substring(0, 1).toUpperCase();
 
-        let avatarHtml = conv.has_photo === 1 
-            ? `<img src="../api/user_photo.php?user_id=${conv.other_user_id}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;" alt="${conv.other_user_name}">` 
-            : `<div class="avatar" style="width: 45px; height: 45px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold;">${initials}</div>`;
+            // Formulate last message display
+            let lastMsg = conv.last_message_text || 'No messages yet';
+            if (conv.last_message_sender_id === currentUserId) {
+                lastMsg = 'You: ' + lastMsg;
+            }
 
-        let onlineDot = conv.is_online ? `<div style="position:absolute; bottom:2px; right:2px; width:12px; height:12px; background-color:#22c55e; border-radius:50%; border:2px solid var(--bg-card); pointer-events:none;"></div>` : '';
-        let avatarContainer = `<div style="position:relative; width:45px; height:45px; flex-shrink:0;">${avatarHtml}${onlineDot}</div>`;
+            let timeStr = '';
+            if (conv.last_message_time) {
+                const date = new Date(conv.last_message_time.replace(/-/g, '/'));
+                timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
 
-        html += `
+            let avatarHtml = conv.has_photo === 1
+                ? `<img src="../api/user_photo.php?user_id=${conv.other_user_id}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;" alt="${conv.other_user_name}">`
+                : `<div class="avatar" style="width: 45px; height: 45px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold;">${initials}</div>`;
+
+            let onlineDot = conv.is_online ? `<div style="position:absolute; bottom:2px; right:2px; width:12px; height:12px; background-color:#22c55e; border-radius:50%; border:2px solid var(--bg-card); pointer-events:none;"></div>` : '';
+            let avatarContainer = `<div style="position:relative; width:45px; height:45px; flex-shrink:0;">${avatarHtml}${onlineDot}</div>`;
+
+            html += `
             <div class="chat-item ${isActive}" onclick="openConversation(${conv.conversation_id})" id="conv-item-${conv.conversation_id}">
                 ${avatarContainer}
                 <div class="chat-item-details">
@@ -660,174 +721,174 @@ function renderConversationsList(conversations) {
                 </div>
             </div>
         `;
-    });
+        });
 
-    chatList.innerHTML = html;
-}
-
-async function openConversation(conversationId) {
-    activeConversationId = conversationId;
-    
-    // Hide empty state and show main area
-    document.getElementById('chatEmptyState').style.display = 'none';
-    const mainContent = document.getElementById('chatMainContent');
-    mainContent.style.display = 'flex';
-    
-    // Highlight list item
-    document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
-    const activeItem = document.getElementById(`conv-item-${conversationId}`);
-    if (activeItem) {
-        activeItem.classList.add('active');
-        // Clear its unread badge locally for quick feedback
-        const badge = activeItem.querySelector('.chat-item-unread');
-        if (badge) badge.remove();
+        chatList.innerHTML = html;
     }
-    
-    document.getElementById('chatContainer').classList.add('thread-active');
-    
-    // Fetch header details and messages
-    await loadMessages(conversationId);
-}
 
-async function loadMessages(conversationId) {
-    try {
-        const response = await fetch(`../api/messages.php?conversation_id=${conversationId}`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            // Update header with partner name and photo
-            if (data.partner_name) {
-                document.getElementById('headerName').innerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none; color:inherit;">${data.partner_name}</a>`;
-                let avatarElem = document.getElementById('headerAvatar');
-                if (data.partner_has_photo) {
-                    avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}"><img id="headerAvatar" src="../api/user_photo.php?user_id=${data.partner_id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${data.partner_name}"></a>`;
-                } else {
-                    let initials = data.partner_name.substring(0, 1).toUpperCase();
-                    avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none;"><div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">${initials}</div></a>`;
-                }
-                
-                // Update activeRecipientId for booking modal
-                activeRecipientId = data.partner_id;
-                
-                // Update status
-                const statusElem = document.querySelector('.chat-main-status');
-                if (data.is_online) {
-                    statusElem.innerHTML = `<span style="color:#22c55e; font-weight:600;">&bull; Online</span>`;
-                } else {
-                    let timeStr = 'Offline';
-                    if (data.last_active) {
-                        timeStr = formatLastSeen(data.last_active);
-                    }
-                    statusElem.innerHTML = `<span style="color:var(--text-muted);">${timeStr}</span>`;
-                }
-            } else {
-                document.getElementById('headerName').textContent = 'Partner';
-                document.getElementById('headerAvatar').outerHTML = `<div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">P</div>`;
-                document.querySelector('.chat-main-status').textContent = 'Offline';
-            }
+    async function openConversation(conversationId) {
+        activeConversationId = conversationId;
 
-            renderMessages(data.messages);
-            scrollToBottom();
-            
-            // Mark navbar badge as read if we have one (or decrement)
-            // The next page load or polling will update it correctly.
+        // Hide empty state and show main area
+        document.getElementById('chatEmptyState').style.display = 'none';
+        const mainContent = document.getElementById('chatMainContent');
+        mainContent.style.display = 'flex';
+
+        // Highlight list item
+        document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+        const activeItem = document.getElementById(`conv-item-${conversationId}`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+            // Clear its unread badge locally for quick feedback
+            const badge = activeItem.querySelector('.chat-item-unread');
+            if (badge) badge.remove();
         }
-    } catch (error) {
-        console.error('Error loading messages:', error);
-    }
-}
 
-function renderMessages(messages) {
-    const chatBody = document.getElementById('chatBody');
-    if (messages.length === 0) {
-        chatBody.innerHTML = `
+        document.getElementById('chatContainer').classList.add('thread-active');
+
+        // Fetch header details and messages
+        await loadMessages(conversationId);
+    }
+
+    async function loadMessages(conversationId) {
+        try {
+            const response = await fetch(`../api/messages.php?conversation_id=${conversationId}`);
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Update header with partner name and photo
+                if (data.partner_name) {
+                    document.getElementById('headerName').innerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none; color:inherit;">${data.partner_name}</a>`;
+                    let avatarElem = document.getElementById('headerAvatar');
+                    if (data.partner_has_photo) {
+                        avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}"><img id="headerAvatar" src="../api/user_photo.php?user_id=${data.partner_id}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${data.partner_name}"></a>`;
+                    } else {
+                        let initials = data.partner_name.substring(0, 1).toUpperCase();
+                        avatarElem.outerHTML = `<a href="user_profile.php?id=${data.partner_id}" style="text-decoration:none;"><div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">${initials}</div></a>`;
+                    }
+
+                    // Update activeRecipientId for booking modal
+                    activeRecipientId = data.partner_id;
+
+                    // Update status
+                    const statusElem = document.querySelector('.chat-main-status');
+                    if (data.is_online) {
+                        statusElem.innerHTML = `<span style="color:#22c55e; font-weight:600;">&bull; Online</span>`;
+                    } else {
+                        let timeStr = 'Offline';
+                        if (data.last_active) {
+                            timeStr = formatLastSeen(data.last_active);
+                        }
+                        statusElem.innerHTML = `<span style="color:var(--text-muted);">${timeStr}</span>`;
+                    }
+                } else {
+                    document.getElementById('headerName').textContent = 'Partner';
+                    document.getElementById('headerAvatar').outerHTML = `<div class="avatar" id="headerAvatar" style="width: 40px; height: 40px; font-size: 1.1rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); color:var(--text-primary); font-weight:bold; flex-shrink: 0;">P</div>`;
+                    document.querySelector('.chat-main-status').textContent = 'Offline';
+                }
+
+                renderMessages(data.messages);
+                scrollToBottom();
+
+                // Mark navbar badge as read if we have one (or decrement)
+                // The next page load or polling will update it correctly.
+            }
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    }
+
+    function renderMessages(messages) {
+        const chatBody = document.getElementById('chatBody');
+        if (messages.length === 0) {
+            chatBody.innerHTML = `
             <div style="margin: auto; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
                 No messages yet. Send a message to start the conversation!
             </div>
         `;
-        lastMessageIdSeen = 0;
-        return;
-    }
+            lastMessageIdSeen = 0;
+            return;
+        }
 
-    let html = '';
-    messages.forEach(msg => {
-        const isSent = msg.sender_id === currentUserId;
-        const groupClass = isSent ? 'sent' : 'received';
-        const bubbleClass = isSent ? 'sent' : 'received';
-        
-        const date = new Date(msg.sent_at.replace(/-/g, '/'));
-        const timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let html = '';
+        messages.forEach(msg => {
+            const isSent = msg.sender_id === currentUserId;
+            const groupClass = isSent ? 'sent' : 'received';
+            const bubbleClass = isSent ? 'sent' : 'received';
 
-        // Escape HTML to prevent XSS
-        const escapeHtml = (unsafe) => {
-            return (unsafe || '').replace(/[&<"'>]/g, function (m) {
-                return {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#039;'
-                }[m];
-            });
-        };
+            const date = new Date(msg.sent_at.replace(/-/g, '/'));
+            const timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        let messageContent = escapeHtml(msg.message_text);
-        
-        let hasSmartLink = false;
-        
-        const smartLinkRegex = /\[BOOK_SKILL:(\d+):([^\]]+)\]/g;
-        messageContent = messageContent.replace(smartLinkRegex, function(match, skillId, skillName) {
-            hasSmartLink = true;
-            const cleanSkillName = escapeHtml(skillName).replace(/'/g, "\\'");
-            
-            if (isSent) {
-                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Sent</div></div>`;
-            } else {
-                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            // Escape HTML to prevent XSS
+            const escapeHtml = (unsafe) => {
+                return (unsafe || '').replace(/[&<"'>]/g, function (m) {
+                    return {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#039;'
+                    }[m];
+                });
+            };
+
+            let messageContent = escapeHtml(msg.message_text);
+
+            let hasSmartLink = false;
+
+            const smartLinkRegex = /\[BOOK_SKILL:(\d+):([^\]]+)\]/g;
+            messageContent = messageContent.replace(smartLinkRegex, function (match, skillId, skillName) {
+                hasSmartLink = true;
+                const cleanSkillName = escapeHtml(skillName).replace(/'/g, "\\'");
+
+                if (isSent) {
+                    return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Sent</div></div>`;
+                } else {
+                    return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
                             <button onclick="openBooking(activeRecipientId, '${cleanSkillName}', ${skillId}, ${msg.message_id})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: var(--primary); color: #fff; border: none; font-weight: 700; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Accept & Book</button>
                             <button onclick="sendNotInterested(${msg.message_id})" class="btn btn-sm" style="display:inline-flex; align-items:center; gap:6px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Not Interested</button>
                         </div>`;
-            }
-        });
-        
-        const declinedRegex = /\[OFFER_DECLINED:(\d+):([^\]]+)\]/g;
-        messageContent = messageContent.replace(declinedRegex, function(match, skillId, skillName) {
-            hasSmartLink = true;
-            if (isSent) {
-                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Offer Declined</div></div>`;
-            } else {
-                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                }
+            });
+
+            const declinedRegex = /\[OFFER_DECLINED:(\d+):([^\]]+)\]/g;
+            messageContent = messageContent.replace(declinedRegex, function (match, skillId, skillName) {
+                hasSmartLink = true;
+                if (isSent) {
+                    return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Offer Declined</div></div>`;
+                } else {
+                    return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
                             <div style="display:inline-flex; align-items:center; gap:6px; background: rgba(0,0,0,0.1); color: var(--text-muted); padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Offer Declined</div>
                         </div>`;
-            }
-        });
+                }
+            });
 
-        const acceptedRegex = /\[OFFER_ACCEPTED:(\d+):([^\]]+)\]/g;
-        messageContent = messageContent.replace(acceptedRegex, function(match, skillId, skillName) {
-            hasSmartLink = true;
-            if (isSent) {
-                return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(34, 197, 94, 0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Accepted</div></div>`;
-            } else {
-                return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            const acceptedRegex = /\[OFFER_ACCEPTED:(\d+):([^\]]+)\]/g;
+            messageContent = messageContent.replace(acceptedRegex, function (match, skillId, skillName) {
+                hasSmartLink = true;
+                if (isSent) {
+                    return `<div style="margin-top: 12px;"><div style="display:inline-flex; align-items:center; gap:6px; background: rgba(34, 197, 94, 0.25); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Accepted</div></div>`;
+                } else {
+                    return `<div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
                             <div style="display:inline-flex; align-items:center; gap:6px; background: rgba(34, 197, 94, 0.1); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Offer Accepted</div>
                         </div>`;
-            }
-        });
-        
-        // Convert newlines to <br>
-        messageContent = messageContent.replace(/\n/g, '<br>');
-        
-        // Parse bold **text** to <b>text</b>
-        messageContent = messageContent.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+                }
+            });
 
-        if (msg.message_type === 'audio' && msg.media_url) {
-            const bubbleColor = isSent ? 'var(--primary)' : 'var(--bg-secondary)';
-            const textColor = isSent ? '#fff' : 'var(--text-primary)';
-            const waveBaseColor = isSent ? 'rgba(255,255,255,0.4)' : 'var(--border-color)';
-            const waveActiveColor = isSent ? '#fff' : 'var(--primary)';
-            const btnBg = isSent ? 'rgba(255,255,255,0.2)' : 'var(--bg-hover)';
-            
-            messageContent = `
+            // Convert newlines to <br>
+            messageContent = messageContent.replace(/\n/g, '<br>');
+
+            // Parse bold **text** to <b>text</b>
+            messageContent = messageContent.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+            if (msg.message_type === 'audio' && msg.media_url) {
+                const bubbleColor = isSent ? 'var(--primary)' : 'var(--bg-secondary)';
+                const textColor = isSent ? '#fff' : 'var(--text-primary)';
+                const waveBaseColor = isSent ? 'rgba(255,255,255,0.4)' : 'var(--border-color)';
+                const waveActiveColor = isSent ? '#fff' : 'var(--primary)';
+                const btnBg = isSent ? 'rgba(255,255,255,0.2)' : 'var(--bg-hover)';
+
+                messageContent = `
                 <div class="custom-audio-player" style="display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 18px; background: ${bubbleColor}; color: ${textColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                     <button type="button" class="play-pause-btn" onclick="toggleAudio(this)" style="background: ${btnBg}; border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: inherit; flex-shrink: 0; transition: transform 0.1s;">
                         <svg class="icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px;">
@@ -858,18 +919,18 @@ function renderMessages(messages) {
                     <span class="audio-duration" style="font-size: 0.75rem; font-family: monospace; font-weight: 600; min-width: 35px; text-align: right;">0:00</span>
                 </div>
             `;
-        }
+            }
 
-        let extraStyle = '';
-        if (msg.message_type === 'audio' && msg.media_url) {
-            extraStyle = 'background:transparent; padding:0; box-shadow:none; border:none;';
-        } else if (hasSmartLink) {
-            extraStyle = isSent 
-                ? 'background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25); border: none;'
-                : 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #3730a3; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); border: 1px solid #c7d2fe;';
-        }
+            let extraStyle = '';
+            if (msg.message_type === 'audio' && msg.media_url) {
+                extraStyle = 'background:transparent; padding:0; box-shadow:none; border:none;';
+            } else if (hasSmartLink) {
+                extraStyle = isSent
+                    ? 'background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25); border: none;'
+                    : 'background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #3730a3; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1); border: 1px solid #c7d2fe;';
+            }
 
-        html += `
+            html += `
             <div class="message-group ${groupClass}" data-id="${msg.message_id}">
                 <div class="message-bubble ${bubbleClass}" style="${extraStyle}">
                     ${messageContent}
@@ -877,556 +938,577 @@ function renderMessages(messages) {
                 <span class="message-time">${timeStr}</span>
             </div>
         `;
-        
-        if (msg.message_id > lastMessageIdSeen) {
-            lastMessageIdSeen = msg.message_id;
-        }
-    });
 
-    chatBody.innerHTML = html;
-}
-
-async function pollActiveThread() {
-    if (activeConversationId <= 0) return;
-    
-    try {
-        const response = await fetch(`../api/messages.php?conversation_id=${activeConversationId}`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            // Update header status in case they came online/went offline
-            const statusElem = document.querySelector('.chat-main-status');
-            if (data.is_online) {
-                statusElem.innerHTML = `<span style="color:#22c55e; font-weight:600;">&bull; Online</span>`;
-            } else {
-                let timeStr = 'Offline';
-                if (data.last_active) {
-                    timeStr = formatLastSeen(data.last_active);
-                }
-                statusElem.innerHTML = `<span style="color:var(--text-muted);">${timeStr}</span>`;
+            if (msg.message_id > lastMessageIdSeen) {
+                lastMessageIdSeen = msg.message_id;
             }
+        });
 
-            // Check if there are new messages
-            const messages = data.messages;
-            if (messages.length > 0) {
-                const latestMsg = messages[messages.length - 1];
-                if (latestMsg.message_id > lastMessageIdSeen) {
-                    renderMessages(messages);
-                    scrollToBottom();
+        chatBody.innerHTML = html;
+    }
+
+    async function pollActiveThread() {
+        if (activeConversationId <= 0) return;
+
+        try {
+            const response = await fetch(`../api/messages.php?conversation_id=${activeConversationId}`);
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Update header status in case they came online/went offline
+                const statusElem = document.querySelector('.chat-main-status');
+                if (data.is_online) {
+                    statusElem.innerHTML = `<span style="color:#22c55e; font-weight:600;">&bull; Online</span>`;
+                } else {
+                    let timeStr = 'Offline';
+                    if (data.last_active) {
+                        timeStr = formatLastSeen(data.last_active);
+                    }
+                    statusElem.innerHTML = `<span style="color:var(--text-muted);">${timeStr}</span>`;
+                }
+
+                // Check if there are new messages
+                const messages = data.messages;
+                if (messages.length > 0) {
+                    const latestMsg = messages[messages.length - 1];
+                    if (latestMsg.message_id > lastMessageIdSeen) {
+                        renderMessages(messages);
+                        scrollToBottom();
+                    }
                 }
             }
+        } catch (error) {
+            console.error('Error polling thread:', error);
         }
-    } catch (error) {
-        console.error('Error polling thread:', error);
-    }
-}
-
-async function handleSend(event) {
-    event.preventDefault();
-    if (isRecording) {
-        // Stop recording and send audio
-        stopRecording(false);
-    } else {
-        // Send text message
-        sendMessage();
-    }
-}
-
-async function sendMessage() {
-    const chatInput = document.getElementById('chatInput');
-    let text = chatInput.value.trim();
-    if (text === '' && !(offerSkillId > 0 && offerSkillName)) return;
-    
-    if (offerSkillId > 0 && offerSkillName) {
-        text += `\n\n[BOOK_SKILL:${offerSkillId}:${offerSkillName}]`;
-        offerSkillId = 0; // Only send the button once
-        offerSkillName = '';
     }
 
-    chatInput.value = '';
-    chatInput.focus();
-
-    const formData = new FormData();
-    formData.append('conversation_id', activeConversationId);
-    formData.append('message_text', text);
-    formData.append('csrf_token', window.csrfToken);
-
-    try {
-        const response = await fetch('../api/messages.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        if (data.status === 'success') {
-            loadMessages(activeConversationId);
-            fetchConversations();
+    async function handleSend(event) {
+        event.preventDefault();
+        if (isRecording) {
+            // Stop recording and send audio
+            stopRecording(false);
+        } else {
+            // Send text message
+            sendMessage();
         }
-    } catch (error) {
-        console.error('Error sending message:', error);
     }
-}
 
-async function sendNotInterested(offerMsgId) {
-    if (!confirm("Are you sure you want to decline this offer?")) return;
-    
-    const text = "Thank you for the offer, but I'm not interested at the moment.";
-    const formData = new FormData();
-    formData.append('conversation_id', activeConversationId);
-    formData.append('message_text', text);
-    formData.append('decline_offer_msg_id', offerMsgId);
-    formData.append('csrf_token', window.csrfToken);
+    async function sendMessage() {
+        const chatInput = document.getElementById('chatInput');
+        let text = chatInput.value.trim();
+        if (text === '' && !(offerSkillId > 0 && offerSkillName)) return;
 
-    try {
-        const response = await fetch('../api/messages.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        if (data.status === 'success') {
-            loadMessages(activeConversationId);
-            fetchConversations();
+        if (offerSkillId > 0 && offerSkillName) {
+            text += `\n\n[BOOK_SKILL:${offerSkillId}:${offerSkillName}]`;
+            offerSkillId = 0; // Only send the button once
+            offerSkillName = '';
         }
-    } catch (error) {
-        console.error('Error sending message:', error);
+
+        chatInput.value = '';
+        chatInput.focus();
+
+        const formData = new FormData();
+        formData.append('conversation_id', activeConversationId);
+        formData.append('message_text', text);
+        formData.append('csrf_token', window.csrfToken);
+
+        try {
+            const response = await fetch('../api/messages.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                loadMessages(activeConversationId);
+                fetchConversations();
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
     }
-}
 
-// Voice Recording Logic
-let mediaRecorder;
-let audioChunks = [];
-let isRecording = false;
-let isRecordingCanceled = false;
+    async function sendNotInterested(offerMsgId) {
+        if (!confirm("Are you sure you want to decline this offer?")) return;
 
-async function toggleRecording() {
-    if (!isRecording) {
-        startRecording();
-    } else {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.pause();
-            document.getElementById('micIcon').outerHTML = `
+        const text = "Thank you for the offer, but I'm not interested at the moment.";
+        const formData = new FormData();
+        formData.append('conversation_id', activeConversationId);
+        formData.append('message_text', text);
+        formData.append('decline_offer_msg_id', offerMsgId);
+        formData.append('csrf_token', window.csrfToken);
+
+        try {
+            const response = await fetch('../api/messages.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                loadMessages(activeConversationId);
+                fetchConversations();
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
+    }
+
+    // Voice Recording Logic
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+    let isRecordingCanceled = false;
+
+    async function toggleRecording() {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.pause();
+                document.getElementById('micIcon').outerHTML = `
                 <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>`;
-            document.getElementById('chatInput').placeholder = "Recording paused... Mic to resume, Send to finish.";
-            document.getElementById('micBtn').classList.remove('recording-active');
-        } else if (mediaRecorder && mediaRecorder.state === 'paused') {
-            mediaRecorder.resume();
-            document.getElementById('micIcon').outerHTML = `
+                document.getElementById('chatInput').placeholder = "Recording paused... Mic to resume, Send to finish.";
+                document.getElementById('micBtn').classList.remove('recording-active');
+            } else if (mediaRecorder && mediaRecorder.state === 'paused') {
+                mediaRecorder.resume();
+                document.getElementById('micIcon').outerHTML = `
                 <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="6" y="4" width="4" height="16"></rect>
                     <rect x="14" y="4" width="4" height="16"></rect>
                 </svg>`;
-            document.getElementById('chatInput').placeholder = "Recording... Mic to pause, Send to finish.";
-            document.getElementById('micBtn').classList.add('recording-active');
+                document.getElementById('chatInput').placeholder = "Recording... Mic to pause, Send to finish.";
+                document.getElementById('micBtn').classList.add('recording-active');
+            }
         }
     }
-}
 
-async function startRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        const options = {
-            mimeType: 'audio/webm;codecs=opus',
-            audioBitsPerSecond: 16000
-        };
-        
-        if (MediaRecorder.isTypeSupported(options.mimeType)) {
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            let mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/mp4';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = ''; // Let browser decide
+                }
+            }
+
+            const options = { audioBitsPerSecond: 16000 };
+            if (mimeType) {
+                options.mimeType = mimeType;
+            }
+
             mediaRecorder = new MediaRecorder(stream, options);
-        } else {
-            mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 16000 });
-        }
-        
-        audioChunks = [];
-        isRecordingCanceled = false;
 
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
+            audioChunks = [];
+            isRecordingCanceled = false;
 
-        mediaRecorder.onstop = () => {
-            if (!isRecordingCanceled) {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                sendAudioMessage(audioBlob);
-            }
-            
-            // Stop all tracks to release microphone
-            stream.getTracks().forEach(track => track.stop());
-            resetMicUI();
-        };
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
 
-        mediaRecorder.start();
-        isRecording = true;
-        
-        // Update UI for recording state
-        document.getElementById('cancelBtn').style.display = 'block';
-        document.getElementById('micBtn').classList.add('recording-active');
-        document.getElementById('micIcon').outerHTML = `
+            mediaRecorder.onstop = () => {
+                if (!isRecordingCanceled) {
+                    const actualMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+                    const audioBlob = new Blob(audioChunks, { type: actualMimeType });
+                    const ext = actualMimeType.includes('mp4') ? 'm4a' : 'webm';
+                    sendAudioMessage(audioBlob, 'voice_message.' + ext);
+                }
+
+                // Stop all tracks to release microphone
+                stream.getTracks().forEach(track => track.stop());
+                resetMicUI();
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+
+            // Update UI for recording state
+            document.getElementById('cancelBtn').style.display = 'block';
+            document.getElementById('micBtn').classList.add('recording-active');
+            document.getElementById('micIcon').outerHTML = `
             <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="6" y="4" width="4" height="16"></rect>
                 <rect x="14" y="4" width="4" height="16"></rect>
             </svg>`;
-        document.getElementById('chatInput').placeholder = "Recording... Mic to pause, Send to finish.";
-        document.getElementById('chatInput').disabled = true;
-    } catch (err) {
-        console.error("Error accessing microphone:", err);
-        alert("Please allow microphone access to record audio messages.");
+            document.getElementById('chatInput').placeholder = "Recording... Mic to pause, Send to finish.";
+            document.getElementById('chatInput').disabled = true;
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            alert("Please allow microphone access to record audio messages.");
+        }
     }
-}
 
-function stopRecording(cancel = false) {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        isRecordingCanceled = cancel;
-        mediaRecorder.stop();
-        isRecording = false;
+    function stopRecording(cancel = false) {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            isRecordingCanceled = cancel;
+            mediaRecorder.stop();
+            isRecording = false;
+        }
     }
-}
 
-function cancelRecording() {
-    stopRecording(true);
-}
+    function cancelRecording() {
+        stopRecording(true);
+    }
 
-function resetMicUI() {
-    document.getElementById('cancelBtn').style.display = 'none';
-    document.getElementById('micBtn').classList.remove('recording-active');
-    document.getElementById('micIcon').outerHTML = `
+    function resetMicUI() {
+        document.getElementById('cancelBtn').style.display = 'none';
+        document.getElementById('micBtn').classList.remove('recording-active');
+        document.getElementById('micIcon').outerHTML = `
         <svg id="micIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
             <line x1="12" y1="19" x2="12" y2="23"></line>
             <line x1="8" y1="23" x2="16" y2="23"></line>
         </svg>`;
-    document.getElementById('chatInput').placeholder = "Write a message...";
-    document.getElementById('chatInput').disabled = false;
-    document.getElementById('chatInput').focus();
-}
-
-async function sendAudioMessage(blob) {
-    if (activeConversationId <= 0) return;
-
-    const formData = new FormData();
-    formData.append('conversation_id', activeConversationId);
-    formData.append('audio_file', blob, 'voice_message.webm');
-    formData.append('csrf_token', window.csrfToken);
-
-    try {
-        const response = await fetch('../api/messages.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        if (data.status === 'success') {
-            loadMessages(activeConversationId);
-            fetchConversations();
-        } else {
-            console.error('Error sending audio message:', data.error);
-        }
-    } catch (error) {
-        console.error('Error sending audio message:', error);
+        document.getElementById('chatInput').placeholder = "Write a message...";
+        document.getElementById('chatInput').disabled = false;
+        document.getElementById('chatInput').focus();
     }
-}
 
-function scrollToBottom() {
-    const chatBody = document.getElementById('chatBody');
-    chatBody.scrollTop = chatBody.scrollHeight;
-}
+    async function sendAudioMessage(blob, filename = 'voice_message.webm') {
+        if (activeConversationId <= 0) return;
 
-function backToInbox() {
-    document.getElementById('chatContainer').classList.remove('thread-active');
-    activeConversationId = 0;
-}
+        const formData = new FormData();
+        formData.append('conversation_id', activeConversationId);
+        formData.append('audio_file', blob, filename);
+        formData.append('csrf_token', window.csrfToken);
 
-async function hideInbox(conversationId, event) {
-    event.stopPropagation();
-    if (!confirm('Are you sure you want to hide this conversation? The history will be preserved if you chat again.')) return;
-    
-    try {
-        const response = await fetch('../api/messages.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'hide_inbox',
-                conversation_id: conversationId,
-                csrf_token: window.csrfToken
-            })
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-            if (activeConversationId === conversationId) {
-                backToInbox();
+        try {
+            const response = await fetch('../api/messages.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                loadMessages(activeConversationId);
+                fetchConversations();
+            } else {
+                console.error('Error sending audio message:', data.error);
             }
-            fetchConversations();
+        } catch (error) {
+            console.error('Error sending audio message:', error);
         }
-    } catch (error) {
-        console.error('Error hiding inbox:', error);
     }
-}
 
-// Custom Audio Player Logic
-function generateWaveformBarsHtml(count, color) {
-    let html = '';
-    // Pre-defined pseudo-random heights to create a consistent waveform
-    const heights = [6, 12, 18, 14, 8, 16, 20, 24, 18, 10, 14, 22, 20, 12, 8, 18, 24, 16, 10, 14, 20, 18, 12, 8, 16, 22, 14, 10];
-    for (let i = 0; i < count; i++) {
-        let h = heights[i % heights.length];
-        html += `<div style="width: 3px; height: ${h}px; background-color: ${color}; border-radius: 2px; flex-shrink: 0;"></div>`;
+    function scrollToBottom() {
+        const chatBody = document.getElementById('chatBody');
+        chatBody.scrollTop = chatBody.scrollHeight;
     }
-    return html;
-}
 
-function toggleAudio(btn) {
-    const container = btn.closest('.custom-audio-player');
-    const audio = container.querySelector('audio');
-    const iconPlay = btn.querySelector('.icon-play');
-    const iconPause = btn.querySelector('.icon-pause');
-    
-    // Pause all other audios on the page
-    document.querySelectorAll('.custom-audio-player audio').forEach(a => {
-        if (a !== audio && !a.paused) {
-            a.pause();
-            const otherBtn = a.closest('.custom-audio-player').querySelector('.play-pause-btn');
-            otherBtn.querySelector('.icon-play').style.display = 'block';
-            otherBtn.querySelector('.icon-pause').style.display = 'none';
+    function backToInbox() {
+        document.getElementById('chatContainer').classList.remove('thread-active');
+        activeConversationId = 0;
+    }
+
+    async function hideInbox(conversationId, event) {
+        event.stopPropagation();
+        if (!confirm('Are you sure you want to hide this conversation? The history will be preserved if you chat again.')) return;
+
+        try {
+            const response = await fetch('../api/messages.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'hide_inbox',
+                    conversation_id: conversationId,
+                    csrf_token: window.csrfToken
+                })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                if (activeConversationId === conversationId) {
+                    backToInbox();
+                }
+                fetchConversations();
+            }
+        } catch (error) {
+            console.error('Error hiding inbox:', error);
+        }
+    }
+
+    // Custom Audio Player Logic
+    function generateWaveformBarsHtml(count, color) {
+        let html = '';
+        // Pre-defined pseudo-random heights to create a consistent waveform
+        const heights = [6, 12, 18, 14, 8, 16, 20, 24, 18, 10, 14, 22, 20, 12, 8, 18, 24, 16, 10, 14, 20, 18, 12, 8, 16, 22, 14, 10];
+        for (let i = 0; i < count; i++) {
+            let h = heights[i % heights.length];
+            html += `<div style="width: 3px; height: ${h}px; background-color: ${color}; border-radius: 2px; flex-shrink: 0;"></div>`;
+        }
+        return html;
+    }
+
+    function toggleAudio(btn) {
+        const container = btn.closest('.custom-audio-player');
+        const audio = container.querySelector('audio');
+        const iconPlay = btn.querySelector('.icon-play');
+        const iconPause = btn.querySelector('.icon-pause');
+
+        // Pause all other audios on the page
+        document.querySelectorAll('.custom-audio-player audio').forEach(a => {
+            if (a !== audio && !a.paused) {
+                a.pause();
+                const otherBtn = a.closest('.custom-audio-player').querySelector('.play-pause-btn');
+                otherBtn.querySelector('.icon-play').style.display = 'block';
+                otherBtn.querySelector('.icon-pause').style.display = 'none';
+            }
+        });
+
+        if (audio.paused) {
+            audio.play();
+            iconPlay.style.display = 'none';
+            iconPause.style.display = 'block';
+        } else {
+            audio.pause();
+            iconPlay.style.display = 'block';
+            iconPause.style.display = 'none';
+        }
+    }
+
+    function updateAudioProgress(audio) {
+        const container = audio.closest('.custom-audio-player');
+        const progressContainer = container.querySelector('.waveform-progress-container');
+        const durationElem = container.querySelector('.audio-duration');
+
+        let duration = audio.duration;
+        // Fallback if duration is Infinity (common in some webm recordings until end is reached)
+        if (duration === Infinity || isNaN(duration)) {
+            duration = 60; // fallback max
+        }
+
+        if (duration > 0) {
+            const percent = Math.min((audio.currentTime / duration) * 100, 100);
+            progressContainer.style.width = `${percent}%`;
+
+            // Show current time while playing
+            const mins = Math.floor(audio.currentTime / 60);
+            const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
+            durationElem.textContent = `${mins}:${secs}`;
+        }
+    }
+
+    function setAudioDuration(audio) {
+        const container = audio.closest('.custom-audio-player');
+        const durationElem = container.querySelector('.audio-duration');
+        let duration = audio.duration;
+
+        if (duration && duration !== Infinity && !isNaN(duration)) {
+            const mins = Math.floor(duration / 60);
+            const secs = Math.floor(duration % 60).toString().padStart(2, '0');
+            durationElem.textContent = `${mins}:${secs}`;
+        } else {
+            // If webm duration is Infinity, display 0:00 until played
+            durationElem.textContent = "0:00";
+        }
+    }
+
+    function audioEnded(audio) {
+        const container = audio.closest('.custom-audio-player');
+        const btn = container.querySelector('.play-pause-btn');
+        const progressContainer = container.querySelector('.waveform-progress-container');
+
+        btn.querySelector('.icon-play').style.display = 'block';
+        btn.querySelector('.icon-pause').style.display = 'none';
+        progressContainer.style.width = '0%';
+        setAudioDuration(audio); // reset to total duration text
+    }
+
+    function seekAudio(event, waveformContainer) {
+        const audio = waveformContainer.querySelector('audio');
+        let duration = audio.duration;
+        if (!duration || duration === Infinity || isNaN(duration)) {
+            return; // Cannot seek reliably without known duration
+        }
+
+        const rect = waveformContainer.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const percent = Math.max(0, Math.min(1, clickX / rect.width));
+
+        audio.currentTime = percent * duration;
+    }
+
+    let currentSurgeMultiplier = 1.0;
+
+    function updateSurgeCost() {
+        var duration = document.getElementById('duration').value;
+        var baseCost = 0;
+        if (duration == '30') baseCost = 5;
+        if (duration == '60') baseCost = 10;
+        if (duration == '90') baseCost = 15;
+        if (duration == '120') baseCost = 20;
+
+        var costEl = document.getElementById('modal_cost');
+        if (currentSurgeMultiplier > 1) {
+            var newCost = (baseCost * currentSurgeMultiplier).toFixed(2);
+            costEl.innerHTML = `<span style="text-decoration: line-through; color: var(--text-muted); font-size:0.9em;">${baseCost} TC</span> <strong style="color: var(--danger);">${newCost} TC</strong> <span style="font-size:0.8em; color:var(--danger);">(${currentSurgeMultiplier}× Surge)</span>`;
+        } else {
+            costEl.textContent = baseCost.toFixed(2) + ' TC';
+        }
+    }
+
+    // Booking Modal Logic
+    function setMinDateTime() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var d = String(now.getDate()).padStart(2, '0');
+        var h = String(now.getHours()).padStart(2, '0');
+        var min = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+    }
+
+    var providerAvailabilityLocked = false;
+
+    function generateSlotOptions(slots) {
+        var select = document.getElementById('slot_select');
+        select.innerHTML = '<option value="">Choose a time slot...</option>';
+        var dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (var i = 0; i < 14; i++) {
+            var d = new Date(today);
+            d.setDate(d.getDate() + i);
+            var dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()];
+
+            slots.forEach(function (slot) {
+                if (slot.day_of_week === dayName) {
+                    var parts = slot.start_time.split(':');
+                    var slotDate = new Date(d);
+                    slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+
+                    // Skip slots in the past
+                    if (slotDate <= new Date()) return;
+
+                    var y = slotDate.getFullYear();
+                    var mo = String(slotDate.getMonth() + 1).padStart(2, '0');
+                    var da = String(slotDate.getDate()).padStart(2, '0');
+                    var dateStr = y + '-' + mo + '-' + da;
+
+                    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    var label = dayName + ', ' + months[slotDate.getMonth()] + ' ' + slotDate.getDate() + ' — ' + formatTime12(slot.start_time) + ' to ' + formatTime12(slot.end_time);
+                    var value = dateStr + 'T' + slot.start_time;
+
+                    var opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    function formatTime12(t) {
+        var parts = t.split(':');
+        var h = parseInt(parts[0]);
+        var m = parts[1];
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + m + ' ' + ampm;
+    }
+
+    function onSlotSelected(val) {
+        document.getElementById('scheduled_time_locked').value = val;
+    }
+
+    function openBooking(providerId, skillName, skillId, offerMsgId) {
+        document.getElementById('modal_provider_id').value = providerId;
+        document.getElementById('modal_skill_id').value = skillId;
+        document.getElementById('modal_offer_msg_id').value = offerMsgId || '';
+        document.getElementById('modal_skill_name').textContent = skillName;
+        setMinDateTime();
+
+        // Fetch surge pricing for this provider
+        fetch('../api/surge_pricing.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                currentSurgeMultiplier = data.surge_multiplier || 1.0;
+                var infoEl = document.getElementById('surge-info');
+                if (data.surge_multiplier > 1) {
+                    var level = data.demand_level;
+                    var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
+                    var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
+                    infoEl.style.display = 'block';
+                    infoEl.style.background = bgColor;
+                    infoEl.style.border = '1px solid ' + borderColor;
+                    infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
+                } else {
+                    infoEl.style.display = 'none';
+                }
+                updateSurgeCost();
+            })
+            .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
+
+        // Fetch availability lock status
+        fetch('../api/provider_availability.php?provider_id=' + providerId)
+            .then(r => r.json())
+            .then(data => {
+                providerAvailabilityLocked = data.locked == 1;
+                var lockInfo = document.getElementById('availability-lock-info');
+                var freeGroup = document.getElementById('datetime-free-group');
+                var slotGroup = document.getElementById('slot-picker-group');
+
+                if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
+                    lockInfo.style.display = 'block';
+                    freeGroup.style.display = 'none';
+                    slotGroup.style.display = 'block';
+                    document.getElementById('slot_select').setAttribute('required', 'required');
+                    document.getElementById('scheduled_time').removeAttribute('required');
+                    generateSlotOptions(data.slots);
+                } else {
+                    lockInfo.style.display = 'none';
+                    freeGroup.style.display = 'block';
+                    slotGroup.style.display = 'none';
+                    document.getElementById('scheduled_time').setAttribute('required', 'required');
+                    document.getElementById('slot_select').removeAttribute('required');
+                }
+            })
+            .catch(() => { });
+
+        document.getElementById('bookingModal').classList.add('active');
+    }
+
+    function closeBooking() {
+        document.getElementById('bookingModal').classList.remove('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('bookingModal');
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === this) closeBooking();
+            });
         }
     });
 
-    if (audio.paused) {
-        audio.play();
-        iconPlay.style.display = 'none';
-        iconPause.style.display = 'block';
-    } else {
-        audio.pause();
-        iconPlay.style.display = 'block';
-        iconPause.style.display = 'none';
-    }
-}
+    function prepareBookingSubmit() {
+        var freeInput = document.getElementById('scheduled_time').value;
+        var lockedInput = document.getElementById('scheduled_time_locked').value;
+        var finalInput = document.getElementById('final_scheduled_time');
 
-function updateAudioProgress(audio) {
-    const container = audio.closest('.custom-audio-player');
-    const progressContainer = container.querySelector('.waveform-progress-container');
-    const durationElem = container.querySelector('.audio-duration');
-    
-    let duration = audio.duration;
-    // Fallback if duration is Infinity (common in some webm recordings until end is reached)
-    if (duration === Infinity || isNaN(duration)) {
-        duration = 60; // fallback max
-    }
-    
-    if (duration > 0) {
-        const percent = Math.min((audio.currentTime / duration) * 100, 100);
-        progressContainer.style.width = `${percent}%`;
-        
-        // Show current time while playing
-        const mins = Math.floor(audio.currentTime / 60);
-        const secs = Math.floor(audio.currentTime % 60).toString().padStart(2, '0');
-        durationElem.textContent = `${mins}:${secs}`;
-    }
-}
-
-function setAudioDuration(audio) {
-    const container = audio.closest('.custom-audio-player');
-    const durationElem = container.querySelector('.audio-duration');
-    let duration = audio.duration;
-    
-    if (duration && duration !== Infinity && !isNaN(duration)) {
-        const mins = Math.floor(duration / 60);
-        const secs = Math.floor(duration % 60).toString().padStart(2, '0');
-        durationElem.textContent = `${mins}:${secs}`;
-    } else {
-        // If webm duration is Infinity, display 0:00 until played
-        durationElem.textContent = "0:00";
-    }
-}
-
-function audioEnded(audio) {
-    const container = audio.closest('.custom-audio-player');
-    const btn = container.querySelector('.play-pause-btn');
-    const progressContainer = container.querySelector('.waveform-progress-container');
-    
-    btn.querySelector('.icon-play').style.display = 'block';
-    btn.querySelector('.icon-pause').style.display = 'none';
-    progressContainer.style.width = '0%';
-    setAudioDuration(audio); // reset to total duration text
-}
-
-function seekAudio(event, waveformContainer) {
-    const audio = waveformContainer.querySelector('audio');
-    let duration = audio.duration;
-    if (!duration || duration === Infinity || isNaN(duration)) {
-        return; // Cannot seek reliably without known duration
-    }
-    
-    const rect = waveformContainer.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const percent = Math.max(0, Math.min(1, clickX / rect.width));
-    
-    audio.currentTime = percent * duration;
-}
-
-let currentSurgeMultiplier = 1.0;
-
-function updateSurgeCost() {
-    var duration = document.getElementById('duration').value;
-    var baseCost = 0;
-    if (duration == '30') baseCost = 5;
-    if (duration == '60') baseCost = 10;
-    if (duration == '90') baseCost = 15;
-    if (duration == '120') baseCost = 20;
-    
-    var costEl = document.getElementById('modal_cost');
-    if (currentSurgeMultiplier > 1) {
-        var newCost = (baseCost * currentSurgeMultiplier).toFixed(2);
-        costEl.innerHTML = `<span style="text-decoration: line-through; color: var(--text-muted); font-size:0.9em;">${baseCost} TC</span> <strong style="color: var(--danger);">${newCost} TC</strong> <span style="font-size:0.8em; color:var(--danger);">(${currentSurgeMultiplier}× Surge)</span>`;
-    } else {
-        costEl.textContent = baseCost.toFixed(2) + ' TC';
-    }
-}
-
-// Booking Modal Logic
-function setMinDateTime() {
-    var now = new Date();
-    var y = now.getFullYear();
-    var m = String(now.getMonth() + 1).padStart(2, '0');
-    var d = String(now.getDate()).padStart(2, '0');
-    var h = String(now.getHours()).padStart(2, '0');
-    var min = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('scheduled_time').min = y + '-' + m + '-' + d + 'T' + h + ':' + min;
-}
-
-var providerAvailabilityLocked = false;
-
-function generateSlotOptions(slots) {
-    var select = document.getElementById('slot_select');
-    select.innerHTML = '<option value="">Choose a time slot...</option>';
-    var dayMap = {'Sunday':0,'Monday':1,'Tuesday':2,'Wednesday':3,'Thursday':4,'Friday':5,'Saturday':6};
-    var today = new Date();
-    today.setHours(0,0,0,0);
-
-    for (var i = 0; i < 14; i++) {
-        var d = new Date(today);
-        d.setDate(d.getDate() + i);
-        var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
-
-        slots.forEach(function(slot) {
-            if (slot.day_of_week === dayName) {
-                var parts = slot.start_time.split(':');
-                var slotDate = new Date(d);
-                slotDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
-
-                // Skip slots in the past
-                if (slotDate <= new Date()) return;
-
-                var y = slotDate.getFullYear();
-                var mo = String(slotDate.getMonth() + 1).padStart(2, '0');
-                var da = String(slotDate.getDate()).padStart(2, '0');
-                var dateStr = y + '-' + mo + '-' + da;
-
-                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                var label = dayName + ', ' + months[slotDate.getMonth()] + ' ' + slotDate.getDate() + ' — ' + formatTime12(slot.start_time) + ' to ' + formatTime12(slot.end_time);
-                var value = dateStr + 'T' + slot.start_time;
-
-                var opt = document.createElement('option');
-                opt.value = value;
-                opt.textContent = label;
-                select.appendChild(opt);
+        if (providerAvailabilityLocked && document.getElementById('slot-picker-group').style.display !== 'none') {
+            if (!lockedInput) {
+                alert('Please select an available slot.');
+                return false;
             }
-        });
-    }
-}
-
-function formatTime12(t) {
-    var parts = t.split(':');
-    var h = parseInt(parts[0]);
-    var m = parts[1];
-    var ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return h + ':' + m + ' ' + ampm;
-}
-
-function onSlotSelected(val) {
-    document.getElementById('scheduled_time_locked').value = val;
-}
-
-function openBooking(providerId, skillName, skillId, offerMsgId) {
-    document.getElementById('modal_provider_id').value = providerId;
-    document.getElementById('modal_skill_id').value = skillId;
-    document.getElementById('modal_offer_msg_id').value = offerMsgId || '';
-    document.getElementById('modal_skill_name').textContent = skillName;
-    setMinDateTime();
-
-    // Fetch surge pricing for this provider
-    fetch('../api/surge_pricing.php?provider_id=' + providerId)
-        .then(r => r.json())
-        .then(data => {
-            currentSurgeMultiplier = data.surge_multiplier || 1.0;
-            var infoEl = document.getElementById('surge-info');
-            if (data.surge_multiplier > 1) {
-                var level = data.demand_level;
-                var bgColor = level === 'extreme' ? 'rgba(186,26,26,0.08)' : level === 'high' ? 'rgba(115,92,0,0.08)' : 'rgba(47,95,156,0.08)';
-                var borderColor = level === 'extreme' ? 'var(--danger)' : level === 'high' ? 'var(--warning)' : 'var(--info)';
-                infoEl.style.display = 'block';
-                infoEl.style.background = bgColor;
-                infoEl.style.border = '1px solid ' + borderColor;
-                infoEl.innerHTML = '<i data-lucide="flame" class="lucide-sm"></i> <strong>Surge Pricing Active (' + data.surge_multiplier + '×)</strong> — This provider has ' + data.provider_sessions_7d + ' bookings this week (platform avg: ' + data.platform_avg_7d + ')';
-            } else {
-                infoEl.style.display = 'none';
+            finalInput.value = lockedInput;
+        } else {
+            if (!freeInput) {
+                alert('Please select a preferred date and time.');
+                return false;
             }
-            updateSurgeCost();
-        })
-        .catch(() => { currentSurgeMultiplier = 1.0; updateSurgeCost(); });
-
-    // Fetch availability lock status
-    fetch('../api/provider_availability.php?provider_id=' + providerId)
-        .then(r => r.json())
-        .then(data => {
-            providerAvailabilityLocked = data.locked == 1;
-            var lockInfo = document.getElementById('availability-lock-info');
-            var freeGroup = document.getElementById('datetime-free-group');
-            var slotGroup = document.getElementById('slot-picker-group');
-            var freeInput = document.getElementById('scheduled_time');
-            var lockedInput = document.getElementById('scheduled_time_locked');
-
-            if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
-                lockInfo.style.display = 'block';
-                freeGroup.style.display = 'none';
-                slotGroup.style.display = 'block';
-                freeInput.removeAttribute('name');
-                freeInput.removeAttribute('required');
-                lockedInput.setAttribute('name', 'scheduled_time');
-                document.getElementById('slot_select').setAttribute('required', 'required');
-                generateSlotOptions(data.slots);
-            } else {
-                lockInfo.style.display = 'none';
-                freeGroup.style.display = 'block';
-                slotGroup.style.display = 'none';
-                freeInput.setAttribute('name', 'scheduled_time');
-                freeInput.setAttribute('required', 'required');
-                lockedInput.removeAttribute('name');
-                document.getElementById('slot_select').removeAttribute('required');
-            }
-        })
-        .catch(() => {});
-
-    document.getElementById('bookingModal').classList.add('active');
-}
-
-function closeBooking() {
-    document.getElementById('bookingModal').classList.remove('active');
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('bookingModal');
-    if (modal) {
-        modal.addEventListener('click', function (e) {
-            if (e.target === this) closeBooking();
-        });
+            finalInput.value = freeInput;
+        }
+        return true;
     }
-});
 
 </script>
 
@@ -1437,26 +1519,32 @@ document.addEventListener('DOMContentLoaded', function() {
             <h3>Book a Session</h3>
             <button class="modal-close" onclick="closeBooking()">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="bookingForm" onsubmit="return prepareBookingSubmit()">
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" id="modal_provider_id" value="">
             <input type="hidden" name="skill_id" id="modal_skill_id" value="">
             <input type="hidden" name="offer_msg_id" id="modal_offer_msg_id" value="">
-            
-            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong></p>
-            
-            <div id="surge-info" style="display:none; padding:12px; margin-bottom:16px; border-radius:6px; font-size:0.85rem; color:var(--text-primary);"></div>
-            
+            <input type="hidden" name="scheduled_time" id="final_scheduled_time" value="">
+
+            <p style="color:var(--text-secondary); margin-bottom:16px;">Skill: <strong id="modal_skill_name"></strong>
+            </p>
+
+            <div id="surge-info"
+                style="display:none; padding:12px; margin-bottom:16px; border-radius:6px; font-size:0.85rem; color:var(--text-primary);">
+            </div>
+
             <!-- Lock availability message -->
-            <div id="availability-lock-info" style="display:none; background:rgba(220,20,60,0.06); border:1px solid rgba(220,20,60,0.25); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:0.82rem; color:crimson;">
+            <div id="availability-lock-info"
+                style="display:none; background:rgba(220,20,60,0.06); border:1px solid rgba(220,20,60,0.25); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:0.82rem; color:crimson;">
                 <i data-lucide="lock" class="lucide-sm"></i>
-                The teacher is not available outside of the preferred time slots. Please select one of the available slots provided by the teacher.
+                The teacher is not available outside of the preferred time slots. Please select one of the available
+                slots provided by the teacher.
             </div>
 
             <!-- Free-form datetime (shown when unlocked) -->
             <div class="form-group" id="datetime-free-group">
                 <label for="scheduled_time">Preferred Date &amp; Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control">
+                <input type="datetime-local" id="scheduled_time" class="form-control">
             </div>
 
             <!-- Slot picker (shown when locked) -->
@@ -1465,7 +1553,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <select id="slot_select" class="form-control" onchange="onSlotSelected(this.value)">
                     <option value="">Choose a time slot...</option>
                 </select>
-                <input type="hidden" id="scheduled_time_locked" name="">
+                <input type="hidden" id="scheduled_time_locked">
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -1476,7 +1564,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="120">120 minutes (20 TC base)</option>
                 </select>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:12px; background:var(--bg-secondary); border-radius:6px;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:12px; background:var(--bg-secondary); border-radius:6px;">
                 <span style="font-weight:600; color:var(--text-secondary);">Total Cost:</span>
                 <span id="modal_cost" style="font-weight:bold; font-size:1.1rem; color:var(--primary);">10.00 TC</span>
             </div>

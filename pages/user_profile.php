@@ -268,10 +268,11 @@ include __DIR__ . '/../includes/header.php';
             <h3>Book a Session</h3>
             <button class="modal-close" onclick="closeBooking()">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="bookingForm" onsubmit="return prepareBookingSubmit()">
             <input type="hidden" name="action" value="book_session">
             <input type="hidden" name="provider_id" value="<?php echo $profile_id; ?>">
             <input type="hidden" name="skill_id" id="modal_skill_id">
+            <input type="hidden" name="scheduled_time" id="final_scheduled_time" value="">
 
             <p style="color:var(--text-secondary); margin-bottom:8px;">Provider:
                 <strong><?php echo htmlspecialchars($user['name']); ?></strong>
@@ -288,10 +289,9 @@ include __DIR__ . '/../includes/header.php';
                 The teacher is not available outside of the preferred time slots. Please select one of the available slots provided by the teacher.
             </div>
 
-            <!-- Free-form datetime (shown when unlocked) -->
             <div class="form-group" id="datetime-free-group">
                 <label for="scheduled_time">Preferred Date &amp; Time</label>
-                <input type="datetime-local" id="scheduled_time" name="scheduled_time" class="form-control">
+                <input type="datetime-local" id="scheduled_time" class="form-control">
             </div>
 
             <!-- Slot picker (shown when locked) -->
@@ -300,7 +300,7 @@ include __DIR__ . '/../includes/header.php';
                 <select id="slot_select" class="form-control" onchange="onSlotSelected(this.value)">
                     <option value="">Choose a time slot...</option>
                 </select>
-                <input type="hidden" id="scheduled_time_locked" name="">
+                <input type="hidden" id="scheduled_time_locked">
             </div>
             <div class="form-group">
                 <label for="duration">Duration (minutes)</label>
@@ -322,6 +322,27 @@ include __DIR__ . '/../includes/header.php';
 <script>
     var currentSurgeMultiplier = 1.0;
     var providerAvailabilityLocked = false;
+
+    function prepareBookingSubmit() {
+        var freeInput = document.getElementById('scheduled_time').value;
+        var lockedInput = document.getElementById('scheduled_time_locked').value;
+        var finalInput = document.getElementById('final_scheduled_time');
+        
+        if (providerAvailabilityLocked && document.getElementById('slot-picker-group').style.display !== 'none') {
+            if (!lockedInput) {
+                alert('Please select an available slot.');
+                return false;
+            }
+            finalInput.value = lockedInput;
+        } else {
+            if (!freeInput) {
+                alert('Please select a preferred date and time.');
+                return false;
+            }
+            finalInput.value = freeInput;
+        }
+        return true;
+    }
 
     // Set min datetime to the user's local "now"
     function setMinDateTime() {
@@ -434,25 +455,19 @@ include __DIR__ . '/../includes/header.php';
                 var lockInfo = document.getElementById('availability-lock-info');
                 var freeGroup = document.getElementById('datetime-free-group');
                 var slotGroup = document.getElementById('slot-picker-group');
-                var freeInput = document.getElementById('scheduled_time');
-                var lockedInput = document.getElementById('scheduled_time_locked');
 
                 if (providerAvailabilityLocked && data.slots && data.slots.length > 0) {
                     lockInfo.style.display = 'block';
                     freeGroup.style.display = 'none';
                     slotGroup.style.display = 'block';
-                    freeInput.removeAttribute('name');
-                    freeInput.removeAttribute('required');
-                    lockedInput.setAttribute('name', 'scheduled_time');
                     document.getElementById('slot_select').setAttribute('required', 'required');
+                    document.getElementById('scheduled_time').removeAttribute('required');
                     generateSlotOptions(data.slots);
                 } else {
                     lockInfo.style.display = 'none';
                     freeGroup.style.display = 'block';
                     slotGroup.style.display = 'none';
-                    freeInput.setAttribute('name', 'scheduled_time');
-                    freeInput.setAttribute('required', 'required');
-                    lockedInput.removeAttribute('name');
+                    document.getElementById('scheduled_time').setAttribute('required', 'required');
                     document.getElementById('slot_select').removeAttribute('required');
                 }
             })
