@@ -211,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action" value="update_profile">
 
                     <div class="profile-photo-upload-container">
-                        <div>
+                        <div id="avatar-container">
                             <?php if (!empty($user['profile_photo'])): ?>
                                 <img src="../api/user_photo.php?user_id=<?php echo $user_id; ?>&v=<?php echo time(); ?>"
                                     class="avatar-img avatar-lg" alt="Profile Photo">
@@ -226,7 +226,7 @@ include __DIR__ . '/../includes/header.php';
                             <div class="upload-btn-wrapper">
                                 <button type="button" class="btn btn-sm btn-secondary"><i data-lucide="upload"
                                         class="lucide-sm"></i> Choose Image</button>
-                                <input type="file" name="profile_photo" accept="image/jpeg, image/png, image/webp" />
+                                <input type="file" id="profile-photo-input" name="profile_photo" accept="image/jpeg, image/png, image/webp" />
                             </div>
                             <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Recommended: Square
                                 image, max 2MB. Updates when you click Save Changes.</p>
@@ -467,5 +467,25 @@ include __DIR__ . '/../includes/header.php';
 
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('profile-photo-input');
+        const avatarContainer = document.getElementById('avatar-container');
+
+        if (fileInput && avatarContainer) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        avatarContainer.innerHTML = '<img src="' + event.target.result + '" class="avatar-img avatar-lg" alt="Profile Preview" style="object-fit: cover;">';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    });
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
