@@ -318,7 +318,8 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             const item = e.target.closest('.notif-item');
             if (item) {
                 const notifId = item.getAttribute('data-id');
-                markAsRead(notifId, item);
+                const link = item.getAttribute('data-link');
+                markAsRead(notifId, item, link);
             }
         });
 
@@ -358,13 +359,33 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             let html = '';
             notifications.forEach(n => {
                 let icon = '<i data-lucide="bell" class="lucide-sm"></i>';
-                if (n.type === 'booking') icon = '<i data-lucide="calendar" class="lucide-sm"></i>';
-                else if (n.type === 'session_update') icon = '<i data-lucide="message-square" class="lucide-sm"></i>';
-                else if (n.type === 'loan_default') icon = '<i data-lucide="alert-triangle" class="lucide-sm"></i>';
-                else if (n.type === 'loan_repaid') icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
+                let link = '#';
+                
+                if (n.type === 'booking' || n.type === 'session_update') {
+                    if (n.type === 'booking') icon = '<i data-lucide="calendar" class="lucide-sm"></i>';
+                    if (n.type === 'session_update') icon = '<i data-lucide="message-square" class="lucide-sm"></i>';
+                    
+                    let filter = '';
+                    let msgLower = n.message.toLowerCase();
+                    if (msgLower.includes('completed')) filter = '?filter=completed';
+                    else if (msgLower.includes('dispute')) filter = '?filter=disputed';
+                    else if (msgLower.includes('review')) filter = '?filter=under-review';
+                    else if (msgLower.includes('cancel')) filter = '?filter=cancelled';
+                    
+                    link = '../pages/sessions.php' + filter;
+                } else if (n.type === 'loan_default' || n.type === 'loan_repaid') {
+                    if (n.type === 'loan_default') icon = '<i data-lucide="alert-triangle" class="lucide-sm"></i>';
+                    if (n.type === 'loan_repaid') icon = '<i data-lucide="check-circle" class="lucide-sm"></i>';
+                    link = '../pages/wallet.php';
+                } else if (n.type === 'system') {
+                    if (n.message.toLowerCase().includes('task')) {
+                        icon = '<i data-lucide="clipboard-list" class="lucide-sm"></i>';
+                        link = '../pages/community_tasks.php';
+                    }
+                }
 
                 html += `
-                    <div class="notif-item" data-id="${n.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; gap: 10px; transition: var(--transition); background: transparent;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                    <div class="notif-item" data-id="${n.id}" data-link="${link}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; gap: 10px; transition: var(--transition); background: transparent;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
                         <span style="font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;">${icon}</span>
                         <div style="flex-grow: 1; min-width: 0;">
                             <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem; line-height: 1.4; word-wrap: break-word;">${n.message}</p>
@@ -377,7 +398,11 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             if (window.lucide) lucide.createIcons();
         }
 
-        function markAsRead(notifId, element) {
+        function markAsRead(notifId, element, link = null) {
+            if (link && link !== '#') {
+                element.style.opacity = '0.5';
+            }
+            
             fetch('../api/notifications.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -386,14 +411,23 @@ if (isset($conn) && $user_id > 0 && !$is_admin) {
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
-                    element.style.opacity = '0.5';
-                    setTimeout(() => {
-                        element.remove();
-                        fetchNotifications();
-                    }, 300);
+                    if (link && link !== '#') {
+                        window.location.href = link;
+                    } else {
+                        element.style.opacity = '0.5';
+                        setTimeout(() => {
+                            element.remove();
+                            fetchNotifications();
+                        }, 300);
+                    }
                 }
             })
-            .catch(err => console.error('Error marking notification read:', err));
+            .catch(err => {
+                console.error('Error marking notification read:', err);
+                if (link && link !== '#') {
+                    window.location.href = link;
+                }
+            });
         }
 
         function markAllRead() {
